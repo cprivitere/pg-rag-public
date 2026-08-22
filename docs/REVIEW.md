@@ -150,26 +150,25 @@ bare score — and nomic's `doc_prefix` was missing (0.9437 → restored to
 
 **Fix / rule:** prefixes are per-model card facts — read them from the model's
 HF card, never borrow across families, and re-audit the whole `BAKEOFF_CANDIDATES`
-list when touching one (a half-applied fix is as confounded as a wrong one).
++
+## Addendum (2026-08-22) — production embed switched to bge-small-f16
 ## Addendum (2026-08-22) — production embed switched to bge-small-f16
 
-Wired the bakeoff winner into the pipeline. Live-validation before wiring
-found bge-small's token ceiling is **hard at 512**: llama-server rejects
-inputs >512 tokens with HTTP 400, and sweeping `-c` 512..4096 / `-b`
-512..16384 / `-ub` 512..8192 changed nothing (unlike mxbai, no server flag
-expands the window). The live corpus has 528 docs (0.2%) over that limit
-(computed skill profiles up to 2071 tokens) — embedding them raw would have
-crashed `build-index` (embed_batch only caught Connection/Timeout, not the
-400). Fix: `llama_embeddings.embed_batch` clips inputs to
-`MAX_EMBED_CHARS=2000` (≈400 tokens at the measured ~4.9 chars/token) with a
-shrink-and-retry on residual 400s; the server runs `--pooling cls` (mxbai's
-re-embed was required because `embedding_hash` is content-based (a model
-switch is invisible to the incremental indexer). The index path embeds docs
-bare (`build_index` → `embed_batch`); the **query** path applies bge-small's
-`Represent this sentence for searching relevant passages: ` prompt via
-`embed_text` — the same query_prefix/doc_prefix split the bakeoff validated
-(0.9028 bare → 0.9875 with the query prompt). Tradeoff: the longest 0.2% of
-docs are indexed by their first ~400 tokens.
+Production embed moved from mxbai-xsmall to bge-small-f16 (bakeoff winner,
+0.9875). Two findings drive the record; the how lives in code, not here:
+- **Live-validation found bge-small's token ceiling is hard at 512** — llama-server
+  rejects anything above with HTTP 400, and no `-c`/`-b`/`-ub` sweep raises it
+  (unlike mxbai's 4096 ctx). 528 live docs (0.2%; computed skill profiles to
+  2071 tokens) exceed it, so raw embedding would have crashed `build-index`.
+- **Code review caught the query embed path first shipped without the model's
+  query prompt**, silently running the bare ~0.90 config instead of the 0.9875
+  winner.
+
+The fix — `MAX_EMBED_CHARS` clip + per-text shrink, `QUERY_PREFIX` on queries
+only (docs bare), `--pooling cls` at `-c 512`, and the mandatory full re-embed
+(`embedding_hash` is content-based) — is owned by `llama_embeddings.py` and
+AGENTS.md, not restated here. Tradeoff: the longest 0.2% of docs are indexed
+by their first ~400 tokens.
 
 ## Verdict
 
