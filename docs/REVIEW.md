@@ -163,12 +163,13 @@ crashed `build-index` (embed_batch only caught Connection/Timeout, not the
 400). Fix: `llama_embeddings.embed_batch` clips inputs to
 `MAX_EMBED_CHARS=2000` (≈400 tokens at the measured ~4.9 chars/token) with a
 shrink-and-retry on residual 400s; the server runs `--pooling cls` (mxbai's
-`mean` would not reproduce the bakeoff result) at `-c 512`; and a full
 re-embed was required because `embedding_hash` is content-based (a model
-switch is invisible to the incremental indexer). Tradeoff: the longest 0.2%
-of docs are indexed by their first ~400 tokens.
-
-## Verdict
+switch is invisible to the incremental indexer). The index path embeds docs
+bare (`build_index` → `embed_batch`); the **query** path applies bge-small's
+`Represent this sentence for searching relevant passages: ` prompt via
+`embed_text` — the same query_prefix/doc_prefix split the bakeoff validated
+(0.9028 bare → 0.9875 with the query prompt). Tradeoff: the longest 0.2% of
+docs are indexed by their first ~400 tokens.
 
 ## Verdict
 
