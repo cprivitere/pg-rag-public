@@ -3,9 +3,10 @@
 Contract (see scripts/bakeoff_corpus.py): the corpus is cluster-sampled — docs
 are grouped into entity clusters (same case-normalized metadata.name across the
 cross-source tables + multi-chunk page families), whole clusters are selected
-(type-stratified, seeded, no table > cap_share), and each query's golds are its
-whole cluster (by construction present in the corpus). base_key strips the
-_chunk_N suffix. golds are never empty.
+(type-stratified, seeded, no table > cap_share), each query's golds are its
+whole cluster (by construction present in the corpus), and a hard tier targets
+one specific field-bearing doc. base_key strips the _chunk_N suffix. golds are
+never empty.
 """
 
 from scripts.bakeoff_corpus import (
@@ -44,7 +45,6 @@ def test_base_key():
     assert base_key("recipe_1") == "recipe_1"
 
 
-
 def test_build_clusters_hybrid_gold():
     """Entity clusters link same-name docs across tables AND multi-chunk pages."""
     docs = make_docs()
@@ -73,14 +73,45 @@ def test_build_queries_has_expected_fields_and_golds_in_corpus():
     by_id = {d["id"]: d for d in docs}
     clusters, _ = build_clusters(docs, by_id)
     chosen_cids = pick_clusters(clusters, by_id, 25)
-    queries = build_queries(docs, clusters, chosen_cids, n=5)
-    assert len(queries) >= 5
-    corpus_ids = ids(docs)  # docs are all pipelines' corpus input in this unit
+    queries = build_queries(docs, clusters, chosen_cids, n=8)
+    assert len(queries) >= 8
+    corpus_ids = ids(docs)
     for q in queries:
         assert "id" in q and "text" in q
         assert "expected_doc_ids" in q
         assert len(q["expected_doc_ids"]) > 0               # golds never empty
         for g in q["expected_doc_ids"]:
             assert g in corpus_ids                          # gold is retrievable
-    # The wiki page cluster yields a multi-gold query.
+    # The wiki page / cross-linked clusters yield multi-gold queries.
     assert any(len(q["expected_doc_ids"]) >= 2 for q in queries)
+
+
+def test_hard_queries_single_specific_gold():
+    """Hard (needle) tier: gold is ONE specific doc that carries the structured
+    fact being asked (skill_level_req in its text), not the whole entity cluster.
+    The question must surface that doc, which is what gives MRR/hit range."""
+    docs = []
+    for i in range(4):   # recipes: R1/R3 carry a skill_level_req in their text
+        req = "16" if i % 2 == 1 else None
+        text = f"Recipe R{i} Required Skill Level: 16" if req else f"Recipe R{i} desc"
+        docs.append({"id": f"recipe_R{i}", "type": "recipe", "text": text,
+                     "metadata": {"name": f"R{i}",
+                                  **({"skill_level_req": req} if req else {})}})
+    for i in range(4):
+        docs.append({"id": f"item_I{i}", "type": "item", "text": f"item I{i} value",
+                     "metadata": {"name": f"I{i}"}})
+    by_id = {d["id"]: d for d in docs}
+    clusters, _ = build_clusters(docs, by_id)
+    chosen = pick_clusters(clusters, by_id, 20)
+    queries = build_queries(docs, clusters, chosen, n=12)
+    hard = [q for q in queries if q["id"].startswith("q_hard_")]
+    assert hard                                         # hard tier is produced
+    for q in hard:
+        assert len(q["expected_doc_ids"]) == 1          # single specific gold
+        gold = by_id[q["expected_doc_ids"][0]]
+        assert gold["type"] == "recipe"
+        assert "skill_level_req" in gold["metadata"]    # gold carries the fact
+        assert gold["metadata"]["skill_level_req"] in gold["text"]  # retrievable
+        assert q["expected_doc_ids"][0] in ids(docs)    # gold is in the corpus
+        assert "skill level" in q["text"].lower()       # question targets the fact
+        assert q["expected_doc_ids"][0] in ("recipe_R1", "recipe_R3")  # fielded only

@@ -17,8 +17,12 @@ to 1 and MRR/NDCG/Recall degenerate. Instead:
   per-table doc budget (no table may exceed cap_share of the corpus) for a
   representative spread, and force one rich cluster per interesting query type
   so every query type is covered. Deterministic via SEED.
-- Queries: one per interesting type + fills, to N_QUERIES. Each query's golds =
-  its whole cluster, so most are multi-gold.
+- A "needle" (hard) tier of HARD_N single-gold queries: the gold is one specific
+  doc carrying a distinguishing structured fact (skill_level_req / value / skill
+  / location), with same-name siblings as in-corpus distractors, so MRR/hit@k
+  keep dynamic range instead of saturating at the entity-cluster ceiling.
+- The corpus carries a fingerprint (gold stats, type distribution, content
+  hash) so a changed/regenerated run is detectable.
 - The corpus carries a fingerprint (gold stats, type distribution, content
   hash) so a changed/regenerated run is detectable.
 
@@ -38,11 +42,25 @@ DOCS_PATH = DATA / "documents.json"
 OUT_PATH = DATA / "bakeoff_corpus.json"
 
 TARGET = 500            # corpus docs (golds are by-construction present)
-N_QUERIES = 24           # evaluation queries
+N_QUERIES = 24          # evaluation queries
+HARD_N = 6              # of the queries: single-gold "needle" tier (MRR range)
 SEED = 42
 CAP_SHARE = 0.25        # no single table's docs >25% of the corpus sample
 AMBIG_CAP = 30          # name with more entity-table matches: too generic to group
 INTERESTING = ("recipe", "item", "wiki", "ability", "quest", "skillprofile", "effect")
+# Hard-query templates: (type, metadata field, question). The gold is the ONE
+# doc of that type whose text contains the field value; same-name siblings in
+# the corpus act as distractors, restoring MRR/hit-range that the multi-gold
+# entity clusters saturate. Field must appear in the doc text (verified) so the
+# gold is retrievable.
+HARD_TEMPLATES = [
+    ("recipe", "skill_level_req", "What skill level is required to craft {name}?"),
+    ("item", "value", "What is the buy value of the item {name}?"),
+    ("ability", "skill", "Which skill does the {name} ability belong to?"),
+    ("quest", "location", "Where does the quest {name} take place?"),
+    ("ability", "damage_type", "What damage type is the {name} ability?"),
+    ("recipe", "skill", "What skill is used to craft {name}?"),
+]
 # Tables whose same-name records are plausibly the same entity (cross-source link).
 CROSS_TABLES = {
     "item", "recipe", "quest", "ability", "effect", "skill",
@@ -196,16 +214,35 @@ def build_queries(docs, clusters, chosen_cids, n=N_QUERIES):
         return TYPE_TEMPLATES[t].format(name=doc_name(doc))
 
     queries, used = [], set()
-    # one query per interesting type: richest chosen cluster containing that type
-    for t in INTERESTING:
+    # Hard "needle" tier: single-gold queries whose gold is a specific doc that
+    # carries a distinguishing structured fact (skill_level_req / value / skill /
+    # location ...), while same-name siblings are in-corpus distractors. This
+    # restores MRR/hit@k dynamic range the multi-gold clusters saturate.
+    hard_added = 0
+    for t, field, tmpl in HARD_TEMPLATES:
+        if hard_added >= HARD_N or len(queries) >= n:
+            break
+        gold = None
         for c in ordered:
-            ids = clusters[c]
-            if any(by_id[i]["type"] == t for i in ids):
-                queries.append({"id": f"q_{t}_{len(queries)}",
-                                "text": q_text(t, anchor_of_type(ids, t)),
-                                "expected_doc_ids": list(ids)})
-                used.update(ids)
+            for i in clusters[c]:
+                d = by_id[i]
+                if d["type"] != t or i in used:
+                    continue
+                v = (d.get("metadata", {}) or {}).get(field)
+                if v is None or v == "":
+                    continue
+                if str(v).lower() in (d.get("text", "") or "").lower():
+                    gold = i
+                    break
+            if gold is not None:
                 break
+        if gold is None:
+            continue
+        queries.append({"id": f"q_hard_{hard_added}",
+                        "text": tmpl.format(name=doc_name(by_id[gold])),
+                        "expected_doc_ids": [gold]})
+        used.add(gold)
+        hard_added += 1
     # fills from remaining chosen clusters
     for c in ordered:
         if len(queries) >= n:
@@ -239,8 +276,9 @@ def fingerprint(corpus):
         "n_queries": len(rels),
         "golds_per_query_mean": round(sum(rels) / len(rels), 2) if rels else 0.0,
         "golds_per_query_min": min(rels) if rels else 0,
-        "golds_per_query_max": max(rels) if rels else 0,
         "multi_gold_queries": sum(1 for r in rels if r > 1),
+        "hard_queries": sum(1 for q in corpus["queries"] if q["id"].startswith("q_hard_")),
+        "hard_queries": sum(1 for q in corpus["queries"] if q["id"].startswith("q_hard_")),
         "corpus_type_dist": dict(sorted(type_dist.items())),
         "content_hash": hashlib.sha256(blob).hexdigest()[:12],
     }
