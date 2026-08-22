@@ -491,8 +491,9 @@ def run_bakeoff(args):
     # Surface the corpus fingerprint so a changed/regenerated corpus is
     # detectable and runs are comparable (see bakeoff_corpus.py).
     fp = corpus.get("fingerprint", {})
+    for k in ("n_docs", "n_queries", "seed", "golds_per_query_mean",
+              "golds_per_query_min", "golds_per_query_max",
               "multi_gold_queries", "hard_queries", "content_hash"):
-              "multi_gold_queries", "content_hash"):
         if k in fp:
             results[k] = fp[k]
     sys.stderr.write(f"  corpus fingerprint: mean {fp.get('golds_per_query_mean')} "
