@@ -141,11 +141,12 @@ The Aug 22 "prefix fairness" pass (Tier 0) set `mxbai-xsmall` to nomic's
 instruction-tuned. Card verification refuted that: mxbai-embed-**xsmall** is a
 bare, pooled (mean) model — `Represent this sentence for searching relevant
 passages: ` belongs to mxbai-embed-**large** only. Measured on the 40-query
-corpus, the nomic prefix cost mxbai −0.15 MRR (0.7744 vs 0.9250 bare). A
-full-list review then caught two half-applied prefixes in
-`BAKEOFF_CANDIDATES`: mxbai's `doc_prefix` still carried `search_document:`
-(query-bare/doc-prefixed → measured 0.9250, true bare 0.9042), and nomic's
-`doc_prefix` was missing (0.9437 → restored to 0.9563 with `search_document:`).
+corpus, applying nomic's two prefixes (0.7744) cost mxbai ~0.13 MRR over true
+bare (0.9042). A full-list review then caught two half-applied prefixes in
+`BAKEOFF_CANDIDATES`: mxbai's `doc_prefix` still carried `search_document:` —
+query-bare / doc-prefixed, an intermediate state measuring 0.9250, not the
+bare score — and nomic's `doc_prefix` was missing (0.9437 → restored to
+0.9563 with `search_document:`).
 
 **Fix / rule:** prefixes are per-model card facts — read them from the model's
 HF card, never borrow across families, and re-audit the whole `BAKEOFF_CANDIDATES`
