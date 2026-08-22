@@ -52,6 +52,14 @@ def _get_existing_dim(collection):
 
 
 def build_index(documents=None, chroma_path="data/chroma", source=None):
+    """Incrementally reconcile the Chroma "project_gorgon" collection with
+    ``documents`` (default: load_documents(), which refuses a stale
+    DOCUMENTS_VERSION). Validates the collection dim == EMBEDDING_DIM,
+    deletes removed ids (source-restricted for a partial rebuild when
+    ``source`` is given), and embeds only changed docs: metadata-only changes
+    go through collection.update (no re-embed), unchanged docs are skipped.
+    Batches embedding at EMBED_BATCH_SIZE and upserts/metadata updates at
+    BATCH_SIZE."""
     if documents is None:
         documents = load_documents()
 

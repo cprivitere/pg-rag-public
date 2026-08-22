@@ -192,6 +192,8 @@ def _apply_name_promotion(query, pool_ids, pool_docs, pool_metas, pool_dists,
 
 
 def _term_overlap(query, document):
+    """Fraction of query terms (lowercased, whitespace-split) that appear as
+    substrings in the document text; 0.0 for an empty query."""
     query_terms = set(query.lower().split())
     if not query_terms:
         return 0.0
@@ -201,6 +203,9 @@ def _term_overlap(query, document):
 
 
 def _rerank(query, ids, documents, metadatas, distances, count):
+    """Pure lexical fallback re-ranker (no server): score each doc as
+    1/(rank+1) + _term_overlap(query, doc), sort descending, return the top
+    ``count`` quads."""
     scored = []
     for rank, (doc_id, doc, meta, dist) in enumerate(
         zip(ids, documents, metadatas, distances)
@@ -274,6 +279,11 @@ def _where_matches(metadata, clause):
 
 def _hybrid_fuse(dense_ids, dense_texts, dense_metadatas, dense_distances,
                   bm25_ids, all_docs, count):
+    """RRF-fuse the dense and BM25 rank lists (RRF_K=60), then apply the
+    tsys_power_* caps (per-base chunk members, distinct-base origins) so a
+    treasure-suffix mechanics swarm cannot crowd unrelated targets out of the
+    rerank window. Returns the top ``count`` (ids, texts, metas, dists);
+    BM25-only docs get dist 0.0."""
     dense_info = {}
     for rank, (doc_id, text, meta, dist) in enumerate(
         zip(dense_ids, dense_texts, dense_metadatas, dense_distances)
@@ -344,6 +354,13 @@ def _hybrid_fuse(dense_ids, dense_texts, dense_metadatas, dense_distances,
 
 
 def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=True, hybrid=False, query_type="general", trace=None):
+    """Run the retrieval stage: spell-correct, embed + query Chroma (count
+    effective = 20 for comparison, else ``count or 3``), optionally RRF-fuse BM25
+    (_hybrid_fuse) and inject/promote exact-name entities, apply post-fusion
+    metadata/token filters (BM25 bypasses Chroma's where), then cross-encode
+    via :8082 with lexical fallback. Returns the Chroma results dict
+    (ids/documents/metadatas/distances + rerank_used); appends a per-stage
+    id list to ``trace`` when given."""
     raw_question = question
     question = correct_query(question)
     client = chromadb.PersistentClient(

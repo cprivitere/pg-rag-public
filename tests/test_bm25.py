@@ -1,3 +1,7 @@
+"""Tests BM25 ranking, the hybrid dense+BM25 fusion (_hybrid_fuse) and
+routing, and the HYBRID_MULTIPLIER/RRF_K constants and result-count choices in
+pgrag.rag.retriever.retrieve."""
+
 from unittest.mock import patch, MagicMock, ANY
 
 from pgrag.rag.bm25 import BM25
