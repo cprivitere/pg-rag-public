@@ -131,7 +131,7 @@ alias = "bk"
 # Debug/foreground commands
 [tasks."debug-embed"]
 description = "Start embedding server in foreground (debug)"
-run = "llama-server -hf twine-network/mxbai-embed-xsmall-v1-Q8_0-GGUF:Q8_0 --host 0.0.0.0 --port 8081 --embedding --pooling mean -ngl 99 --ubatch-size 8192 -np 1 -c 4096"
+run = "llama-server -hf unsloth/bge-small-en-v1.5-GGUF:f16 --host 0.0.0.0 --port 8081 --embedding --pooling cls -ngl 99 --ubatch-size 8192 -np 1 -c 512"
 alias = "dse"
 
 # --- LLM server ---

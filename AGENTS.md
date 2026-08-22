@@ -97,7 +97,7 @@ mise drift                        # check docs/skills against the repo (aliases:
 - **Local services** (running on Windows host):
   | svc | port | model / note |
   |-----|------|--------------|
-  | Embeddings | 8081 | `mxbai-xsmall` Q8 (`/embed` + `/batch`) — needed for Q&A/eval |
+  | Embeddings | 8081 | `bge-small-en-v1.5` f16 (cls pooling, hard 512-token input cap — `llama_embeddings.MAX_EMBED_CHARS`) — needed for Q&A/eval |
   | LLM | 8080 | `gemma-4-26B` — RAG Q&A; **draft model OOMs if already running → `mise down` first** |
   | Reranker | 8082 | `bge-reranker-v2-m3`, optional, lexical fallback |
   | OpenWebUI | 3000 | `../mywebui` |

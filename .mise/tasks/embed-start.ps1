@@ -18,7 +18,7 @@ if ($existing) {
 
 $exe = 'llama-server'
 $logFile = Join-Path $logDir 'embed.log'
-$serverArgs = @('-hf','twine-network/mxbai-embed-xsmall-v1-Q8_0-GGUF:Q8_0','--host','0.0.0.0','--port','8081','--embedding','--pooling','mean','-ngl','99','-b','4096','--ubatch-size','4096','-np','1','-c','4096',"--log-file","$logFile")
+$serverArgs = @('-hf','unsloth/bge-small-en-v1.5-GGUF:f16','--host','0.0.0.0','--port','8081','--embedding','--pooling','cls','-ngl','99','-b','4096','--ubatch-size','4096','-np','1','-c','512',"--log-file","$logFile")
 
 Start-Process -FilePath $exe -ArgumentList $serverArgs -WindowStyle Hidden
 

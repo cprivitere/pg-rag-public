@@ -151,9 +151,24 @@ bare score — and nomic's `doc_prefix` was missing (0.9437 → restored to
 **Fix / rule:** prefixes are per-model card facts — read them from the model's
 HF card, never borrow across families, and re-audit the whole `BAKEOFF_CANDIDATES`
 list when touching one (a half-applied fix is as confounded as a wrong one).
-Winner after correction: `bge-small-f16` (0.9875), whose
-`Represent this sentence for searching relevant passages: ` query prefix
-(docs bare) the BGE card explicitly recommends for short-query retrieval.
+## Addendum (2026-08-22) — production embed switched to bge-small-f16
+
+Wired the bakeoff winner into the pipeline. Live-validation before wiring
+found bge-small's token ceiling is **hard at 512**: llama-server rejects
+inputs >512 tokens with HTTP 400, and sweeping `-c` 512..4096 / `-b`
+512..16384 / `-ub` 512..8192 changed nothing (unlike mxbai, no server flag
+expands the window). The live corpus has 528 docs (0.2%) over that limit
+(computed skill profiles up to 2071 tokens) — embedding them raw would have
+crashed `build-index` (embed_batch only caught Connection/Timeout, not the
+400). Fix: `llama_embeddings.embed_batch` clips inputs to
+`MAX_EMBED_CHARS=2000` (≈400 tokens at the measured ~4.9 chars/token) with a
+shrink-and-retry on residual 400s; the server runs `--pooling cls` (mxbai's
+`mean` would not reproduce the bakeoff result) at `-c 512`; and a full
+re-embed was required because `embedding_hash` is content-based (a model
+switch is invisible to the incremental indexer). Tradeoff: the longest 0.2%
+of docs are indexed by their first ~400 tokens.
+
+## Verdict
 
 ## Verdict
 

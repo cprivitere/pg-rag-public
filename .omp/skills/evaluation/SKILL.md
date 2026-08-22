@@ -85,10 +85,12 @@ Each file:
   + `title: none | text: `; jina-v5-retrieval `Query:`/`Document:`; nomic
   `search_query:`/`search_document:` (both required); bge-small-en-v1.5
   `Represent this sentence for searching relevant passages: ` on queries
-  only (docs bare); bge-m3 / MiniLM-L6 / **mxbai-xsmall** embed bare.
-  When adding or changing a candidate, verify the prompt against the model's
-  HF card — a prefix borrowed from another family is a confound. `mxbai-xsmall`
-  is the production embed; bare is its card behavior, not an oversight.
+  only (docs bare); bge-m3 / MiniLM-L6 / mxbai-xsmall embed bare. When adding
+  or changing a candidate, verify the prompt against the model's HF card — a
+  prefix borrowed from another family is a confound (`mxbai-xsmall`'s bare is
+  its card behavior, not an oversight). **Production embed is bge-small-f16**
+  (wired 2026-08-22): `Represent this sentence...` query prefix, docs bare,
+  pooling `cls`, hard 512-token input cap (`llama_embeddings.MAX_EMBED_CHARS`).
 
 ## Two layers of measurement
 

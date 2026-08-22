@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 
 LLM_MODEL = "unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL"
 RERANK_MODEL = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
-EMBED_MODEL = "twine-network/mxbai-embed-xsmall-v1-Q8_0-GGUF:Q8_0"
+EMBED_MODEL = "unsloth/bge-small-en-v1.5-GGUF:f16"
 
 PORTS = {"embed": 8084, "llm": 8085, "reranker": 8086}
 
