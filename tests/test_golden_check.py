@@ -1,3 +1,7 @@
+"""Tests scripts.golden_check.check_golden against the golden JSON files in
+GOLDEN_DIR; requires the LLM (:8080) and embedding (:8081) servers and retries
+sampled LLM answers to damp nondeterminism."""
+
 import json
 from pathlib import Path
 

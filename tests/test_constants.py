@@ -1,3 +1,7 @@
+"""Asserts versioned build/pipeline invariants by importing pgrag.config and
+build constants and parsing source: embedding dim, context budget, TOP_K,
+chroma path/collection names, embed/upsert batch sizes, and pipeline call order."""
+
 import ast
 import sys
 from pathlib import Path

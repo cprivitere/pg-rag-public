@@ -1,3 +1,8 @@
+"""Tests pgrag.vectorstore.build_index.build_index end-to-end against a temp
+Chroma collection: correct embedding dims, purging deleted docs, metadata-only
+re-image of reembeds, dimension-mismatch aborts, per-batch interleaving,
+interruption resume, and partial --source rebuilds."""
+
 import tempfile
 from pathlib import Path
 from unittest.mock import patch

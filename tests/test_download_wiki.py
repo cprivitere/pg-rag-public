@@ -1,3 +1,12 @@
+"""Tests pgrag.loaders.download_wiki sync behavior.
+
+Covers V43 batch splitting (≤50 titles per API call), skip/base delay use,
+redirect and negative pageid treated as missing, fetch/category failure
+aborts, V45/V48 timestamp completeness with tombstones, V51 stable
+deterministic filenames, atomic metadata saves, stale/orphan purge, and
+skip-vs-download page logic.
+"""
+
 import json
 import time
 from pathlib import Path

@@ -1,3 +1,6 @@
+"""Tests that pgrag.rag.retriever.retrieve corrects typos in query text before
+embedding, while leaving already-correct queries unaltered."""
+
 import types
 
 import pytest

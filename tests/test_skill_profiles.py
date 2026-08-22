@@ -1,3 +1,7 @@
+"""Tests pgrag.documents.skill_profiles.build_skill_profile_documents: per-skill
+documents assembled from abilities/advancement, recipes, quest values, train and
+trainer sections, empty-section omission, and deterministic output across builds."""
+
 import pytest
 from pgrag.documents.skill_profiles import build_skill_profile_documents
 

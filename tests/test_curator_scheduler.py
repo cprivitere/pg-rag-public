@@ -1,3 +1,6 @@
+"""Tests scripts.curator_scheduler.run_curator_with_scheduler ordering: the
+build-documents subprocess must run before build-index (V25)."""
+
 import sys
 from unittest.mock import MagicMock, patch
 

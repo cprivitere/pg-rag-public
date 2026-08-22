@@ -1,29 +1,24 @@
-"""Embedder subset eval (SPEC T86).
+"""Embedder bake-off eval.
 
-Deterministic 1.2k-doc subset + 13 sources-derived queries
-(data/eval_subset.json), MRR@10 / hit@3 / hit@5 / recall@10 per embedder
-vs jina baseline (:8081).
+Deterministic fat-doc corpus (data/bakeoff_corpus.json) scored in each
+model's own vector space: MRR@10 / hit@3 / hit@5 / recall@10 / NDCG@10 per
+candidate plus measured per-PID VRAM, ranked report
+(data/bakeoff_report.json).
 
 Run:
-  uv run python scripts/embed_eval.py --gen-subset   # (re)build subset
-  uv run python scripts/embed_eval.py                # jina baseline only
-  uv run python scripts/embed_eval.py --sweep        # + spawn candidates on :8085
+  uv run python scripts/embed_eval.py --bakeoff [--only <substring>]
 
-Candidate servers spawn like the VRAM probe: llama-server --embedding
---pooling mean (uniform naive pooling for every candidate) unless the
-candidate declares a `pooling` field (e.g. bge-m3/jina-v5 -> last).
-Baseline runs its production pooling (jina-v5 requires --pooling last).
-Docs truncated to 512 chars for uniformity across short-context models;
-pass --no-trunc to run at corpus chunk ceiling instead. Metrics computed
-in each model's own vector space (dims differ — no cross-model vectors).
+Candidates spawn like the VRAM probe: llama-server --embedding on :8085,
+pooling per candidate (uniform naive unless the candidate declares a `pooling`
+field, e.g. bge-m3/jina-v5 -> last). Docs truncated to 512 chars for
+uniformity across short-context models. Metrics computed in each model's own
+vector space (dims differ — no cross-model vectors).
 
-Writes: data/eval_subset.json, data/embed_eval.json
+Writes: data/bakeoff_report.json
 """
 import argparse
-import hashlib
 import json
 import math
-import random
 import re
 import subprocess
 import sys
@@ -31,49 +26,21 @@ import time
 from pathlib import Path
 
 try:
-    from scripts.embed_vram_probe import CANDIDATES, _url_args, get_base_url, get_per_pid_vram
+    from scripts.embed_vram_probe import get_per_pid_vram
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from scripts.embed_vram_probe import CANDIDATES, _url_args, get_base_url, get_per_pid_vram
+    from scripts.embed_vram_probe import get_per_pid_vram
 
 DATA = Path(__file__).resolve().parent.parent / "data"
-DOCS_PATH = DATA / "documents.json"
-SUBSET_PATH = DATA / "eval_subset.json"
-OUT_PATH = DATA / "embed_eval.json"
 
-SEED = 42
-TARGET = 1200
-N_QUERIES = 13
 TRUNC = 512
 BATCH = 32
 PORT = 8085
-HOST = "Scamper"
-BASELINE_URL = "http://localhost:8081/embedding"
-
-CHUNK_SUFFIX = re.compile(r"_chunk_\d+$")
-
-SLOTS = [
-    ("recipe", "How much XP does {name} give?"),
-    ("recipe", "What do I need to craft {name}?"),
-    ("item", "What does the item {name} do?"),
-    ("item", None),
-    ("ability", "What does the ability {name} do?"),
-    ("skillprofile", "Tell me everything about the {name} skill"),
-    ("quest", "How do I start the quest {name}?"),
-    ("wiki", "What does the wiki say about {title}?"),
-    ("effect", "What effect does {name} have?"),
-    ("tsys", "What does {name} grant?"),
-    ("attribute", "What does the stat {name} do?"),
-    ("itemuse", "What can {name} be used on?"),
-    ("source", "What do I learn from {name}?"),
-]
-
-JINA_CURRENT = "jina-v5-text-small (current)"
 
 BAKEOFF_CANDIDATES = [
     {
         "name": "embeddinggemma-300m-Q8",
-        "hf": "unsloth/embeddinggemma-300m-GGUF:Q8_0",
+        "hf": "unsloth/embeddinggemma-300M-GGUF:Q8_0",
         "pooling": "mean",
         "dims": 768,
         "ctx": 2048,
@@ -86,7 +53,7 @@ BAKEOFF_CANDIDATES = [
         "hf": "jinaai/jina-embeddings-v5-text-nano-retrieval-GGUF:Q8_0",
         "pooling": "last",
         "dims": 768,
-        "ctx": 8192,
+        "ctx": 4096,
         "query_prefix": "Query: ",
         "doc_prefix": "Document: ",
         "vram_mb": 233,
@@ -104,162 +71,84 @@ BAKEOFF_CANDIDATES = [
     {
         "name": "bge-small-Q8",
         "hf": "ggml-org/bge-small-en-v1.5-Q8_0-GGUF:Q8_0",
-        "pooling": "mean",
+        "pooling": "cls",
         "dims": 384,
         "ctx": 512,
-        "query_prefix": None,
+        "query_prefix": "Represent this sentence for searching relevant passages: ",
         "doc_prefix": None,
         "vram_mb": 37,
     },
+    {
+        "name": "bge-small-f16",
+        "hf": "unsloth/bge-small-en-v1.5-GGUF:f16",
+        "pooling": "cls",
+        "dims": 384,
+        "ctx": 512,
+        "query_prefix": "Represent this sentence for searching relevant passages: ",
+        "doc_prefix": None,
+        "vram_mb": 68,
+    },
+    {
+        "name": "mxbai-xsmall-Q8",
+        "hf": "twine-network/mxbai-embed-xsmall-v1-Q8_0-GGUF:Q8_0",
+        "pooling": "mean",
+        "dims": 384,
+        "ctx": 4096,
+        "query_prefix": None,
+        "doc_prefix": None,
+        "vram_mb": 31,
+    },
+    {
+        "name": "bge-m3-Q8",
+        "hf": "ggml-org/bge-m3-Q8_0-GGUF:Q8_0",
+        "pooling": "cls",
+        "dims": 1024,
+        "ctx": 4096,
+        "query_prefix": None,
+        "doc_prefix": None,
+        "vram_mb": 635,
+    },
+    {
+        "name": "bge-m3-Q4",
+        "hf": "gpustack/bge-m3-GGUF:Q4_K_M",
+        "pooling": "cls",
+        "dims": 1024,
+        "ctx": 4096,
+        "query_prefix": None,
+        "doc_prefix": None,
+        "vram_mb": 438,
+    },
+    {
+        "name": "jina-v5-small-retrieval-Q8",
+        "hf": "jinaai/jina-embeddings-v5-text-small-retrieval-GGUF:Q8_0",
+        "pooling": "last",
+        "dims": 1024,
+        "ctx": 4096,
+        "query_prefix": "Query: ",
+        "doc_prefix": "Document: ",
+        "vram_mb": 639,
+    },
+    {
+        "name": "nomic-embed-v1.5-Q8",
+        "hf": "nomic-ai/nomic-embed-text-v1.5-GGUF:Q8_0",
+        "pooling": "mean",
+        "dims": 768,
+        "ctx": 2048,
+        "query_prefix": "search_query: ",
+        "doc_prefix": "search_document: ",
+        "vram_mb": 146,
+    },
+    {
+        "name": "embeddinggemma-300m-qat-Q8",
+        "hf": "ggml-org/embeddinggemma-300m-qat-q8_0-GGUF:Q8_0",
+        "pooling": "mean",
+        "dims": 768,
+        "ctx": 2048,
+        "query_prefix": "task: search result | query: ",
+        "doc_prefix": "title: none | text: ",
+        "vram_mb": 329,
+    },
 ]
-
-
-def load_docs():
-    with open(DOCS_PATH, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def base_key(doc_id):
-    return CHUNK_SUFFIX.sub("", doc_id)
-
-
-def doc_name(doc):
-    meta = doc.get("metadata", {})
-    return meta.get("name") or base_key(doc["id"])
-
-
-def _type_budgets(counts, target):
-    weights = {t: (c ** 0.5) for t, c in counts.items()}
-    total_w = sum(weights.values())
-    budgets = {}
-    for t, w in weights.items():
-        b = max(3, int(target * w / total_w))
-        budgets[t] = min(counts[t], b)
-    remaining = target - sum(budgets.values())
-    assert remaining >= 0, (counts, budgets)
-    rng = random.Random(SEED)
-    order = [t for t, _ in sorted(counts.items(), key=lambda kv: kv[1])]
-    while remaining:
-        progressed = False
-        for t in order:
-            if remaining and budgets[t] < counts[t]:
-                budgets[t] += 1
-                remaining -= 1
-                progressed = True
-        if not progressed:
-            break
-    return budgets
-
-
-def _pick_doc(rng, ids_by_type, used, type_):
-    pool = [i for i in ids_by_type[type_] if i not in used]
-    if not pool:
-        return None
-    return rng.choice(pool)
-
-
-def _family_labels(subset_ids, doc_id):
-    key = base_key(doc_id)
-    return sorted(i for i in subset_ids if base_key(i) == key)
-
-
-def _produces_recipes(subset_docs_by_id, item_id, item_name):
-    if not item_name:
-        return []
-    found = []
-    for did, doc in subset_docs_by_id.items():
-        if doc["type"] != "recipe" or did == item_id:
-            continue
-        text = doc["text"]
-        tail = text.partition("Produces:")[2]
-        for line in tail.splitlines():
-            if line.startswith("-") and item_name.lower() in line.lower():
-                found.append(did)
-                break
-        if len(found) >= 5:
-            break
-    return sorted(found)
-
-
-def gen_subset(docs=None, target=TARGET):
-    if docs is None:
-        docs = load_docs()
-    docs = [d for d in docs if d.get("text", "").strip()]
-    target = min(target, len(docs))
-    counts = {}
-    ids_by_type = {}
-    for doc in docs:
-        t = doc["type"]
-        counts[t] = counts.get(t, 0) + 1
-        ids_by_type.setdefault(t, []).append(doc["id"])
-
-    budgets = _type_budgets(counts, target)
-    rng = random.Random(SEED)
-    order = {}
-    for t, ids in ids_by_type.items():
-        order[t] = rng.sample(ids, budgets[t]) if len(ids) > budgets[t] else list(ids)
-
-    subset_ids = [i for t in order for i in order[t]]
-    assert len(subset_ids) == sum(budgets.values())
-    assert len(set(subset_ids)) == len(subset_ids)
-    by_id = {d["id"]: d for d in docs}
-
-    docs_out = []
-    for did in subset_ids:
-        d = by_id[did]
-        docs_out.append({"id": did, "type": d["type"], "name": doc_name(d), "text": d["text"]})
-
-    queries = []
-    used = set()
-    attempts = 0
-    while len(queries) < N_QUERIES and attempts < 200:
-        attempts += 1
-        slot = SLOTS[len(queries)]
-        type_, template = slot
-        pick = _pick_doc(rng, order, used, type_)
-        if pick is None:
-            if len(queries) < N_QUERIES:
-                break
-        used.add(pick)
-        doc = by_id[pick]
-        name = doc_name(doc)
-        if type_ == "wiki":
-            title = base_key(doc["id"])
-            if title.startswith("wiki_"):
-                title = title[len("wiki_"):]
-            q = template.format(title=title.replace("_", " ").strip() or name)
-        elif template is None:
-            item_name = name
-            recipes = _produces_recipes({d["id"]: d for d in docs_out}, pick, item_name)
-            if recipes:
-                q = f"What recipes can produce {item_name}?"
-                labels = recipes + [pick]
-            else:
-                q = f"What does the item {name} do?"
-                labels = _family_labels(subset_ids, pick)
-        else:
-            q = template.format(name=name)
-            labels = _family_labels(subset_ids, pick)
-        if not labels:
-            continue
-        queries.append({"q": q, "relevant": sorted(labels)})
-
-    if len(queries) != N_QUERIES:
-        raise RuntimeError(f"gen failed: {len(queries)}/{N_QUERIES} queries")
-    for q in queries:
-        assert all(i in by_id for i in q["relevant"])
-    return {"docs": docs_out, "queries": queries}
-
-
-def save_subset(subset):
-    SUBSET_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = SUBSET_PATH.with_suffix(".tmp")
-    tmp.write_text(json.dumps(subset, indent=1, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(SUBSET_PATH)
-
-
-def load_subset():
-    return json.loads(SUBSET_PATH.read_text(encoding="utf-8"))
 
 
 def truncate(texts):
@@ -289,7 +178,7 @@ def _post_embed(texts, url):
     return vecs
 
 
-def embed_all(texts, url=BASELINE_URL, batch=BATCH, prefix=None):
+def embed_all(texts, url, batch=BATCH, prefix=None):
     vecs = []
     truncated = truncate(_prefix(texts, prefix))
     for i in range(0, len(truncated), batch):
@@ -390,55 +279,6 @@ def _kill_port(port):
         pass
 
 
-def resolve_base_url(host=HOST, port=PORT):
-    import socket
-
-    try:
-        addrs = socket.getaddrinfo(host, port, socket.AF_INET6, socket.SOCK_STREAM)
-        for res in addrs:
-            _af, _st, _p, _cn, sa = res
-            ip, _port, _flow, scope = sa
-            if scope:
-                return f"http://[{ip}%{scope}]:{port}"
-            return f"http://[{ip}]:{port}"
-    except Exception:
-        pass
-    return f"http://{host}:{port}"
-
-
-def spawn_candidate(cand, pooling="mean", ctx=4096):
-    log_file = DATA / f"embed_eval_{cand['name'].split()[0]}.log"
-    cmd = ["llama-server", *_url_args(cand["url"], cand["local"]),
-           "--host", HOST, "--port", str(PORT),
-           "--embedding", "--pooling", pooling, "-ngl", "99",
-           "-c", str(ctx), "-np", "1", "--ubatch-size", cand.get("ubatch", "512"),
-           "--log-file", str(log_file)]
-    sys.stderr.write(f"  spawning {cand['name']}...\n")
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    base_url = resolve_base_url()
-    try:
-        for _ in range(300):
-            time.sleep(1)
-            try:
-                if requests_health(base_url):
-                    return {"base_url": base_url, "proc": proc}
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return stop_candidate(cand)
-
-def stop_candidate(cand, proc=None):
-    if proc is not None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except Exception:
-            proc.kill()
-        time.sleep(2)
-    return {"name": cand["name"], "ok": False, "note": "start timeout"}
-
-
 def requests_health(base_url):
     import requests
 
@@ -461,30 +301,6 @@ def run_model(subset, url, doc_prefix=None, query_prefix=None):
 def label_indices(subset):
     idx = {d["id"]: i for i, d in enumerate(subset["docs"])}
     return [[idx[i] for i in q["relevant"]] for q in subset["queries"]]
-
-
-def with_deltas(cand_metrics, base):
-    out = dict(cand_metrics)
-    for k, v in base.items():
-        out[f"delta_{k}"] = round(cand_metrics[k] - v, 4)
-    return out
-
-
-def evaluate_candidate(cand, subset, pooling="mean", ctx=4096, doc_prefix=None, query_prefix=None):
-    info = spawn_candidate(cand, pooling=pooling, ctx=ctx)
-    if not info.get("ok", True):
-        return {"ok": False, "note": info.get("note")}
-    proc = info["proc"]
-    try:
-        m = run_model(subset, info["base_url"], doc_prefix=doc_prefix, query_prefix=query_prefix)
-        return m
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except Exception:
-            proc.kill()
-        time.sleep(2)
 
 
 def run_bakeoff(args):
@@ -630,101 +446,14 @@ def parse_server_log(log_path):
         return f"log parse error: {e}"
 
 
-def get_gguf_size_mb(cand):
-    """Get GGUF file size in MB. Check local HF cache first, fall back to estimate."""
-    import os
-    # Try local HF cache
-    cache_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
-    # Search for the file in cache
-    hf_repo = cand.get("gghf_repo", "")
-    hf_file = cand.get("gghf_file", "")
-    if hf_repo and hf_file:
-        # Try common HF cache paths
-        for snapshots_dir in [Path(cache_home) / "hub" / f"models--{hf_repo.replace('/', '--')}" / "snapshots"]:
-            if snapshots_dir.exists():
-                for snap in snapshots_dir.iterdir():
-                    fpath = snap / hf_file
-                    if fpath.exists():
-                        return round(fpath.stat().st_size / (1024 * 1024), 1)
-    # Fallback: return None (user can check HF card)
-    return None
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Embedder subset eval (SPEC T86)")
-    parser.add_argument("--gen-subset", action="store_true", help="regenerate eval_subset.json")
-    parser.add_argument("--sweep", action="store_true", help="spawn + evaluate candidate embedders")
-    parser.add_argument("--only", default=None, help="run only this candidate (substring match)")
-    parser.add_argument("--mxbai-prefix", action="store_true",
-                        help="instruct prefixes (search_document:/search_query:) for mxbai candidates")
-    parser.add_argument("--no-trunc", action="store_true",
-                        help="do not truncate docs to 512 chars (corpus chunk ceiling, SPEC B29)")
-    parser.add_argument("--ctx", type=int, default=4096,
-                        help="server -c context size for ALL models (uniform token ceiling)")
-    parser.add_argument("--trunc-chars", type=int, default=None,
-                        help="truncate docs to N chars client-side (safe under ctx; server 400s on over-ctx)")
+    parser = argparse.ArgumentParser(description="Embedder bake-off eval")
     parser.add_argument("--bakeoff", action="store_true",
-                        help="run bake-off: fat-doc corpus, GGUF size as VRAM, ranked report")
+                        help="run bake-off: fat-doc corpus, measured per-PID VRAM, ranked report")
+    parser.add_argument("--only", default=None,
+                        help="run only this candidate (substring match)")
     args = parser.parse_args()
-
-    if args.no_trunc or args.trunc_chars is not None:
-        global TRUNC
-        TRUNC = None if args.no_trunc else args.trunc_chars
-
-    if args.bakeoff:
-        run_bakeoff(args)
-        return
-
-    if args.gen_subset or not SUBSET_PATH.exists():
-        sys.stderr.write("building subset...\n")
-        save_subset(gen_subset())
-    subset = load_subset()
-    sys.stderr.write(f"subset: {len(subset['docs'])} docs, {len(subset['queries'])} queries\n")
-
-    if not args.sweep:
-        base_url = BASELINE_URL
-        sys.stderr.write(f"baseline evaluate at {base_url}...\n")
-        baseline = run_model(subset, base_url)
-        print(json.dumps({"subset": {"docs": len(subset["docs"]), "queries": len(subset["queries"])},
-                          "baseline": baseline}, indent=2))
-        OUT_PATH.write_text(json.dumps(
-            {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-             "subset": {"docs": len(subset["docs"]), "queries": len(subset["queries"])},
-             "baseline": baseline}, indent=2), encoding="utf-8")
-        return
-
-    jina = next(c for c in CANDIDATES if c["name"] == JINA_CURRENT)
-    sys.stderr.write(f"baseline (spawned jina, pooling last) on :{PORT}...\n")
-    baseline = evaluate_candidate(jina, subset, pooling="last", ctx=args.ctx)
-    if not isinstance(baseline, dict) or "ok" in baseline:
-        sys.stderr.write(f"baseline spawn failed: {baseline}\n")
-        return
-    results = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-               "subset": {"docs": len(subset["docs"]), "queries": len(subset["queries"])},
-               "baseline": baseline,
-               "candidates": {}}
-    only_list = [o.strip().lower() for o in (args.only or "").split(",") if o.strip()]
-    for cand in CANDIDATES:
-        if cand["name"] == JINA_CURRENT:
-            continue
-        if only_list and not any(o in cand["name"].lower() for o in only_list):
-            continue
-        qp = cand.get("query_prefix")
-        dp = cand.get("doc_prefix")
-        if args.mxbai_prefix and "mxbai" in cand["name"]:
-            qp = qp or "search_query: "
-            dp = dp or "search_document: "
-        m = evaluate_candidate(cand, subset, pooling=cand.get("pooling", "mean"),
-                               ctx=args.ctx, doc_prefix=dp, query_prefix=qp)
-        if not isinstance(m, dict) or "ok" in m:
-            sys.stderr.write(f"  {cand['name']}: FAILED {m}\n")
-            results["candidates"][cand["name"]] = m
-            continue
-        label = cand["name"] + (" (prefix)" if args.mxbai_prefix else "")
-        results["candidates"][label] = with_deltas(m, baseline)
-        sys.stderr.write(f"  {label}: {m}\n")
-    print(json.dumps(results, indent=2))
-    OUT_PATH.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    run_bakeoff(args)
 
 
 if __name__ == "__main__":

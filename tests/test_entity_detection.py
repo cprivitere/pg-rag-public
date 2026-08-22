@@ -1,3 +1,8 @@
+"""Tests pgrag.rag.query_classifier entity detection: classify_query routing
+to entity/general/comparison, find_entity (longest-name wins, word boundary,
+plural append, typo fallback, real alias/lorebook index), and find_entities
+greedy multi-entity resolution in query order."""
+
 import pytest
 
 from pgrag.rag.query_classifier import classify_query, find_entity, find_entities

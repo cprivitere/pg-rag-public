@@ -1,3 +1,7 @@
+"""Tests pgrag.rag.retriever.retrieve filter handling (default vs. source/table/
+composite where clauses and result counts) and pgrag.rag.pipeline.ask metadata-
+filter passthrough and source citation formatting."""
+
 from unittest.mock import patch, MagicMock
 
 from pgrag.rag.retriever import retrieve

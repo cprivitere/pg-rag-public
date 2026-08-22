@@ -1,3 +1,9 @@
+"""Tests pgrag.rag.retriever hybrid-stage helpers: _term_overlap scoring,
+_rerank count/term-match promotion, _hybrid_fuse tsys chunk-cluster and
+distinct-base capping, _tsys_base_id/_tsys_origin_id, _entity_name_match,
+_name_injection_ids longest-span injection, _is_fragment_id, and
+_apply_name_promotion."""
+
 from pgrag.rag.retriever import (
     _term_overlap,
     _rerank,

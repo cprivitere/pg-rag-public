@@ -1,3 +1,7 @@
+"""Tests pgrag.vectorstore.health_check.health_check exit codes: a healthy index
+exits 0, while count mismatches, orphaned/missing docs, embedding/metadata hash
+corruption, and dimension mismatches are reported as 1."""
+
 import json
 import tempfile
 from pathlib import Path

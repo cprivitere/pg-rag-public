@@ -1,3 +1,10 @@
+"""Tests pgrag.rag.entity_retrieval.build_entity_context.
+
+Covers dossier assembly order (coverage, rows, narrative), the leveling doc
+joining skill hubs gated on intent, facet type filters, budget caps, and wiki
+page linkage keyed on the entity_id, plus multi-entity dedup and tracing.
+"""
+
 import pytest
 
 from pgrag.rag import entity_retrieval as er

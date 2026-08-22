@@ -1,3 +1,9 @@
+"""Quality-contract tests for generated documents built from real CDN data.
+
+Covers document shape, text hygiene (taxonomy/wikicode residue), determinism
+and id uniqueness, chunk↔document coverage, and cross-source consistency.
+"""
+
 import re
 from pathlib import Path
 

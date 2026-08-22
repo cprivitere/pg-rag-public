@@ -1,3 +1,11 @@
+"""Contracts for build_summary_documents (CDN/computed per-skill summaries).
+
+Owns summary doc shape {id, type, text, metadata} and grouping/ranking for
+the computed-summary builder. The related gathering variant is covered in
+test_gathering_summaries.py; test_documents.py covers end-to-end
+build_documents() summary *supplementation* (CDN vs wiki precedence).
+"""
+
 from pgrag.documents.summaries import build_summary_documents
 
 
@@ -39,7 +47,7 @@ def test_ranks_by_level_descending():
     assert "Cheese A (10)" in lines[3]
 
 
-def test_summary_shape():
+def test_cdn_summary_shape():
     recipes = _make_recipes({
         "r1": {"Name": "Cheese A", "Skill": "Cheesemaking", "SkillLevelReq": 10},
     })

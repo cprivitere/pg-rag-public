@@ -1,3 +1,8 @@
+"""Tests pgrag.rag.query_classifier: classify_query routing (comparison /
+lookup / general / entity), and find_entity / find_entities hub resolution —
+longest-name-wins, strict whole-word matching, leveling-intent overrides,
+the NPC proper-noun case guard, and typo fallback via correct_query."""
+
 import pytest
 
 from pgrag.rag.query_classifier import classify_query, find_entities, find_entity

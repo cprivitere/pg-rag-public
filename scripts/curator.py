@@ -1,4 +1,6 @@
-"""Background curator agent — scan wiki for fragmented knowledge, create curated docs."""
+"""Heuristic curation: regex-scan wiki pages for fragmented topics and emit
+template curated docs. Deliberately NO LLM — deterministic and offline, so the
+curated docs are stable retrieval anchors that don't vary run-to-run."""
 
 from pathlib import Path
 from datetime import datetime
@@ -45,8 +47,13 @@ def scan_wiki_for_fragments():
 
 
 def create_curated_from_fragments(topic: str, fragments: list):
-    """Create a curated document from identified fragments."""
-    # This is a simplified version - in production, would use LLM
+    """Build a deterministic template doc for one fragment topic (no LLM).
+
+    Emits a `==Heading==` + "Auto-generated from N wiki sources" listing of up
+    to the first 5 matching file snippets. Deliberately not LLM-curated: the
+    output must be reproducible so the curator is offline-testable and the
+    curated docs are stable retrieval anchors.
+    """
     content = f"=={topic.replace('_', ' ').title()}==\n"
     content += f"Auto-generated from {len(fragments)} wiki sources.\n\n"
     

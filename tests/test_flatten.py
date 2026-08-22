@@ -1,3 +1,7 @@
+"""Tests pgrag.documents.builder document text generation: recipe XP/reward/
+dropoff fields, item equip/skill/effect/crafting fields, and churn/hash
+stability of the generated text."""
+
 from pgrag.documents.builder import build_item_documents, build_recipe_documents
 from pgrag.vectorstore.hashes import embedding_hash
 

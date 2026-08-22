@@ -1,3 +1,7 @@
+"""Tests the pgrag.rag.reranker_client.rerank_documents contract: truncation of
+long queries/documents, document-count capping, payload shape, response parsing
+and sorting, and RerankError on server errors or malformed payloads."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

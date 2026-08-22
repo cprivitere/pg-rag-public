@@ -1,3 +1,7 @@
+"""Tests query_classifier's entity-index cache: it invalidates when the
+underlying index file's mtime changes and serves cached lookups between
+calls."""
+
 import json
 import types
 

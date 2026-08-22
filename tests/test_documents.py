@@ -1,3 +1,13 @@
+"""Builder orchestration suite: every builder shape + build_documents() end-to-end.
+
+Covers build_{item,recipe,skill,quest,ability,npc,effect,lorebook,area,
+landmark,title,vault,ai,abilitykeyword,itemuse,xptable}_documents and the
+summary *supplementation* path (CDN-vs-wiki precedence). The per-builder
+whitebox suites live next door: test_summaries.py (computed summaries),
+test_gathering_summaries.py (gathering summaries), test_wiki_builder.py
+(wiki parser), test_skill_profiles.py, test_chunking.py.
+"""
+
 from unittest.mock import patch
 
 from pgrag.documents.builder import (

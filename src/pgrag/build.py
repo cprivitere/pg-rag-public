@@ -16,6 +16,10 @@ except (AttributeError, ValueError):
 
 
 def generate_documents() -> None:
+    """Build the full corpus: load CDN + wiki into a GameDatabase, run
+    build_documents(), atomically write data/documents.json (tmp +
+    os.replace), and stamp DOCUMENTS_VERSION_FILE so build-index can refuse a
+    stale generation. Prints the document count."""
     db = GameDatabase()
 
     load_database(db)

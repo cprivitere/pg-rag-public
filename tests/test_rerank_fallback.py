@@ -1,3 +1,7 @@
+"""Tests the pgrag.rag.retriever._rerank_or_cross_encoder fallback: reranker
+server failures fall back to lexical score order and are recorded in stats,
+while the cross-encoder path reorders results by reranker scores."""
+
 from pgrag.rag.retriever import _rerank_or_cross_encoder, _term_overlap
 from pgrag.rag import reranker_client
 

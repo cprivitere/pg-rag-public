@@ -1,3 +1,7 @@
+"""Tests entity_retrieval's cached document loading (_load_docs): it rebuilds
+the cache when the source file's mtime changes and serves the cached list
+between calls."""
+
 import json
 import types
 

@@ -1,3 +1,9 @@
+"""Tests pgrag.vectorstore.build_index and its hash helpers.
+
+Covers load_documents refusing a stale or missing DOCUMENTS_VERSION marker,
+embedding_hash vs metadata_hash change detection, and _get_existing_dim.
+"""
+
 from unittest.mock import MagicMock, patch
 
 from pgrag.vectorstore.hashes import embedding_hash, metadata_hash

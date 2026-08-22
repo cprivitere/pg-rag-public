@@ -1,3 +1,10 @@
+"""Tests pgrag.documents.wiki_builder.
+
+Covers _preserve_template_names keeping Item/NPC/Quest/Skill/Area/Recipe/
+LoreBook/Ability template names while other wikicode is stripped, and
+build_wiki_documents emitting row, coverage, and narrative records.
+"""
+
 from pgrag.documents.wiki_builder import build_wiki_documents, _preserve_template_names
 
 

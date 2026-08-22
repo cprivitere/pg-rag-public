@@ -1,3 +1,9 @@
+"""Tests the lookup query path of pgrag.rag.pipeline.ask.
+
+Covers a lookup-classified query passing count=20 and hybrid=True through to
+retrieve and returning the generated answer.
+"""
+
 import pytest
 
 from pgrag.rag import pipeline

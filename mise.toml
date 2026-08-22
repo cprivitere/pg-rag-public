@@ -117,7 +117,7 @@ description = "Run offline retrieval evaluation (BM25 + classifier + entity reso
 run = "uv run python scripts/retrieval_eval.py --offline"
 
 [tasks."bakeoff-corpus"]
-description = "Regenerate the embedder bake-off corpus (data/bakeoff_corpus.json) from current data/documents.json: ~500 fattest docs, 12 multi-gold queries. Plain bake-off re-runs reuse the persisted corpus"
+description = "Regenerate the embedder bake-off corpus (data/bakeoff_corpus.json) from current data/documents.json: up to ~500 sampled docs, 40-query / 3-tier set (needle / fill / paraphrase). Plain bake-off re-runs reuse the persisted corpus"
 run = "uv run python scripts/bakeoff_corpus.py"
 alias = "bkc"
 

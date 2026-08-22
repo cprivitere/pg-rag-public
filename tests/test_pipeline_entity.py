@@ -1,3 +1,10 @@
+"""Tests the entity-specific path of pgrag.rag.pipeline.ask.
+
+Covers the skill-profile hub overriding the general corpus, bypassing
+synthesis, fallback to the general corpus on a hub miss, and the gap-fill
+re-retrieval loop firing at most once with an empty-subject/answer fallback.
+"""
+
 import pytest
 
 from pgrag.rag import pipeline

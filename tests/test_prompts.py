@@ -1,3 +1,8 @@
+"""Tests pgrag.rag.prompts.build_prompt: per-query-type instruction sections
+(comparison / lookup / general / entity / leveling) are included or excluded
+as expected, the question and context are embedded, and the prompt encourages
+reasoning from stated facts while blocking fabrication."""
+
 from pgrag.rag.prompts import build_prompt
 
 

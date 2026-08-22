@@ -1,3 +1,8 @@
+"""Tests pgrag.loaders.wiki_loader.load_wiki and _HASHED_FILE_RE: real titles
+from .meta.json, stripped-stem fallback, skipping legacy unhashed files,
+collision suffixes, hex-like titles, unreadable-meta fallback, and the
+hashed-filename regex."""
+
 from pgrag.loaders.wiki_loader import _HASHED_FILE_RE, load_wiki
 
 

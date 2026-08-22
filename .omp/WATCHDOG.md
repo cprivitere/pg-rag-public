@@ -17,7 +17,10 @@ reference files, symbols, and code only.
 - alter source metadata (doc ids, `metadata.source`/`table`, wiki `parent_id` semantics)?
 - change indexing semantics (metadata is add-only; Chroma `update()` merges, never replaces)?
 - affect retrieval ranking (embedding model, chunk max/overlap, RRF constants, reranker model/batch)?
-- require retrieval regression tests (`test_bm25.py`, `test_retrieval_unit.py`, `test_rerank*.py`) that were not run?
+- require retrieval regression tests (`test_bm25.py`, `test_retrieval_unit.py`, `test_rerank*.py`) that were not run, or touch a split-file contract in `docs/TEST_CONTRACTS.md` L3 without satisfying both files?
+- weaken or delete a test assertion to make a failure pass (a test edit that changes an assertion is a contract change — it must state the new contract and run the sibling suite, `docs/TEST_CONTRACTS.md`)?
+- hand-edit a build artifact (`documents.json`, `bm25_index.pkl`, `wiki_parsed.json`, real `data/wiki/.meta.json`) to satisfy a test instead of fixing the builder?
+- weaken or delete the stale-`DOCUMENTS_VERSION` refusal in `load_documents` (`build_index.py`)? It is directly tested (`test_build_index.py`::`test_documents_version_refuses_stale`), so a weakened guard must not pass silently.
 - accidentally trigger a full corpus rebuild (~135k docs, 98 MB; expensive)?
 - introduce unnecessary dependencies or MCP servers?
 - respect `CONTEXT_BUDGET` (entity context capped at 34000 chars)?

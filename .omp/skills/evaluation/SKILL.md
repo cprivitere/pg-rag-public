@@ -26,9 +26,11 @@ Each file:
 
 - `facts` is a list of variant groups: the answer PASSES if ANY variant in
   each group appears (normalized substring) in the LLM answer.
-- 5 files exist today; the planned expansion targets ~20–30 covering
-  recipes-by-ingredient, level-gated crafting, item acquisition/drops, ability
-  lookups, comparisons, quest requirements, wiki lore, wiki how-to assembly.
+- 34 files exist today (18 entity / 12 general / 3 recipe / 1 comparison),
+  spanning recipes-by-ingredient, level-gated crafting, item acquisition/drops,
+  ability lookups, comparisons, quest requirements, wiki lore, wiki how-to
+  assembly. Future additions should favor the balanced categories
+  (comparison currently 1/34 is the thinnest).
 
 ## Running it
 
@@ -71,6 +73,23 @@ Each file:
   a new per-stage assertion in `tests/test_retrieval_eval.py` for pure metric
   or well-formedness guarantees.
 
+## Embed-model bakeoff (`embed_eval.py`)
+
+- `mise bakeoff` (alias `bk`) — `uv run python scripts/embed_eval.py --bakeoff`:
+  ranks all `BAKEOFF_CANDIDATES` on the persisted `data/bakeoff_corpus.json`
+  (40-query needle/fill/paraphrase set, `mise bakeoff-corpus` regenerates it)
+  → MRR/Recall/NDCG@10, HardMRR, per-PID VRAM. Spawns each embedder on :8085.
+- **Per-candidate `query_prefix`/`doc_prefix` are card-verified (2026-08-22)
+  and live only in `BAKEOFF_CANDIDATES`** — a prefix is a per-model property,
+  not a runtime flag. Sources: embeddinggemma `task: search result | query: `
+  + `title: none | text: `; jina-v5-retrieval `Query:`/`Document:`; nomic
+  `search_query:`/`search_document:` (both required); bge-small-en-v1.5
+  `Represent this sentence for searching relevant passages: ` on queries
+  only (docs bare); bge-m3 / MiniLM-L6 / **mxbai-xsmall** embed bare.
+  When adding or changing a candidate, verify the prompt against the model's
+  HF card — a prefix borrowed from another family is a confound. `mxbai-xsmall`
+  is the production embed; bare is its card behavior, not an oversight.
+
 ## Two layers of measurement
 
 1. **LLM end-to-end** — fact presence (subset recall of stated facts) over
@@ -94,10 +113,16 @@ Each file:
 
 ## Planned direction
 
-- Expand goldens to ~20–30, including named regression cases:
-  - `recipes-using-spider-silk` (metadata/keyword search) — fails before
-    recipe metadata enrichment, passes after.
+- Golden set is **at target (34)** — future additions should fill the thinnest
+  buckets (comparison is 1/34 today) or capture a *named regression case*,
+  e.g.:
   - `grow-field-mushrooms` ("How do I grow Field Mushrooms?") — fails before
-    wiki page expansion, passes after.
+    wiki page expansion, passes after (already present).
+  - a `recipes-using-spider-silk`-style metadata/keyword case — fails before
+    recipe metadata enrichment, passes after (covered by the
+    `recipes-using-basic-spider-silk` family).
+- When adding a golden: ground every fact in the corpus first (`grep
+  data/documents.json`) so it is actually retrievable — an un-grounded fact
+  is a permanently-failing test.
 - Extend `evaluation/queries.jsonl` (45 cases today) across the same
   categories, and promote benchmark snapshots into regression thresholds.

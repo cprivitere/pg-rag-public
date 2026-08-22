@@ -1,3 +1,11 @@
+"""Contracts for the gathering-summary builders (CDN keyword + wiki-table).
+
+Owns build_gathering_summaries / build_wiki_gathering_summaries /
+build_wiki_harvest_map shapes and parsing. test_summaries.py owns the
+CDN/computed per-skill summary builder; test_documents.py covers
+build_documents() end-to-end summary supplementation.
+"""
+
 from pgrag.documents.summaries import (
     build_gathering_summaries,
     build_wiki_gathering_summaries,
@@ -121,7 +129,7 @@ def test_empty_inputs():
     assert summaries == []
 
 
-def test_summary_shape():
+def test_gathering_summary_shape():
     items = _make_items(("i1", "Parasol", ["Mushroom1"]))
     recipes = _make_recipes(("r1", "Mushroom1", "Mycology", 0))
     summaries = build_gathering_summaries(items, recipes)

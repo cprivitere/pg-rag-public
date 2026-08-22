@@ -1,3 +1,8 @@
+"""Tests pgrag.documents.chunking: small documents pass through unmodified,
+large documents split into suffixed chunks with preserved metadata, and
+splitting is sentence-aware with character fallback, type-aware size limits,
+and overlap handling."""
+
 from pgrag.documents.chunking import (
     chunk_document, chunk_all_documents,
     DEFAULT_MAX_CHARS, OVERLAP_CHARS, TYPE_MAX_CHARS,

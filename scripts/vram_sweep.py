@@ -98,7 +98,7 @@ def _spawn(kind, name, flags, port):
     log_path = DATA / f"vram_sweep_{kind}_{name}.log"
     log_fh = open(log_path, "w", encoding="utf-8")
     proc = subprocess.Popen(
-        ["llama-server", *_url_args(_model_of(kind), False),
+        ["llama-server", *_url_args(_model_of(kind)),
          *flags, "--host", "127.0.0.1", "--port", str(port)],
         stdout=log_fh, stderr=subprocess.STDOUT)
     return proc, log_fh

@@ -72,6 +72,7 @@ def build_curated_documents():
 
 
 def build_item_documents(db):
+    """Build item documents from the `items` CDN table (metadata.table "items")."""
     documents = []
 
     items = db.tables.get("items", {})
@@ -203,6 +204,7 @@ Value:
 
 
 def build_recipe_documents(db):
+    """Build recipe documents from the `recipes` CDN table (metadata.table "recipes")."""
     documents = []
 
     resolver = GameResolver(db)
@@ -344,6 +346,7 @@ Produces:
 
 
 def build_skill_documents(db):
+    """Build skill documents from the `skills` CDN table (metadata.table "skills")."""
     documents = []
     skills = db.tables.get("skills", {})
 
@@ -424,6 +427,7 @@ Advancement Hints:
 
 
 def build_quest_documents(db):
+    """Build quest documents from the `quests` CDN table (metadata.table "quests")."""
     documents = []
     quests = db.tables.get("quests", {})
 
@@ -524,6 +528,7 @@ Description:
 
 
 def build_ability_documents(db):
+    """Build ability documents from the `abilities` CDN table (metadata.table "abilities")."""
     documents = []
     abilities = db.tables.get("abilities", {})
 
@@ -588,6 +593,7 @@ Reset Time: {reset_time}s"""
 
 
 def build_npc_documents(db):
+    """Build NPC documents from the `npcs` CDN table (metadata.table "npcs")."""
     documents = []
     npcs = db.tables.get("npcs", {})
 
@@ -636,6 +642,7 @@ Location: {area}"""
 
 
 def build_effect_documents(db):
+    """Build effect documents from the `effects` CDN table (metadata.table "effects")."""
     documents = []
     effects = db.tables.get("effects", {})
 
@@ -673,6 +680,7 @@ Description:
 
 
 def build_lorebook_documents(db):
+    """Build lorebook documents from the `lorebooks` CDN table (metadata.table "lorebooks")."""
     documents = []
     lorebooks = db.tables.get("lorebooks", {})
 
@@ -719,6 +727,7 @@ Content:
 
 
 def build_directedgoal_documents(db):
+    """Build directed-goal documents from the `directedgoals` CDN table (metadata.table "directedgoals")."""
     documents = []
     goals = db.tables.get("directedgoals", [])
 
@@ -761,6 +770,7 @@ Zone: {zone}"""
 
 
 def build_area_documents(db):
+    """Build area documents from the `areas` CDN table (metadata.table "areas")."""
     documents = []
     areas = db.tables.get("areas", {})
 
@@ -791,6 +801,7 @@ Internal ID: {area_id}"""
 
 
 def build_itemuse_documents(db):
+    """Build item-use documents from the `itemuses` CDN table (metadata.table "itemuses")."""
     documents = []
 
     resolver = GameResolver(db)
@@ -829,6 +840,7 @@ Recipe IDs: {', '.join(str(r) for r in recipes)}"""
 
 
 def build_landmark_documents(db):
+    """Build landmark documents from the `landmarks` CDN table (metadata.table "landmarks")."""
     documents = []
     landmarks = db.tables.get("landmarks", {})
 
@@ -869,6 +881,7 @@ Description:
 
 
 def build_title_documents(db):
+    """Build player-title documents from the `playertitles` CDN table (metadata.table "playertitles")."""
     documents = []
     titles = db.tables.get("playertitles", {})
 
@@ -893,6 +906,7 @@ def build_title_documents(db):
 
 
 def build_vault_documents(db):
+    """Build storage-vault documents from the `storagevaults` CDN table (metadata.table "storagevaults")."""
     documents = []
     vaults = db.tables.get("storagevaults", {})
 
@@ -926,6 +940,7 @@ Has Associated NPC: {has_npc}"""
 
 
 def build_advancementtable_documents(db):
+    """Build advancement-table documents from the `advancementtables` CDN table (metadata.table "advancementtables")."""
     documents = []
     tables = db.tables.get("advancementtables", {})
 
@@ -965,6 +980,7 @@ def build_advancementtable_documents(db):
 
 
 def build_ai_documents(db):
+    """Build AI-behavior documents from the `ai` CDN table (metadata.table "ai")."""
     documents = []
     ai_data = db.tables.get("ai", {})
 
@@ -1011,6 +1027,7 @@ Abilities:
 
 
 def build_attribute_documents(db):
+    """Build attribute documents from the `attributes` CDN table (metadata.table "attributes")."""
     documents = []
     attrs = db.tables.get("attributes", {})
 
@@ -1044,6 +1061,7 @@ Display Type: {display_type}"""
     return documents
 
 def build_source_documents(db):
+    """Build source documents from the `sources_abilities`/`sources_items`/`sources_recipes` CDN tables (table per source)."""
     documents = []
     resolver = GameResolver(db)
 
@@ -1101,6 +1119,7 @@ Found in {table_name}:
 
 
 def build_tsys_documents(db):
+    """Build treasure-info documents from the `tsysclientinfo` CDN table (metadata.table "tsysclientinfo")."""
     documents = []
     tsys = db.tables.get("tsysclientinfo", {})
 
@@ -1153,6 +1172,7 @@ Tiers:
 
 
 def build_xptable_documents(db):
+    """Build XP-table documents from the `xptables` CDN table (metadata.table "xptables")."""
     documents = []
     tables = db.tables.get("xptables", {})
 
@@ -1194,6 +1214,7 @@ XP required per level:
 
 
 def build_abilitykeyword_documents(db):
+    """Build ability-keyword combo documents from the `abilitykeywords` CDN table (metadata.table "abilitykeywords")."""
     import hashlib
 
     documents = []
@@ -1246,6 +1267,7 @@ def build_abilitykeyword_documents(db):
 
 
 def _assemble_documents(db):
+    """Combine all per-table builders plus summaries, and normalize each doc's metadata (type, inferred name)."""
     documents = []
 
     documents.extend(build_item_documents(db))
@@ -1360,4 +1382,5 @@ def _assemble_documents(db):
 
 
 def build_documents(db):
+    """Assemble all documents and chunk them for indexing."""
     return chunk_all_documents(_assemble_documents(db))

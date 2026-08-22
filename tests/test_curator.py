@@ -1,3 +1,7 @@
+"""Tests scripts.curator.run_curator: it creates a curated area-levels
+document from wiki sources and regenerates it when the source files
+change."""
+
 from pathlib import Path
 from unittest.mock import patch
 

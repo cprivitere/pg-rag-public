@@ -1,3 +1,7 @@
+"""Tests pgrag.rag.spelling.correct_query typo correction against a fake word
+vocab: transposed and in-sentence typos are corrected, while vocab tokens,
+short tokens, tokens with no close match, and low-ratio words are left alone."""
+
 import pytest
 
 from pgrag.rag import spelling

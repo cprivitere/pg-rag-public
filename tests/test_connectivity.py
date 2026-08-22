@@ -1,3 +1,7 @@
+"""Tests server-error handling for pgrag.embeddings.llama_embeddings.embed_batch
+and pgrag.rag.llm.generate: unreachable/timeout servers raise EmbeddingServerError
+/LLMServerError with the endpoint in the message, and HTTP errors propagate."""
+
 import pytest
 import requests
 from unittest.mock import patch

@@ -1,3 +1,7 @@
+"""Tests pgrag.embeddings.llama_embeddings.validate_embeddings: valid vectors
+pass through, and EmbeddingValidationError is raised for empty input,
+non-list vectors, empty/non-numeric entries, and dimension mismatches."""
+
 import pytest
 from pgrag.embeddings.llama_embeddings import validate_embeddings, EmbeddingValidationError
 

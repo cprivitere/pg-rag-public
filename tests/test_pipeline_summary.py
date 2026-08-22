@@ -1,3 +1,7 @@
+"""Tests pgrag.rag.pipeline._summary_score (gathering vs. recipe summary
+preference, distance fallback, and crafting-term disambiguation) and
+_find_matching_summary (best-candidate selection and empty results)."""
+
 from unittest.mock import MagicMock, patch
 
 from pgrag.rag.pipeline import _find_matching_summary, _summary_score
