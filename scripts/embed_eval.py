@@ -325,38 +325,52 @@ def _ndcg(ranked, rel_set, k):
     return dcg / idcg if idcg else 0.0
 
 
-def metrics(query_vecs, doc_vecs, labels, k=10):
-    total_mrr = 0.0
-    hit3 = hit5 = hit10 = 0
-    recall_sum = 0.0
-    ndcg_sum = 0.0
-    for qv, rel in zip(query_vecs, labels):
+def metrics(query_vecs, doc_vecs, labels, k=10, kinds=None):
+    """Overall IR metrics; when kinds is a per-query tier list (e.g. 'hard'/
+    'easy'), also compute each tier separately so the report shows whether
+    the hard "needle" tier still discriminates."""
+    def _accums():
+        return {"mrr": 0.0, "ndcg": 0.0, "recall": 0.0, "h3": 0, "h5": 0, "h10": 0, "n": 0}
+
+    all_acc = _accums()
+    by_kind = {}
+    for qv, rel, kd in zip(query_vecs, labels, kinds if kinds else [None] * len(labels)):
         rel_set = set(rel)
         scores = _cosine_scores(qv, doc_vecs)
         ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
+        mrr = 0.0
         for rank, idx in enumerate(ranked, start=1):
             if idx in rel_set:
-                total_mrr += 1.0 / rank
+                mrr = 1.0 / rank
                 break
-        top3 = ranked[:3]
-        top5 = ranked[:5]
-        if any(i in rel_set for i in top3):
-            hit3 += 1
-        if any(i in rel_set for i in top5):
-            hit5 += 1
-        if any(i in rel_set for i in ranked[:10]):
-            hit10 += 1
-        recall_sum += len([i for i in ranked if i in rel_set]) / len(rel_set)
-        ndcg_sum += _ndcg(ranked, rel_set, k)
-    n = len(query_vecs)
-    return {
-        "mrr10": round(total_mrr / n, 4),
-        "ndcg10": round(ndcg_sum / n, 4),
-        "recall10": round(recall_sum / n, 4),
-        "hit3": round(hit3 / n, 4),
-        "hit5": round(hit5 / n, 4),
-        "hit10": round(hit10 / n, 4),
-    }
+        rec = sum(1 for i in ranked if i in rel_set) / len(rel_set)
+        ndcg = _ndcg(ranked, rel_set, k)
+        h3 = sum(1 for i in ranked[:3] if i in rel_set) > 0
+        h5 = sum(1 for i in ranked[:5] if i in rel_set) > 0
+        h10 = sum(1 for i in ranked[:10] if i in rel_set) > 0
+        vals = [mrr, ndcg, rec, h3, h5, h10]
+        for a in (all_acc, by_kind.setdefault(kd, _accums()) if kd else None):
+            if a is None:
+                continue
+            a["mrr"] += vals[0]; a["ndcg"] += vals[1]; a["recall"] += vals[2]
+            a["h3"] += vals[3]; a["h5"] += vals[4]; a["h10"] += vals[5]
+            a["n"] += 1
+    n = all_acc["n"]
+    out = {"mrr10": round(all_acc["mrr"] / n, 4),
+           "ndcg10": round(all_acc["ndcg"] / n, 4),
+           "recall10": round(all_acc["recall"] / n, 4),
+           "hit3": round(all_acc["h3"] / n, 4),
+           "hit5": round(all_acc["h5"] / n, 4),
+           "hit10": round(all_acc["h10"] / n, 4)}
+    for kd, b in by_kind.items():
+        bn = b["n"]
+        out[f"{kd}_mrr10"] = round(b["mrr"] / bn, 4)
+        out[f"{kd}_ndcg10"] = round(b["ndcg"] / bn, 4)
+        out[f"{kd}_recall10"] = round(b["recall"] / bn, 4)
+        out[f"{kd}_hit3"] = round(b["h3"] / bn, 4)
+        out[f"{kd}_hit5"] = round(b["h5"] / bn, 4)
+        out[f"{kd}_hit10"] = round(b["h10"] / bn, 4)
+    return out
 
 
 def _kill_port(port):
@@ -439,7 +453,9 @@ def run_model(subset, url, doc_prefix=None, query_prefix=None):
     doc_vecs = embed_all(doc_texts, url=url, prefix=doc_prefix)
     query_vecs = embed_all(q_texts, url=url, prefix=query_prefix)
     labels = label_indices(subset)
-    return metrics(query_vecs, doc_vecs, labels)
+    kinds = ["hard" if str(q.get("id", "")).startswith("q_hard_") else "easy"
+             for q in subset["queries"]]
+    return metrics(query_vecs, doc_vecs, labels, kinds=kinds)
 
 
 def label_indices(subset):
@@ -480,8 +496,8 @@ def run_bakeoff(args):
         sys.stderr.write("bakeoff corpus not found, run: uv run python scripts/bakeoff_corpus.py\n")
         return
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
-    subset = {"docs": corpus["docs"], "queries": [{"q": q["text"], "relevant": q["expected_doc_ids"]}
-                                                    for q in corpus["queries"]]}
+    subset = {"docs": corpus["docs"], "queries": [{"q": q["text"], "relevant": q["expected_doc_ids"],
+                                                    "id": q.get("id")} for q in corpus["queries"]]}
     sys.stderr.write(f"bakeoff corpus: {len(subset['docs'])} docs, {len(subset['queries'])} queries\n")
 
     results = {"run_date": time.strftime("%Y-%m-%d"),
@@ -562,11 +578,12 @@ def run_bakeoff(args):
     sys.stderr.write(f"\nwrote {report_path}\n")
 
     # Print ranked table
-    print(f"\n{'Name':<30} {'Dims':>5} {'Quant':<8} {'VRAM MB':>8} {'MRR@10':>8} {'Recall@10':>9} {'NDCG@10':>8} {'Hit@3':>7} {'Hit@5':>7} {'Hit@10':>8}")
-    print("-" * 110)
+    print(f"\n{'Name':<30} {'Dims':>5} {'Quant':<8} {'VRAM MB':>8} {'MRR@10':>8} {'Recall@10':>9} {'NDCG@10':>8} {'HardMRR':>8} {'Hit@3':>7} {'Hit@5':>7} {'Hit@10':>8}")
+    print("-" * 118)
     for c in ranked:
         print(f"{c['name']:<30} {c['dims']:>5} {c['quant']:<8} {c['vram_mb']:>8} "
               f"{c.get('mrr10', 0):>8.4f} {c.get('recall10', 0):>9.4f} {c.get('ndcg10', 0):>8.4f} "
+              f"{c.get('hard_mrr10', 0):>8.4f} "
               f"{c.get('hit3', 0):>7.4f} {c.get('hit5', 0):>7.4f} {c.get('hit10', 0):>8.4f}")
     if results.get("winner"):
         print(f"\nWinner: {results['winner']}")

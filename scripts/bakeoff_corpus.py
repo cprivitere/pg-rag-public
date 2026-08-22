@@ -45,7 +45,7 @@ TARGET = 500            # corpus docs (golds are by-construction present)
 N_QUERIES = 24          # evaluation queries
 HARD_N = 6              # of the queries: single-gold "needle" tier (MRR range)
 SEED = 42
-CAP_SHARE = 0.25        # no single table's docs >25% of the corpus sample
+CAP_SHARE = 0.35        # no single table's docs >35% of the corpus sample
 AMBIG_CAP = 30          # name with more entity-table matches: too generic to group
 INTERESTING = ("recipe", "item", "wiki", "ability", "quest", "skillprofile", "effect")
 # Hard-query templates: (type, metadata field, question). The gold is the ONE
