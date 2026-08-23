@@ -1,8 +1,12 @@
 RECIPE_CAP = 25
 QUEST_CAP = 25
 LEVELING_RECIPE_CAP = 60
-# Must match chunking.TYPE_MAX_CHARS["leveling"] so the computed doc is never
-# split across chunks (a split ladder reintroduces the completeness gap).
+# Build budget for the leveling artifact. The chunker splits anything past
+# the leveling token budget (EMBED_WINDOW_TOKENS) into `_chunk_` docs
+# (reassembly at retrieval via parent_id restores the complete ladder), so
+# this no longer needs to match the chunk budget — it just bounds how much of
+# the recipe ladder one artifact carries so no single reassembly exceeds the
+# context window.
 LEVELING_BUDGET = 8192
 
 

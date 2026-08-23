@@ -90,6 +90,7 @@ def _find_matching_summary(question):
         return None
 
     best, best_score = None, None
+    best_id = best_meta = best_dist = None
     for doc_id, doc, meta, dist in zip(
         results["ids"][0],
         results["documents"][0],
@@ -99,7 +100,15 @@ def _find_matching_summary(question):
         score = _summary_score(question, doc, meta, dist)
         if best_score is None or score > best_score:
             best, best_score = doc, score
-    return best
+            best_id, best_meta, best_dist = doc_id, meta, dist
+    if best is None:
+        return None
+    # Rechunked summaries split into `_chunk_` docs — pull the whole artifact
+    # so "all recipes for X" isn't answered from a single fragment.
+    _, best_texts, _, _ = expand_parents(
+        [best_id], [best], [best_meta], [best_dist],
+    )
+    return "\n\n".join(best_texts)
 
 
 def _generate_with(question, documents, query_type, generation=None):

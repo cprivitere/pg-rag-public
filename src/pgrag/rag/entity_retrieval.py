@@ -71,14 +71,26 @@ def _load_docs():
     return _DOCS_CACHE[1]
 
 
-def _hub_chunks(hub_id, docs):
+def _family_chunks(base_id, docs):
+    """Collect a base doc plus any `_chunk_<n>` siblings of it, in chunk order.
+
+    Rechunked artifacts (leveling ladders, summaries, skill profiles) materialize
+    as a base id + `_chunk_<n>` docs; the dossier must reassemble the whole family
+    so the LLM sees the complete artifact, not fragment 0.
+    """
     chunks = []
     for doc in docs:
         doc_id = doc["id"]
-        if doc_id == hub_id or doc_id.startswith(hub_id + "_chunk_"):
+        if doc_id == base_id or doc_id.startswith(base_id + "_chunk_"):
             chunks.append(doc)
     chunks.sort(key=lambda d: int(d["metadata"].get("chunk_index", -1)))
     return chunks
+
+
+def _hub_chunks(hub_id, docs):
+    return _family_chunks(hub_id, docs)
+
+
 def build_entity_context_offline(hub_id, docs=None, budget=None):
     """Offline entity dossier: hub chunks + leveling doc + linked wiki pages.
 
@@ -120,15 +132,13 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
             else hub_id[len("skill_"):]
         )
         _leveling_id = "leveling_" + hub_suffix
-        for _d in docs:
-            if _d["id"] == _leveling_id:
-                ids.append(_d["id"])
-                texts.append(_d["text"])
-                metas.append(_d["metadata"])
-                dists.append(0.0)
-                seen.add(_d["id"])
-                _leveling_included = True
-                break
+        for _d in _family_chunks(_leveling_id, docs):
+            ids.append(_d["id"])
+            texts.append(_d["text"])
+            metas.append(_d["metadata"])
+            dists.append(0.0)
+            seen.add(_d["id"])
+            _leveling_included = True
 
     # Wiki pages linked to this entity (same logic as build_entity_context)
     hub_suffix = (
@@ -283,15 +293,13 @@ def build_entity_context(question, hub_id, budget=None,
     _leveling_included = False
     if include_leveling and hub_id.startswith(("skill_", "skillprofile_")):
         _leveling_id = "leveling_" + hub_id.split("_", 1)[1]
-        for _d in docs:
-            if _d["id"] == _leveling_id:
-                ids.append(_d["id"])
-                texts.append(_d["text"])
-                metas.append(_d["metadata"])
-                dists.append(0.0)
-                seen.add(_d["id"])
-                _leveling_included = True
-                break
+        for _d in _family_chunks(_leveling_id, docs):
+            ids.append(_d["id"])
+            texts.append(_d["text"])
+            metas.append(_d["metadata"])
+            dists.append(0.0)
+            seen.add(_d["id"])
+            _leveling_included = True
 
     rerank_used = False
     FACET_COUNTS = {"recipe": 20}

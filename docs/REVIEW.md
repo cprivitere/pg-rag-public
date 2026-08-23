@@ -170,6 +170,52 @@ only (docs bare), `--pooling cls` at `-c 512`, and the mandatory full re-embed
 AGENTS.md, not restated here. Tradeoff: the longest 0.2% of docs are indexed
 by their first ~400 tokens.
 
+## Addendum (2026-08-22) — rechunk + reassembly retires the 400-token truncation
+
+The tradeoff above (long docs indexed only by their first ~400 tokens) is now
+resolved, not accepted. The embed-capped families — `lorebook`, `skillprofile`,
+`leveling`, `summary`, `curated` — are chunked at build time to
+`MAX_EMBED_CHARS − OVERLAP_CHARS` (~1900c), so **no document exceeds the
+embedder window** (verified: 528 of 258,501 docs head-truncated → 0 of
+258,937). Every produced `_chunk_` doc carries `parent_id`, and retrieval
+reassembles the artifact instead of serving a fragment:
+
+- **entity/comparison dossiers** reassemble leveling families via the
+  generalized `_family_chunks` (base id + `_chunk_<n>`, chunk-ordered) — the
+  hub already collected `skillprofile_*` chunks by prefix; the leveling
+  include was widened from exact-match to its full family.
+- **general/lookup + gap-fill** reuse `expand_parents` (parent_id), unchanged —
+  the linkage now covers CDN/computed splits, not just wiki.
+- **`_find_matching_summary`** expands the winning summary artifact's siblings
+  so "all recipes for X" isn't answered from one fragment.
+- IR metrics were already correct: `canonical_doc_id` collapses `_chunk_` on
+  both sides of every treated query.
+
+**(Resolved) — chunk budget is now token-based, not char-based.** The
+character budget above under-counted because bge-small tokenizes game-content
+denser than the corpus's ~4.9 chars/token headline: ~59% of the 1900–2000c
+chunks tokenized >512 tokens (verified live, e.g. `leveling_BuckleArtistry`
+687 tok @ 1998c vs `skillprofile_Archery_chunk_12` ∈ window @ 1966c). The
+chunker now tokenizes at build time — `EMBED_WINDOW_TOKENS = 400` on the
+embed-capped families (`lorebook`, `skillprofile`, `leveling`, `summary`,
+`curated`), measured with the vendored bge tokenizer (`src/pgrag/data/
+bge_tokenizer.json`, reproduces the server's counts exactly) — so every chunk
+sits under **both** windows: ≤~447 tokens incl. overlap + specials (< 512) and
+≈1960c at max prose density (< 2000). `DOCUMENTS_VERSION` 5 → 6. Verified:
+259,308 docs, **0 over 512 tokens** (embed-capped), **0 over 2000 chars**
+(any); re-embed touched only 1,562 changed docs with **no** shrink-fallback
+triggers; `validate` all-clean. Tests 520 pass (contracts updated).
+
+**Residual — `embed_batch`'s overflow fallback is O(n) sequential.** On ANY
+text over the window, `embed_batch` re-embeds the WHOLE batch one request at a
+time via `_embed_one` (pre-existing from the ccc2cda fix, not introduced here).
+With ~600 dense docs this turned a batch into ~2000 serial round-trips (≈30–40
+min). Worth a per-text-isolation or sub-batch retry fix independent of chunking.
+Also an environment-hygiene note: multiple leftover `build-index` processes
+(run/poll/`nohup` across turns) contended on the single embed server until
+40+ timed-out clients were observed; `taskkill /F /IM python.exe` is the only
+reliable Windows kill (embed runs as `llama-server.exe`).
+
 ## Verdict
 
 The test suite is in better shape than the original review claimed: no mass

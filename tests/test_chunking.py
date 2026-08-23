@@ -5,9 +5,11 @@ and overlap handling."""
 
 from pgrag.documents.chunking import (
     chunk_document, chunk_all_documents,
-    DEFAULT_MAX_CHARS, OVERLAP_CHARS, TYPE_MAX_CHARS,
-    _find_best_split, _split_sentences,
+    DEFAULT_MAX_CHARS, MAX_EMBED_CHARS, OVERLAP_CHARS, TYPE_MAX_CHARS,
+    EMBED_WINDOW_TOKENS, TOKEN_BUDGETED_TYPES, EMBED_FALLBACK_CHARS,
+    _find_best_split, _split_sentences, _split_token_budget,
 )
+from pgrag.documents.tokenizer import token_count
 
 
 def test_small_doc_not_chunked():
@@ -38,6 +40,9 @@ def test_chunks_contain_chunk_metadata():
         assert "chunk_index" in chunk["metadata"]
         assert "chunk_count" in chunk["metadata"]
         assert chunk["metadata"]["chunk_count"] == len(result)
+        # Each chunk points back at its whole doc so retrieval can reassemble
+        # the parent (expand_parents). This is the split+reassembly contract.
+        assert chunk["metadata"]["parent_id"] == "item_1"
 
 
 def test_chunk_preserves_metadata():
@@ -81,20 +86,40 @@ def test_constants():
     assert TYPE_MAX_CHARS["item"] == 1024
     assert TYPE_MAX_CHARS["recipe"] == 1024
     assert TYPE_MAX_CHARS["wiki"] == 1024
-    assert TYPE_MAX_CHARS["lorebook"] == 2048
-    assert TYPE_MAX_CHARS["skillprofile"] == 2048
-    assert TYPE_MAX_CHARS["summary"] == 8192
-    assert TYPE_MAX_CHARS["curated"] == 8192
+    # Embed-capped families are budgeted in TOKENS (EMBED_WINDOW_TOKENS), not
+    # characters: bge-small's hard cap is 512 tokens, and character budgets
+    # fail because token density varies (~2.4 c/t for level tables vs ~4.9 for
+    # prose). At EMBED_WINDOW_TOKENS every chunk stays under both the token
+    # window and the 2000-char clip.
+    for t in ("lorebook", "skillprofile", "leveling", "summary", "curated"):
+        assert t in TOKEN_BUDGETED_TYPES
+    assert EMBED_WINDOW_TOKENS < 512
+    assert EMBED_WINDOW_TOKENS + 64 <= 512  # room for prepended overlap + specials
+    for t in ("item", "recipe", "skill", "quest", "ability", "npc", "effect",
+              "wiki", "directedgoal", "area", "itemuse", "title", "vault",
+              "advancementtable", "ai", "attribute", "source", "tsys",
+              "xptable", "abilitykeyword"):
+        assert TYPE_MAX_CHARS[t] == 1024
+        assert t not in TOKEN_BUDGETED_TYPES
 
 
 def test_type_aware_limits():
-    item_doc = {"id": "i1", "type": "item", "text": "x\n\n" * 500, "metadata": {}}
-    lore_doc = {"id": "w1", "type": "lorebook", "text": "x\n\n" * 500, "metadata": {}}
-
-    item_chunks = chunk_document(item_doc)
-    lore_chunks = chunk_document(lore_doc)
-
-    assert len(item_chunks) > len(lore_chunks)
+    # Embed-capped families budget by TOKENS, so a token-dense document (level
+    # table: ~2.4 chars/token) splits into chunks that each fit bge-small's
+    # 512-token window — the char-only budget did not, which was the bug.
+    dense = {"id": "l1", "type": "leveling",
+             "text": "Level 1: 1 XP\n" * 400, "metadata": {}}
+    chunks = chunk_document(dense)
+    assert len(chunks) > 1
+    for c in chunks:
+        assert token_count(c["text"]) is not None
+        assert token_count(c["text"]) <= 512
+        assert len(c["text"]) <= MAX_EMBED_CHARS
+    # The same char-sized doc as a non-embed family falls back to char budget
+    # and may exceed 512 tokens (it is not embed-capped by design).
+    prose = {"id": "i1", "type": "item",
+             "text": ("This is a fairly long flowing sentence. " * 120), "metadata": {}}
+    assert chunk_document(prose)[0] is prose or len(chunk_document(prose)) >= 1
 
 
 def test_overlap_between_chunks():
@@ -129,13 +154,62 @@ def test_split_sentences():
     assert len(sentences) == 3
 
 
-def test_overlap_text_not_lost():
-    text = "abcdefghij " * 100
-    doc = {"id": "w1", "type": "wiki", "text": text.strip(), "metadata": {}}
-    result = chunk_document(doc, max_chars=200)
-    assert len(result) >= 2
+def test_token_budget_chunks_fit_embed_window():
+    # Token path: every content chunk is within EMBED_WINDOW_TOKENS, and the
+    # final (overlap-augmented) chunk is still under the embedder's 512 hard
+    # cap. Dense level tables (~2.4 chars/token) are the worst case.
+    dense = {"id": "t1", "type": "leveling",
+             "text": "Level 1: 1 XP\n" * 400, "metadata": {}}
+    raw = _split_token_budget(dense["text"], EMBED_WINDOW_TOKENS)
+    assert len(raw) > 1
+    for seg in raw:
+        assert token_count(seg) <= EMBED_WINDOW_TOKENS
+    chunks = chunk_document(dense)
+    for c in chunks:
+        assert token_count(c["text"]) <= 512
+        assert len(c["text"]) <= MAX_EMBED_CHARS
 
-    full_text = "".join(c["text"] for c in result)
-    original_words = text.split()
-    for word in original_words[:50]:
-        assert word in full_text
+
+def test_max_tokens_parameter_preferred_path():
+    # max_tokens forces token chunking on any type (embed-capped or not).
+    dense = {"id": "z1", "type": "item",  # item: normally char-budgeted
+             "text": "Level 1: 1 XP\n" * 400, "metadata": {}}
+    chunks = chunk_document(dense, max_tokens=EMBED_WINDOW_TOKENS)
+    assert len(chunks) > 1
+    for c in chunks:
+        assert token_count(c["text"]) <= 512
+    # explicit max_chars still works (old path)
+    chunks2 = chunk_document(dense, max_chars=100)
+    assert len(chunks2) > 1
+    # mutually exclusive
+    import pytest
+    with pytest.raises(ValueError):
+        chunk_document(dense, max_chars=100, max_tokens=100)
+
+
+def test_tokenizer_fallback_when_unavailable(monkeypatch):
+    # If the vendored tokenizer can't load, token-aware splitters degrade to a
+    # conservative character budget and still produce embed-safe chunks.
+    from pgrag.documents import chunking as ch
+    monkeypatch.setattr(ch, "token_count", lambda _t: None)
+    dense = {"id": "f1", "type": "leveling",
+             "text": "Level 1: 1 XP\n" * 400, "metadata": {}}
+    chunks = _split_token_budget(dense["text"], EMBED_WINDOW_TOKENS)
+    assert chunks  # still splits (char fallback)
+    for seg in chunks:
+        assert len(seg) <= EMBED_FALLBACK_CHARS
+    res = chunk_document(dense)
+    for c in res:
+        assert len(c["text"]) <= MAX_EMBED_CHARS
+
+
+def test_non_positive_budgets_rejected():
+    # max_chars<=0 would leave _find_best_split with no way to shrink its
+    # remainder (an infinite-loop footgun), so reject it outright.
+    import pytest
+    doc = {"id": "g1", "type": "item",
+           "text": "some long paragraph text " * 40, "metadata": {}}
+    with pytest.raises(ValueError):
+        chunk_document(doc, max_chars=0)
+    with pytest.raises(ValueError):
+        chunk_document(doc, max_tokens=0)

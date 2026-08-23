@@ -147,10 +147,11 @@ def test_leveling_skips_skill_without_recipes():
     assert build_leveling_documents(db) == []
 
 
-def test_leveling_fits_single_chunk():
-    # Worst-case-size skill (60 recipes) must still fit the leveling chunk
-    # budget so the artifact is never split across chunks.
-    budget = chunking.TYPE_MAX_CHARS["leveling"]
+def test_leveling_splits_to_embed_chunks_with_parent_links():
+    # Worst-case-size skill (60 recipes) exceeds the embed window; the artifact
+    # is split into `_chunk_` docs at the embed boundary, each pointing back to
+    # the base id so retrieval can reassemble the complete ladder. No chunk may
+    # exceed the embed window (its vector is full-text, never head-truncated).
     db = make_db(
         skills={"Mulching": {"Name": "Mulching", "XpTable": "TypicalNoncombatSkill"}},
         recipes=_mulching_recipes(60),
@@ -158,12 +159,27 @@ def test_leveling_fits_single_chunk():
     )
     docs = build_leveling_documents(db)
     assert len(docs) == 1
-    assert len(docs[0]["text"]) <= budget
+    chunks = chunking.chunk_document(docs[0])
+    assert len(chunks) > 1
+    assert all(len(c["text"]) <= chunking.MAX_EMBED_CHARS for c in chunks)
+    for c in chunks:
+        assert c["metadata"]["parent_id"] == docs[0]["id"]
+    # Reassembly restores the full contents: the head AND the previously-
+    # head-truncated tail both survive splitting. Overlap re-emits a tail
+    # between neighbours, so the reassembly is not byte-identical to the source
+    # (the tail fragment is the whole point — it used to be dropped at embed).
+    joined = "\n\n".join(c["text"] for c in chunks)
+    assert docs[0]["text"][:100] in joined
+    assert docs[0]["text"][-100:] in joined
 
 
-def test_leveling_budget_matches_chunk_budget():
-    # The builder's LEVELING_BUDGET and the chunker's TYPE_MAX_CHARS["leveling"]
-    # must stay equal, or a single-chunk ladder starts splitting silently.
+def test_leveling_build_budget_exceeds_embed_chunk_budget():
+    # Build budget and embed chunk cap are intentionally decoupled: LEVELING_BUDGET
+    # bounds how much of the ladder one artifact carries, while the embedding
+    # chunk cap sets the embed-safe split size. The whole artifact is reassembled
+    # at retrieval via parent_id, so it may (and should) span several chunks.
     from pgrag.documents.skill_profiles import LEVELING_BUDGET
 
-    assert chunking.TYPE_MAX_CHARS["leveling"] == LEVELING_BUDGET
+    assert "leveling" in chunking.TOKEN_BUDGETED_TYPES
+    assert chunking.EMBED_WINDOW_TOKENS < 512
+    assert LEVELING_BUDGET > chunking.MAX_EMBED_CHARS

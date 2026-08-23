@@ -1,8 +1,39 @@
+"""Chunking of generated documents for embedding.
+
+Two budgeting schemes:
+
+- **Non-embed-capped families** (item, recipe, skill, …) chunk by *characters*
+  at ``DEFAULT_MAX_CHARS``. At 1024 chars they never approach the embedder's
+  512-token window (worst measured density ≈2.4 chars/token → ~426 tokens), so
+  an exact token count is unnecessary overhead.
+- **Embed-capped families** (lorebook, skillprofile, leveling, summary,
+  curated) chunk by *tokens* at ``EMBED_WINDOW_TOKENS``. bge-small (the
+  production embedder) hard-rejects inputs past 512 tokens, and the previous
+  character-only budget proved insufficient: dense numeric level tables
+  (~2.4 chars/token vs ~4.9 for prose) blow far past 512 tokens at ~1900 chars.
+  ``EMBED_WINDOW_TOKENS = 400`` keeps every chunk under **both** windows —
+  ≤~447 tokens incl. overlap + specials (< 512) and ≈1960 chars at max prose
+  density (< ``MAX_EMBED_CHARS`` = 2000) — so no chunk is ever clipped or
+  partial-indexed at embed time.
+
+These artifacts are split here and reassembled at retrieval (``parent_id`` →
+``expand_parents`` / ``_family_chunks``) so the LLM still sees the complete doc.
+"""
+
+from __future__ import annotations
+
+import logging
 import re
+
+from pgrag.documents.tokenizer import token_count
+from pgrag.embeddings.llama_embeddings import MAX_EMBED_CHARS
+
+_logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_CHARS = 1024
 OVERLAP_CHARS = 100
 
+# Character budget for the non-embed-capped families (see module docstring).
 TYPE_MAX_CHARS = {
     "item": 1024,
     "recipe": 1024,
@@ -11,7 +42,6 @@ TYPE_MAX_CHARS = {
     "ability": 1024,
     "npc": 1024,
     "effect": 1024,
-    "lorebook": 2048,
     "directedgoal": 1024,
     "area": 1024,
     "itemuse": 1024,
@@ -26,19 +56,45 @@ TYPE_MAX_CHARS = {
     "xptable": 1024,
     "abilitykeyword": 1024,
     "wiki": 1024,
-    "skillprofile": 2048,
-    "leveling": 8192,
-    "summary": 8192,
-    "curated": 8192,
 }
+
+# Families whose chunks are budgeted in tokens to respect the embedder window.
+TOKEN_BUDGETED_TYPES = {
+    "lorebook",
+    "skillprofile",
+    "leveling",
+    "summary",
+    "curated",
+}
+
+# Token budget for the embed-capped families (see module docstring): leaves
+# room for the prepended overlap and special tokens while keeping every chunk
+# under the embedder's hard 512-token window, and staying under the 2000-char
+# clip at worst prose density.
+EMBED_WINDOW_TOKENS = 400
+
+# Conservative character fallback if the vendored tokenizer is unavailable
+# (breaks the offline build): 1000c at worst measured density is ~416 tokens.
+EMBED_FALLBACK_CHARS = 1000
 
 
 def _get_max_chars(doc):
     return TYPE_MAX_CHARS.get(doc.get("type", ""), DEFAULT_MAX_CHARS)
 
 
+def _get_budget(doc):
+    """Return ("tokens", EMBED_WINDOW_TOKENS) for capped families, else char budget."""
+    if doc.get("type") in TOKEN_BUDGETED_TYPES:
+        return "tokens", EMBED_WINDOW_TOKENS
+    return "chars", _get_max_chars(doc)
+
+
 def _split_paragraphs(text):
     return [p.strip() for p in text.split("\n\n") if p.strip()]
+
+
+def _split_lines(text):
+    return [l.strip() for l in text.split("\n") if l.strip()]
 
 
 def _split_sentences(text):
@@ -64,17 +120,16 @@ def _find_best_split(text, max_chars):
     return best, remainder
 
 
-def chunk_document(doc, max_chars=None):
-    if max_chars is None:
-        max_chars = _get_max_chars(doc)
-
-    text = doc["text"]
+def _chunk_chars(text, max_chars):
+    """Split ``text`` into a list of chunk strings by a character budget."""
+    if max_chars <= 0:
+        raise ValueError("max_chars must be > 0")
     if len(text) <= max_chars:
-        return [doc]
+        return [text]
 
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
-        return [doc]
+        return [text]
 
     chunks = []
     current = []
@@ -100,7 +155,103 @@ def chunk_document(doc, max_chars=None):
 
     if current:
         chunks.append("\n\n".join(current))
+    return chunks
 
+
+def _split_words_by_tokens(line, budget):
+    """Split a single line that exceeds the token budget at spaces."""
+    words = line.split(" ")
+    out = []
+    acc = []
+    acc_tokens = 0
+    for w in words:
+        if not w:
+            continue
+        wt = token_count(w) or 0
+        if acc_tokens + wt <= budget:
+            acc.append(w)
+            acc_tokens += wt
+        else:
+            if acc:
+                out.append(" ".join(acc))
+                acc = []
+                acc_tokens = 0
+            # A single word over budget stays whole (pathological; budget-safe).
+            acc = [w]
+            acc_tokens = wt
+    if acc:
+        out.append(" ".join(acc))
+    return out
+
+
+def _split_unit_by_tokens(unit, budget):
+    """Split a paragraph of token-count > budget at line then word boundaries."""
+    lines = _split_lines(unit) or [unit]
+    out = []
+    acc = []
+    acc_tokens = 0
+    for line in lines:
+        lt = token_count(line) or 0
+        if acc_tokens + lt <= budget:
+            acc.append(line)
+            acc_tokens += lt
+        else:
+            if acc:
+                out.append("\n".join(acc))
+                acc = []
+                acc_tokens = 0
+            if lt <= budget:
+                acc = [line]
+                acc_tokens = lt
+            else:
+                out.extend(_split_words_by_tokens(line, budget))
+    if acc:
+        out.append("\n".join(acc))
+    return out
+
+
+def _split_token_budget(text, budget):
+    """Split ``text`` into chunk strings each ≤ ``budget`` WordPiece tokens.
+
+    Falls back to a conservative character budget if the vendored tokenizer is
+    unavailable, so the offline build never hard-fails on a missing asset.
+    """
+    if token_count(text) is None:
+        _logger.warning(
+            "bge tokenizer unavailable; chunking by %d-char budget (-fallback)",
+            EMBED_FALLBACK_CHARS,
+        )
+        return _chunk_chars(text, EMBED_FALLBACK_CHARS)
+    if token_count(text) <= budget:
+        return [text]
+
+    chunks = []
+    current = []
+    current_tokens = 0
+
+    for para in _split_paragraphs(text):
+        pt = token_count(para) or 0
+        if current_tokens + pt <= budget:
+            current.append(para)
+            current_tokens += pt
+        else:
+            if current:
+                chunks.append("\n\n".join(current))
+            if pt <= budget:
+                current = [para]
+                current_tokens = pt
+            else:
+                chunks.extend(_split_unit_by_tokens(para, budget))
+                current = []
+                current_tokens = 0
+
+    if current:
+        chunks.append("\n\n".join(current))
+    return chunks
+
+
+def _assemble(doc, chunks):
+    """Turn a list of chunk strings into chunk documents with lineage metadata."""
     if len(chunks) == 1:
         return [doc]
 
@@ -115,9 +266,40 @@ def chunk_document(doc, max_chars=None):
         chunk["metadata"] = dict(doc["metadata"])
         chunk["metadata"]["chunk_index"] = i
         chunk["metadata"]["chunk_count"] = len(chunks)
+        # Point every produced chunk back at its whole doc so retrieval can
+        # reassemble the parent (expand_parents) — wiki chunks already carry a
+        # parent_id; this extends the same linkage to CDN/computed splits.
+        chunk["metadata"]["parent_id"] = doc["id"]
         result.append(chunk)
 
     return result
+
+
+def chunk_document(doc, max_chars=None, *, max_tokens=None):
+    """Split ``doc`` into embed-safe chunks, or return it unchanged if it fits.
+
+    ``max_tokens`` forces a token budget (the preferred path for embed-capped
+    families); ``max_chars`` forces a character budget (tests / callers that
+    want old behavior); with neither, the per-type budget applies (tokens for
+    the embed-capped families, chars otherwise).
+
+    ``max_tokens`` and ``max_chars`` are mutually exclusive.
+    """
+    if max_tokens is not None:
+        if max_chars is not None:
+            raise ValueError("max_tokens and max_chars are mutually exclusive")
+        if max_tokens <= 0:
+            raise ValueError("max_tokens must be > 0")
+        chunks = _split_token_budget(doc["text"], max_tokens)
+    elif max_chars is not None:
+        chunks = _chunk_chars(doc["text"], max_chars)
+    else:
+        kind, budget = _get_budget(doc)
+        if kind == "tokens":
+            chunks = _split_token_budget(doc["text"], budget)
+        else:
+            chunks = _chunk_chars(doc["text"], budget)
+    return _assemble(doc, chunks)
 
 
 def _apply_overlap(chunks):
@@ -136,8 +318,8 @@ def _apply_overlap(chunks):
     return overlapped
 
 
-def chunk_all_documents(documents, max_chars=None):
+def chunk_all_documents(documents, max_chars=None, *, max_tokens=None):
     result = []
     for doc in documents:
-        result.extend(chunk_document(doc, max_chars))
+        result.extend(chunk_document(doc, max_chars, max_tokens=max_tokens))
     return result

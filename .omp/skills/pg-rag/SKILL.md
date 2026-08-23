@@ -28,9 +28,11 @@ re-retrieves (`_AGENTIC_MAX_ROUNDS = 1`, bounded sibling expansion via
 - `loaders/` — source → in-memory: `cdn_loader.py`, `wiki_loader.py`,
   `database.py`; wiki sync + orphan cleanup in `download_wiki.py`.
 - `documents/` — `builder.py` (CDN entity → docs), `wiki_builder.py`
-  (sections/chunks, `parent_id`), `chunking.py` (1024c/100ov; lorebook +
-  skillprofile 2048, summary/curated 8192), `resolver.py` + `skill_profiles.py`
-  + `summaries.py` (cross-refs, leveling dossiers, gathering summaries).
+  (sections/chunks, `parent_id`), `chunking.py` (1024c/100ov; the embed-capped
+  families lorebook/skillprofile/leveling/summary/curated split at
+  `MAX_EMBED_CHARS − overlap` ≈ 1900c and reassemble at retrieval via
+  `parent_id`), `resolver.py` + `skill_profiles.py` + `summaries.py`
+  (cross-refs, leveling dossiers, gathering summaries).
 - `embeddings/llama_embeddings.py` → :8081.
 - `vectorstore/build_index.py` — incremental hash-based upsert; refuses a
   stale `DOCUMENTS_VERSION`; validates the collection dim.
