@@ -139,7 +139,7 @@ def test_gap_fill_expands_before_subject_retrieval(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", boom_retrieve)
 
     trace = {}
-    result = pipeline.ask("what about Pooping", trace=trace)
+    result = pipeline.ask("what about Pooping", trace=trace, allow_gap_fill=True)
 
     assert calls["generate"] == 2  # initial + one expansion re-answer
     assert calls["retrieve"] == 0
@@ -169,7 +169,7 @@ def test_gap_fill_no_expansion_falls_through_to_subject(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
 
     trace = {}
-    pipeline.ask("what about Pooping", trace=trace)
+    pipeline.ask("what about Pooping", trace=trace, allow_gap_fill=True)
 
     assert calls["retrieve"] == 1  # subject-retrieve fallback ran
     assert trace["resolve"] == {"rounds": 0, "expanded": 0}
@@ -202,6 +202,6 @@ def test_gap_fill_skips_expansion_without_parent_id(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", lambda *a, **k: _fake_retrieve("x1"))
 
     trace = {}
-    pipeline.ask("what about Pooping", trace=trace)
+    pipeline.ask("what about Pooping", trace=trace, allow_gap_fill=True)
     assert e["called"] is False
     assert trace["resolve"] == {"rounds": 0, "expanded": 0}

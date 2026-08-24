@@ -30,14 +30,14 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
                         └─ pipeline.ask / ask_stream → prompt → LLM :8080 → answer
 ```
 
-- **One-shot pipeline**: LLM gets a fixed context and answers once. Only `_gap_fill` / `_stream_answer` re-retrieve (`_AGENTIC_MAX_ROUNDS = 1`, one bounded sibling expansion via `rag/resolve.py`). No agentic tool-calling.
+- **One-shot pipeline**: LLM gets a fixed context and answers once. Only `_gap_fill` / `_stream_answer` re-retrieve (`_AGENTIC_MAX_ROUNDS = 1`, one bounded sibling expansion via `rag/resolve.py`). No agentic tool-calling. `ask()`/`ask_stream()` take `allow_gap_fill=False` by default — re-retrieval on empty/"I don't know" answers is opt-in via `allow_gap_fill=True`.
 - **Freshness contract (avoid stale-document trap)**: `build-documents` stamps `data/derived/documents_version.json` with `DOCUMENTS_VERSION` (config.py, currently `4`). `build-index` only reads the persisted `documents.json` and refuses to embed if the stored version differs — it never regenerates. To converge a source in one command, use `mise sync-*` tasks (they run `build-documents` first). Bump `DOCUMENTS_VERSION` whenever document shape changes.
 
 ## Key Directories
 
 - `src/pgrag/` — importable package (`uv` installs editable).
   - `cli.py` — CLI: `download-cdn`, `download-wiki`, `build-documents`, `build-index`, `validate`.
-  - `config.py` — paths, `EMBEDDING_DIM=384`, `CONTEXT_BUDGET=34000`, `DOCUMENTS_VERSION`, `TARGET_CATEGORIES`/`RECURSIVE_CATEGORIES`.
+  - `config.py` — paths, `EMBEDDING_DIM=384`, `CONTEXT_BUDGET=68000`, `DOCUMENTS_VERSION`, `TARGET_CATEGORIES`/`RECURSIVE_CATEGORIES`.
   - `build.py` — `generate_documents()` orchestration.
   - `loaders/` — `cdn_loader` (tables from CDN json), `wiki_loader` (wiki text + `.meta.json` title mapping, orphan cleanup), `database.GameDatabase` (in-memory `tables` + `wiki` bag).
   - `documents/` — `builder.py`, `wiki_builder.py` (mwparserfromhell → sections/chunks, `parent_id` links), `chunking.py`, `resolver.py` (internal code → display name), `skill_profiles.py`, `summaries.py` (gathering skill maps).
@@ -84,7 +84,7 @@ mise drift                        # check docs/skills against the repo (aliases:
 ## Important Files
 
 - `src/pgrag/cli.py` — entry point; `config.py` — constants/paths; `build.py` — document orchestration; `rag/pipeline.py` — query path (deterministic temp=0/seed=0).
-- `scripts/pg_rag.py` — OpenWebUI pipe, `PG_ROOT = os.environ.get("PG_RAG_ROOT", r"F:\ProjectGorgon\pg-rag-builder")` (env override, Windows default) + `os.chdir()`, adds `PG_ROOT/src` to `sys.path` — the default path is what moves if the repo relocates. Valves: `TOP_K=20`, `USE_HYBRID=True`, `USE_RERANK=True`.
+- `scripts/pg_rag.py` — OpenWebUI pipe, `PG_ROOT = os.environ.get("PG_RAG_ROOT", r"F:\ProjectGorgon\pg-rag-builder")` (env override, Windows default) + `os.chdir()`, adds `PG_ROOT/src` to `sys.path` — the default path is what moves if the repo relocates. Valves: `TOP_K=40`, `USE_HYBRID=True`, `USE_RERANK=True`.
 - `scripts/curator.py` + `curator_scheduler.py` — heuristic (non-LLM) curation: regex-detect fragmented knowledge (area_levels, skill_trainers, crafting_progressions), write template docs to `data/wiki/curated/`, scheduler persists state to `data/curator_state.json` and rebuilds doc/index on change. Deterministic by design — no LLM, so curated docs are stable anchors.
 - `scripts/golden_check.py` — fact-presence golden eval → `data/golden/`; `scripts/embed_eval.py` (+`bakeoff_corpus.py`; VRAM helpers in `embed_vram_probe.py`) — embedding bake-offs.
 - `docs/TEST_CONTRACTS.md` — layer→tests→contract map + regression-triage protocol (read before changing behavior/tests); `docs/REVIEW.md` — audit findings + improvement backlog.
@@ -97,11 +97,12 @@ mise drift                        # check docs/skills against the repo (aliases:
 - **Local services** (running on Windows host):
   | svc | port | model / note |
   |-----|------|--------------|
-  | Embeddings | 8081 | `bge-small-en-v1.5` f16 (cls pooling, hard 512-token input cap — `llama_embeddings.MAX_EMBED_CHARS`) — needed for Q&A/eval |
-  | LLM | 8080 | `gemma-4-26B` — RAG Q&A; **draft model OOMs if already running → `mise down` first** |
-  | Reranker | 8082 | `bge-reranker-v2-m3`, optional, lexical fallback |
+  | Embeddings | 8081 | `EMBED_MODEL` (`[env]`) — bge-small f16, cls pooling, hard 512-token server cap (input chars clipped to `llama_embeddings.MAX_EMBED_CHARS` = 2000); needed for Q&A/eval |
+  | LLM | 8080 | `LLM_MODEL` (`[env]`; `LLM_FLAGS` carries spec/ctx/reasoning) — RAG Q&A; draft model OOMs if already running → `mise down` first |
+  | Reranker | 8082 | `RERANK_MODEL` (`[env]`) — bge-reranker cross-encoder; optional, lexical fallback |
   | OpenWebUI | 3000 | `../mywebui` |
   | Chat (Gradio) | 7860 | `mise chat`; history in browser localStorage |
+- **Single-source models**: refs + tuning flags live once in `mise.toml [env]` (`*_MODEL`/`*_FLAGS`); consumed by `.mise/tasks/*-start.ps1` (`$env:`), `mise debug-*` (`{{ env.* }}`), `scripts/vram_sweep.py` and `scripts/embed_eval.py` (tomllib). `mise drift` fails if any consumer hardcodes a model literal.
 - `scripts/rag_chat.py` and `pg_rag.py` assume these services up.
 - Tests import the installed `pgrag` package — after changing `src/pgrag/`, no reinstall needed (editable install).
 

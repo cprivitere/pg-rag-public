@@ -5,6 +5,15 @@
 
 param()
 
+if (-not $env:EMBED_MODEL) {
+    Write-Error 'EMBED_MODEL not set — run via `mise start` so the [env] single source exports it'
+    exit 1
+}
+if (-not $env:EMBED_FLAGS) {
+    Write-Error 'EMBED_FLAGS not set — run via `mise start` so the [env] single source exports it'
+    exit 1
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 $root = Split-Path -Parent $root
 $logDir = Join-Path $root 'logs'
@@ -18,7 +27,7 @@ if ($existing) {
 
 $exe = 'llama-server'
 $logFile = Join-Path $logDir 'embed.log'
-$serverArgs = @('-hf','unsloth/bge-small-en-v1.5-GGUF:f16','--host','0.0.0.0','--port','8081','--embedding','--pooling','cls','-ngl','99','-b','4096','--ubatch-size','4096','-np','1','-c','512',"--log-file","$logFile")
+$serverArgs = @('-hf', $env:EMBED_MODEL) + ($env:EMBED_FLAGS -split '\s+') + @('--host','0.0.0.0','--port','8081','-b','4096','--ubatch-size','4096','-np','1',"--log-file","$logFile")
 
 Start-Process -FilePath $exe -ArgumentList $serverArgs -WindowStyle Hidden
 

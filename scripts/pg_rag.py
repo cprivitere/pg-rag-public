@@ -39,7 +39,7 @@ from pgrag.rag.synthesis_generator import synthesize_answer
 
 class Pipe:
     class Valves(BaseModel):
-        TOP_K: int = Field(default=20, description="Number of context chunks to retrieve (general queries)")
+        TOP_K: int = Field(default=40, description="Number of context chunks to retrieve (general queries)")
         USE_HYBRID: bool = Field(default=True, description="Enable hybrid BM25 + semantic search")
         USE_RERANK: bool = Field(default=True, description="Enable reranking of results")
 

@@ -75,7 +75,7 @@ def test_ask_stream_resets_on_gap_fill(monkeypatch):
         },
     )
 
-    events = list(pipeline.ask_stream("what is Dungcrafting"))
+    events = list(pipeline.ask_stream("what is Dungcrafting", allow_gap_fill=True))
     types = [e["type"] for e in events]
 
     assert types.count("reset") == 1

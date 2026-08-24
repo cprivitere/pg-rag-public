@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import tomllib
 
 import requests
 
@@ -33,9 +34,19 @@ except ModuleNotFoundError:
     sys.path.insert(0, str(ROOT))
     from scripts.embed_vram_probe import _url_args, _total_vram_mb, get_per_pid_vram
 
-LLM_MODEL = "unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL"
-RERANK_MODEL = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
-EMBED_MODEL = "unsloth/bge-small-en-v1.5-GGUF:f16"
+# Production model refs — single source is mise.toml [env]. Read the live
+# values so a model swap propagates into the sweep with no literal drift.
+# Falls back to the current values if mise.toml is unreadable.
+_LLM_FALLBACK = "unsloth/Qwen3.5-9B-MTP-GGUF:UD-Q4_K_XL"
+_RERANK_FALLBACK = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
+_EMBED_FALLBACK = "unsloth/bge-small-en-v1.5-GGUF:f16"
+try:
+    _model_env = tomllib.loads((ROOT / "mise.toml").read_text(encoding="utf-8")).get("env", {})
+    LLM_MODEL = _model_env.get("LLM_MODEL") or _LLM_FALLBACK
+    RERANK_MODEL = _model_env.get("RERANK_MODEL") or _RERANK_FALLBACK
+    EMBED_MODEL = _model_env.get("EMBED_MODEL") or _EMBED_FALLBACK
+except (OSError, tomllib.TOMLDecodeError):
+    LLM_MODEL, RERANK_MODEL, EMBED_MODEL = _LLM_FALLBACK, _RERANK_FALLBACK, _EMBED_FALLBACK
 
 PORTS = {"embed": 8084, "llm": 8085, "reranker": 8086}
 

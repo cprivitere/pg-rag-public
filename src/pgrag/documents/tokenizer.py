@@ -4,7 +4,7 @@ The corpus build must run with no servers up, but chunking has to respect the
 embedder's hard 512-token window — a character budget cannot guarantee that,
 because token density varies wildly in game text (~2.4 c/t for level tables vs
 ~4.9 c/t for prose). This loads the exact BERT WordPiece tokenizer the embed
-server uses (vendored as ``data/bge_tokenizer.json``) so chunk budgets are
+server uses (vendored at ``pgrag/resources/bge_tokenizer.json``) so chunk budgets are
 measured in tokens, deterministically and offline.
 
 Reproduction check: this tokenizer returns the same counts llama-server reports

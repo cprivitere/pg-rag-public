@@ -142,11 +142,13 @@ def _resolve_expansion(ids, docs, metas, dists):
     return ids, docs, metas, dists, len(docs) - before
 
 
-def _gap_fill(question, answer, ids, docs, metas, dists, query_type, generation=None, trace=None):
+def _gap_fill(question, answer, ids, docs, metas, dists, query_type, generation=None, trace=None, allow_gap_fill=False):
     """One-shot targeted re-retrieval on the missing subject (V36).
     Bare "I do not know." carries no subject -> fall back to the question itself.
     Empty answer also counts as missing.
     """
+    if not allow_gap_fill:
+        return answer, ids, docs, metas, dists, False
     if (answer or "").strip() and not MISSING_REGEX.search(answer or ""):
         return answer, ids, docs, metas, dists, False
     if not (answer or "").strip():
@@ -210,7 +212,7 @@ def _prepare_entity(question):
     )
 
 
-def _ask_entity(question, generation=None, trace=None):
+def _ask_entity(question, generation=None, trace=None, allow_gap_fill=False):
     prepared = _prepare_entity(question)
     if prepared is None:
         return None
@@ -219,7 +221,7 @@ def _ask_entity(question, generation=None, trace=None):
     answer = _generate_with(question, docs, "entity", generation=generation)
     answer, ids, docs, metas, dist, gap_used = _gap_fill(
         question, answer, ids, docs, metas, dists, "entity",
-        generation=generation, trace=trace,
+        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
     )
 
     return {
@@ -292,7 +294,7 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
         metadata_filter=metadata_filter,
         token_filter=token_filter,
         query_type=query_type,
-        count=20 if is_wide else 3,
+        count=40 if is_wide else 3,
         hybrid=is_wide,
         trace=trace,
     )
@@ -368,7 +370,7 @@ def _stream_generation(question, documents, query_type, generation=None):
     return stream_generate(prompt, **(generation or {}))
 
 
-def _stream_answer(question, ids, docs, metas, dists, query_type, generation=None, trace=None):
+def _stream_answer(question, ids, docs, metas, dists, query_type, generation=None, trace=None, allow_gap_fill=False):
     """Stream the answer (and any gap-fill re-answer) for a prepared context.
 
     Yields {"type": "token", "text"} deltas and {"type": "reset"} before a
@@ -379,6 +381,9 @@ def _stream_answer(question, ids, docs, metas, dists, query_type, generation=Non
     for delta in _stream_generation(question, docs, query_type, generation=generation):
         answer += delta
         yield {"type": "token", "text": delta}
+
+    if not allow_gap_fill:
+        return answer, ids, docs, metas, dists, False
 
     if (answer or "").strip() and not MISSING_REGEX.search(answer or ""):
         return answer, ids, docs, metas, dists, False
@@ -439,7 +444,7 @@ def _stream_answer(question, ids, docs, metas, dists, query_type, generation=Non
     return answer, ids, docs, metas, dists, extra.get("rerank_used", False)
 
 
-def ask_stream(question, metadata_filter=None, generation=None, trace=None):
+def ask_stream(question, metadata_filter=None, generation=None, trace=None, allow_gap_fill=False):
     """Streaming variant of ask().
 
     Yields {"type": "token", "text"} deltas (with {"type": "reset"} between
@@ -457,7 +462,7 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None):
             ids, docs, metas, dists, rerank_used = prepared
             answer, ids, docs, metas, dists, gap_used = yield from _stream_answer(
                 question, ids, docs, metas, dists, "entity",
-                generation=generation, trace=trace,
+                generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
             )
             if trace is not None:
                 trace["generation"] = dict(generation or {})
@@ -491,7 +496,7 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None):
     )
     answer, ids, documents, metadatas, distances, gap_used = yield from _stream_answer(
         question, ids, documents, metadatas, distances, qt,
-        generation=generation, trace=trace,
+        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
     )
     if trace is not None:
         trace["generation"] = dict(generation or {})
@@ -517,7 +522,7 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None):
     }}
 
 
-def ask(question, metadata_filter=None, generation=None, trace=None):
+def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_fill=False):
     query_type = classify_query(question)
     if trace is not None:
         trace.setdefault("query", question)
@@ -526,7 +531,7 @@ def ask(question, metadata_filter=None, generation=None, trace=None):
     if query_type == "entity":
         prepared = _prepare_entity(question)
         if prepared is not None:
-            return _ask_entity(question, generation=generation, trace=trace)
+            return _ask_entity(question, generation=generation, trace=trace, allow_gap_fill=allow_gap_fill)
         query_type = "general"
 
     if query_type == "comparison":
@@ -554,7 +559,7 @@ def ask(question, metadata_filter=None, generation=None, trace=None):
     answer = generate(prompt, **(generation or {}))
     answer, ids, documents, metadatas, distances, gap_used = _gap_fill(
         question, answer, ids, documents, metadatas, distances, qt,
-        generation=generation, trace=trace,
+        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
     )
 
     if trace is not None:

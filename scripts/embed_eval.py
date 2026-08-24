@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 
 try:
@@ -149,6 +150,21 @@ BAKEOFF_CANDIDATES = [
         "vram_mb": 329,
     },
 ]
+# The production embedder (bge-small-f16) is the single-source `EMBED_MODEL`
+# from mise.toml [env] — keep the bake-off measuring the CURRENT production
+# embed even after a swap. Other candidates stay comparison literals.
+try:
+    _embed_env = tomllib.loads(
+        (Path(__file__).resolve().parent.parent / "mise.toml").read_text(encoding="utf-8")
+    ).get("env", {})
+    if _embed_env.get("EMBED_MODEL"):
+        for _c in BAKEOFF_CANDIDATES:
+            if _c["name"] == "bge-small-f16":
+                _c["hf"] = _embed_env["EMBED_MODEL"]
+                break
+    del _embed_env
+except (OSError, tomllib.TOMLDecodeError):
+    pass  # fall back to the literal in the manifest
 
 
 def truncate(texts):

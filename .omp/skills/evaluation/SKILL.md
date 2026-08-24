@@ -90,7 +90,7 @@ Each file:
   prefix borrowed from another family is a confound (`mxbai-xsmall`'s bare is
   its card behavior, not an oversight). **Production embed is bge-small-f16**
   (wired 2026-08-22): `Represent this sentence...` query prefix, docs bare,
-  pooling `cls`, hard 512-token input cap (`llama_embeddings.MAX_EMBED_CHARS`).
+  pooling `cls`, hard 512-token server cap (input chars clipped to `llama_embeddings.MAX_EMBED_CHARS` = 2000).
 
 ## Two layers of measurement
 

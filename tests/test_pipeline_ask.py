@@ -90,7 +90,7 @@ def test_general_gap_fill_keeps_sources_well_formed(monkeypatch):
     _setup_general(monkeypatch, fake_generate)
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
 
-    result = pipeline.ask("how do I level Cheesemaking")
+    result = pipeline.ask("how do I level Cheesemaking", allow_gap_fill=True)
 
     sources = result["sources"]
     # original doc + one gap-filled doc, both well typed

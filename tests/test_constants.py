@@ -19,9 +19,12 @@ def test_context_budget_in_config():
     assert isinstance(CONTEXT_BUDGET, int) and CONTEXT_BUDGET > 0
 
 
-def test_v37_general_top_k_20():
+def test_general_top_k_40():
+    """General-path TOP_K defaults to 40 (2x context) so the thinking-on
+    model has more retrieved material to reason over. Contract change from
+    V37's 20."""
     from scripts.pg_rag import Pipe
-    assert Pipe.Valves().TOP_K == 20, "V37: general TOP_K must default to 20"
+    assert Pipe.Valves().TOP_K == 40, "general TOP_K must default to 40"
 
 
 def test_v2_chroma_path_consistent():

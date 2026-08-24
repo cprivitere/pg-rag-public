@@ -122,7 +122,7 @@ def test_gap_fill_fires_once(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.generate", fake_generate)
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
 
-    result = pipeline.ask("what is the Dungcrafting skill")
+    result = pipeline.ask("what is the Dungcrafting skill", allow_gap_fill=True)
 
     assert len(prompts) == 2
     assert "Quest: Graffiti Mastering Poop" in prompts[1]
@@ -152,7 +152,7 @@ def test_gap_fill_empty_subject_falls_back_to_question(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.generate", fake_generate)
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
 
-    result = pipeline.ask("what is Dungcrafting")
+    result = pipeline.ask("what is Dungcrafting", allow_gap_fill=True)
     assert len(retrieved) == 1
     assert "what is dungcrafting" in retrieved[0].strip().lower()
     assert len(calls) == 2
@@ -178,7 +178,7 @@ def test_gap_fill_max_one_loop(monkeypatch):
         },
     )
 
-    pipeline.ask("what is Dungcrafting")
+    pipeline.ask("what is Dungcrafting", allow_gap_fill=True)
     assert len(calls) == 2
 
 
@@ -203,7 +203,7 @@ def test_gap_fill_empty_answer_retries_without_retrieve(monkeypatch):
         },
     )
 
-    result = pipeline.ask("what is Dungcrafting")
+    result = pipeline.ask("what is Dungcrafting", allow_gap_fill=True)
 
     assert len(calls) == 2
     assert len(retrieved) == 0
@@ -231,7 +231,7 @@ def test_gap_fill_empty_answer_then_retrieve(monkeypatch):
         },
     )
 
-    result = pipeline.ask("what is Dungcrafting")
+    result = pipeline.ask("what is Dungcrafting", allow_gap_fill=True)
 
     assert len(calls) == 3
     assert len(retrieved) == 1

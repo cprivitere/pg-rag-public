@@ -3,6 +3,31 @@
 WEBUI_DIR = "F:/ProjectGorgon/mywebui"
 # Logs directory
 LOGS_DIR = "{{ config_root }}/logs"
+# Point PATH to your uv virtual environment's ROCm libraries
+_PATH = "F:/AI/amd-utils/.venv/Lib/site-packages/_rocm_sdk_libraries/bin"
+HSA_OVERRIDE_GFX_VERSION = "11.0.0"
+# Model identities — SINGLE SOURCE of truth. Every consumer reads these:
+#   - `mise debug-embed` / `debug-llm` (via {{ env.X }})
+#   - `.mise/tasks/*-start.ps1` (via $env:X)
+#   - scripts/vram_sweep.py + scripts/check_docs.py (via tomllib)
+# Swap a model (ref + its tuning flags) here; nothing else should change.
+# Launchers append their own host/port/-np/batch/log-file assembly.
+# `mise drift` fails if any consumer hardcodes a model literal.
+# Thinking is ON (default) with `--reasoning-budget 4096`: caps deliberation so
+# a bigger context (CONTEXT_BUDGET=68000, ~2x) can't starve the answer — verified
+# that unbounded thinking over >10k tokens emits empty `content`, and the budget
+# fixes it (content guaranteed, `finish=stop`). -c 32768 covers the larger prompt
+# (~16k tok) plus 8192 output; VRAM is flat (~8 GB) 16K → native 262144, so more
+# context is free if CONTEXT_BUDGET ever rises or for plain chat.
+LLM_MODEL = "unsloth/Qwen3.5-9B-MTP-GGUF:UD-Q4_K_XL"
+LLM_FLAGS = "--spec-type draft-mtp --spec-draft-n-max 6 -ngl 999 -fa on -c 32768 --reasoning-budget 4096"
+# Embeddings — bge-small-en; cls pooling; 512-token hard cap (see
+# llama_embeddings.MAX_EMBED_CHARS). Changing the model = full re-embed.
+EMBED_MODEL = "unsloth/bge-small-en-v1.5-GGUF:f16"
+EMBED_FLAGS = "--embedding --pooling cls -ngl 99 -c 512"
+# Reranker — bge-reranker-v2-m3 cross-encoder; lexical fallback if :8082 down.
+RERANK_MODEL = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
+RERANK_FLAGS = "--reranking --pooling rank -ngl 99"
 
 [task_config]
 # Default to PowerShell on Windows with -NoProfile (mise default)
@@ -131,14 +156,14 @@ alias = "bk"
 # Debug/foreground commands
 [tasks."debug-embed"]
 description = "Start embedding server in foreground (debug)"
-run = "llama-server -hf unsloth/bge-small-en-v1.5-GGUF:f16 --host 0.0.0.0 --port 8081 --embedding --pooling cls -ngl 99 --ubatch-size 8192 -np 1 -c 512"
+run = "llama-server -hf {{ env.EMBED_MODEL }} --host 0.0.0.0 --port 8081 {{ env.EMBED_FLAGS }} --ubatch-size 8192 -np 1"
 alias = "dse"
 
 # --- LLM server ---
 
 [tasks."debug-llm"]
 description = "Start LLM server in foreground (debug)"
-run = "llama-server -hf unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL --spec-type draft-mtp --spec-draft-n-max 4 -ngl 999 -fa on -c 16384 --reasoning-budget 1024 --host 0.0.0.0 --port 8080"
+run = "llama-server -hf {{ env.LLM_MODEL }} {{ env.LLM_FLAGS }} --host 0.0.0.0 --port 8080"
 alias = "dsl"
 
 # --- Open WebUI ---

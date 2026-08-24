@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -148,6 +149,73 @@ def main() -> int:
             _drift(f"skill {name} missing frontmatter")
         else:
             _report("OK", f"skill {name} present")
+
+    # --- 6. Model refs are single-sourced in mise.toml [env] ---------------
+    # Every consumer (.mise/tasks/*-start.ps1, mise debug-* tasks, AGENTS.md,
+    # skills docs) must reference the *_MODEL/*_FLAGS variable / template —
+    # never the literal value. A swapped model without the SAME edit in all
+    # consumers is exactly the drift this catches (a bare literal in any
+    # consumer file = a leftover from before the swap).
+    try:
+        mise_env = tomllib.loads(_read("mise.toml")).get("env", {})
+    except (OSError, tomllib.TOMLDecodeError) as exc:  # pragma: no cover
+        _drift("cannot parse mise.toml [env]", str(exc))
+        mise_env = {}
+
+    model_keys = ["LLM_MODEL", "LLM_FLAGS", "EMBED_MODEL", "EMBED_FLAGS",
+                  "RERANK_MODEL", "RERANK_FLAGS"]
+    if all(k in mise_env for k in model_keys):
+        # Files where a literal model ref/flag WOULD be a leftover. vram_sweep
+        # carries deliberate equal fallbacks (reads env first) — excluded.
+        consumers = {
+            "llm-start.ps1": ROOT / ".mise" / "tasks" / "llm-start.ps1",
+            "embed-start.ps1": ROOT / ".mise" / "tasks" / "embed-start.ps1",
+            "rerank-start.ps1": ROOT / ".mise" / "tasks" / "rerank-start.ps1",
+            "mise.toml debug-* tasks": ROOT / "mise.toml",
+            "AGENTS.md": ROOT / "AGENTS.md",
+        }
+        for label, path in consumers.items():
+            text = path.read_text(encoding="utf-8")
+            if label == "mise.toml debug-* tasks":
+                # mise.toml itself legitimately CONTAINS the values (it is
+                # the source) — only the debug-* task run-strings must
+                # reference {{ env.X }}. Only debug-embed + debug-llm exist
+                # (no debug-rerank), so check just the EMBED/LLM keys.
+                task_keys = [k for k in model_keys if k.startswith(("LLM_", "EMBED_"))]
+                leaks = [k for k in task_keys if f"{{{{ env.{k} }}}}" not in text]
+                if leaks:
+                    _drift("mise debug tasks missing env template", ", ".join(leaks))
+                else:
+                    _report("OK", "mise debug tasks reference env templates")
+            else:
+                leaked = [k for k in model_keys if mise_env[k] in text]
+                if leaked:
+                    _drift(f"{label} hardcodes model literal",
+                           ", ".join(f"{k}={mise_env[k]}" for k in leaked))
+                else:
+                    varref = [v for v in ("LLM_MODEL", "EMBED_MODEL", "RERANK_MODEL",
+                                          "LLM_FLAGS", "EMBED_FLAGS", "RERANK_FLAGS")
+                              if v in text]
+                    _report("OK", f"{label} references env vars: {', '.join(varref) or 'none'}")
+
+        # embed_eval.py's production bake-off candidate must read EMBED_MODEL
+        # from [env] (it legitimately carries OTHER candidates as literals —
+        # only the production row is single-sourced). Assert the env reference
+        # rides along with the manifest, not that literals are absence (which
+        # would false-positive on the comparison models).
+        ee = (ROOT / "scripts" / "embed_eval.py").read_text(encoding="utf-8")
+        if "EMBED_MODEL" in ee and not re.search(
+                r'tomllib\.loads.*EMBED_MODEL|get\("EMBED_MODEL"\)', ee, re.S):
+            _drift("embed_eval.py references EMBED_MODEL but not from mise.toml [env]")
+        elif "EMBED_MODEL" not in ee:
+            _drift("embed_eval.py no longer references EMBED_MODEL (production bake-off unfixed)")
+        else:
+            _report("OK", "embed_eval.py production candidate sourced from EMBED_MODEL")
+
+    else:
+        # A missing key silently skips all model checks — fail loudly instead.
+        _drift("missing model env keys in mise.toml [env]",
+               ", ".join(k for k in model_keys if k not in mise_env))
 
     # --- Report -------------------------------------------------------------
     print(f"drift check: {sum(1 for t, *_ in _lines if t == 'OK')} OK, "

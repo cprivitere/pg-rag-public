@@ -23,7 +23,7 @@ reference files, symbols, and code only.
 - weaken or delete the stale-`DOCUMENTS_VERSION` refusal in `load_documents` (`build_index.py`)? It is directly tested (`test_build_index.py`::`test_documents_version_refuses_stale`), so a weakened guard must not pass silently.
 - accidentally trigger a full corpus rebuild (~135k docs, 98 MB; expensive)?
 - introduce unnecessary dependencies or MCP servers?
-- respect `CONTEXT_BUDGET` (entity context capped at 34000 chars)?
+- respect `CONTEXT_BUDGET` (entity context capped at 68000 chars)?
 - touch wiki loading in a way that could clobber `data/wiki/.meta.json` (tests MUST patch to tmp dirs)?
 
 ## Traps particular to this repo
