@@ -1,0 +1,11 @@
+{
+  "id": "gardeningrelated_items",
+  "question": "Which items are GardeningRelated?",
+  "type": "general",
+  "facts": [
+    ["pig poop"],
+    ["cow poop"],
+    ["gardeningrelated"],
+    ["guano"]
+  ]
+}

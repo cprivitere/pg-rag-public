@@ -1,0 +1,10 @@
+{
+  "id": "chalice-saga-lore",
+  "question": "What is the Chalice Saga about?",
+  "type": "general",
+  "facts": [
+    ["chalice saga"],
+    ["vol"],
+    ["god of death"]
+  ]
+}

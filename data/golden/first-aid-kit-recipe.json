@@ -1,0 +1,10 @@
+{
+  "id": "first-aid-kit-recipe",
+  "question": "What skill do I need to make an Amazing First Aid Kit?",
+  "type": "recipe",
+  "facts": [
+    ["first aid kit", "first aid"],
+    ["toolcrafting"],
+    ["55"]
+  ]
+}

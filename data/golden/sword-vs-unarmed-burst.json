@@ -1,0 +1,11 @@
+{
+  "id": "sword-vs-unarmed-burst",
+  "question": "Which skill has higher single target burst damage, Sword or Unarmed?",
+  "type": "comparison",
+  "facts": [
+    ["sword"],
+    ["unarmed"],
+    ["very damaging"],
+    ["not especially damaging"]
+  ]
+}

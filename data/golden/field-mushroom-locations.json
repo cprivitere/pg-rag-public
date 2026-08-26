@@ -1,0 +1,13 @@
+{
+  "id": "field-mushroom-locations",
+  "question": "Where can I find Field Mushrooms?",
+  "type": "general",
+  "facts": [
+    ["field mushroom"],
+    ["mycology"],
+    ["15"],
+    ["myconian cave", "myconian"],
+    ["eltibule"],
+    ["ranalon"]
+  ]
+}

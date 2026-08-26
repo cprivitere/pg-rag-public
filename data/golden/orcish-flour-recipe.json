@@ -1,0 +1,10 @@
+{
+  "id": "orcish-flour-recipe",
+  "question": "What skill and level do I need to make Orcish Flour?",
+  "type": "entity",
+  "facts": [
+    ["Orcish Flour"],
+    ["Cooking"],
+    ["80"]
+  ]
+}

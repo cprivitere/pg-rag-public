@@ -1,0 +1,11 @@
+{
+  "id": "white-dye-recipe",
+  "question": "What do I need to craft White Dye?",
+  "type": "recipe",
+  "facts": [
+    ["white dye"],
+    ["moonstone"],
+    ["dye making", "dyemaking"],
+    ["16"]
+  ]
+}

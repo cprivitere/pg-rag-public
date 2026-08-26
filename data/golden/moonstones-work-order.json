@@ -1,0 +1,12 @@
+{
+  "id": "moonstones-work-order",
+  "question": "What does the Work Order for Moonstones ask for?",
+  "type": "entity",
+  "facts": [
+    ["work order"],
+    ["moonstone"],
+    ["viedesi"],
+    ["sun vale"],
+    ["10"]
+  ]
+}

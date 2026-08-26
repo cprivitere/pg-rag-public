@@ -1,0 +1,11 @@
+{
+  "id": "healing-potion-omega",
+  "question": "What is the Healing Potion Omega recipe?",
+  "type": "recipe",
+  "facts": [
+    ["healing potion omega"],
+    ["mycology"],
+    ["40"],
+    ["200 health", "restore 200"]
+  ]
+}

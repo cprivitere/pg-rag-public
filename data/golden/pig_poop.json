@@ -1,0 +1,12 @@
+{
+  "id": "pig_poop",
+  "question": "What is Pig Poop?",
+  "type": "entity",
+  "facts": [
+    ["pig poop", "poop from a pig", "pigpoop"],
+    ["animalpoop450", "animalpoop 450", "450"],
+    ["gardeningrelated"],
+    ["stack size", "stack of 100", "stack 100", "stack"],
+    ["4.5", "value"]
+  ]
+}

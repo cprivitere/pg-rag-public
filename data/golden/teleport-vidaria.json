@@ -1,0 +1,10 @@
+{
+  "id": "teleport-vidaria",
+  "question": "What does the Personal Teleportation Device - Vidaria do?",
+  "type": "entity",
+  "facts": [
+    ["personal teleportation device"],
+    ["vidaria"],
+    ["teleport"]
+  ]
+}

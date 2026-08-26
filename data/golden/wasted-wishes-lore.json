@@ -1,0 +1,10 @@
+{
+  "id": "wasted-wishes-lore",
+  "question": "Tell me about the lore book The Wasted Wishes.",
+  "type": "general",
+  "facts": [
+    ["wasted wishes"],
+    ["leeka"],
+    ["serbule"]
+  ]
+}

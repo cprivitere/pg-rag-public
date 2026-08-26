@@ -1,0 +1,18 @@
+{
+  "id": "gazluk-keep-dungeon-level",
+  "question": "What level should I be for Gazluk Keep?",
+  "type": "general",
+  "facts": [
+    [
+      "Gazluk Keep"
+    ],
+    [
+      "5 players",
+      "5-6 players",
+      "group of 5",
+      "five or six players",
+      "five to six players",
+      "group of five"
+    ]
+  ]
+}

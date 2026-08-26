@@ -1,0 +1,10 @@
+{
+  "id": "fireball-ability",
+  "question": "What does the Fireball ability do?",
+  "type": "entity",
+  "facts": [
+    ["fireball"],
+    ["fire magic", "firemagic"],
+    ["throw a ball of fire"]
+  ]
+}

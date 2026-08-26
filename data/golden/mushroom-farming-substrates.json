@@ -1,0 +1,13 @@
+{
+  "id": "mushroom-farming-substrates",
+  "question": "What is a mushroom substrate in Mushroom Farming?",
+  "type": "general",
+  "facts": [
+    ["substrate"],
+    ["dirt"],
+    ["bone"],
+    ["meat"],
+    ["organs"],
+    ["limbs"]
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "punch-ability",
+  "question": "What is the Punch ability?",
+  "type": "entity",
+  "facts": [
+    ["punch"],
+    ["unarmed"],
+    ["open hand"]
+  ]
+}

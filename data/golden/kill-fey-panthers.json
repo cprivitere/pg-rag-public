@@ -1,0 +1,11 @@
+{
+  "id": "kill-fey-panthers",
+  "question": "What does the Kill Fey Panthers quest require?",
+  "type": "entity",
+  "facts": [
+    ["fey panther", "fey panthers"],
+    ["kalaba"],
+    ["eltibule"],
+    ["2"]
+  ]
+}

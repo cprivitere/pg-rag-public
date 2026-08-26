@@ -219,7 +219,15 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-data/
+# The golden eval corpus is a tracked test fixture (tests/test_golden_check.py
+# parametrizes over data/golden/*.json at collection time) — unlike the rest of
+# data/, it must survive a fresh clone. Git can't re-include files under an
+# excluded parent, so ignore dir contents (data/*), not the dir itself.
+data/*
+!data/golden/
+data/golden/*
+!data/golden/*.json
+
 .vscode/
 
 # OpenCode superpowers/agent config — never commit

@@ -1,0 +1,11 @@
+{
+  "id": "punch-vs-front-kick",
+  "question": "Which ability deals more damage, Punch or Front Kick?",
+  "type": "comparison",
+  "facts": [
+    ["front kick"],
+    ["11"],
+    ["punch"],
+    ["6"]
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "fireball-vs-fire-breath",
+  "question": "What is the difference between Fireball and Fire Breath?",
+  "type": "comparison",
+  "facts": [
+    ["fireball"],
+    ["fire breath"],
+    ["14"],
+    ["80"]
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "grow-field-mushrooms",
+  "question": "How do I grow Field Mushrooms?",
+  "type": "general",
+  "facts": [
+    ["field mushroom"],
+    ["mycology level of 15", "mycology level 15", "mycology 15", "15 mycology"],
+    ["5 hours", "05 hrs", "five hours"],
+    ["bone"],
+    ["organs"]
+  ]
+}

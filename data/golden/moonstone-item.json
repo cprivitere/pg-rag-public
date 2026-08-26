@@ -1,0 +1,9 @@
+{
+  "id": "moonstone-item",
+  "question": "What is Moonstone used for?",
+  "type": "entity",
+  "facts": [
+    ["moonstone"],
+    ["new beginnings"]
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "blacksmithing-skill",
+  "question": "Tell me about the Blacksmithing skill.",
+  "type": "entity",
+  "facts": [
+    ["blacksmithing"],
+    ["metal equipment", "metal armor", "metal equipment"],
+    ["buttress"]
+  ]
+}

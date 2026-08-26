@@ -1,0 +1,11 @@
+{
+  "id": "get-pig-snout-quest",
+  "question": "What does the quest Get a Pig Snout require?",
+  "type": "entity",
+  "facts": [
+    ["pig snout"],
+    ["joeh"],
+    ["skinner"],
+    ["serbule"]
+  ]
+}

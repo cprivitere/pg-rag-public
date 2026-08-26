@@ -1,0 +1,12 @@
+{
+  "id": "recipes_using_animal_feces",
+  "question": "What recipes use Animal Feces?",
+  "type": "general",
+  "facts": [
+    ["basic fertilizer from animal feces", "basic fertilizer"],
+    ["level 25", "skill level 25"],
+    ["bottle of water"],
+    ["animal poop"],
+    ["0 to 5 doses", "zero to five"]
+  ]
+}

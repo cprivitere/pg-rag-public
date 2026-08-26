@@ -1,0 +1,10 @@
+{
+  "id": "fireball-2",
+  "question": "What is Fireball 2?",
+  "type": "entity",
+  "facts": [
+    ["fireball 2"],
+    ["fire magic", "firemagic"],
+    ["25"]
+  ]
+}

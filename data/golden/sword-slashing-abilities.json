@@ -1,0 +1,9 @@
+{
+  "id": "sword-slashing-abilities",
+  "question": "Which Sword abilities deal Slashing damage?",
+  "type": "general",
+  "facts": [
+    ["Slashing"],
+    ["Sword Slash", "Parry", "Many Cuts"]
+  ]
+}

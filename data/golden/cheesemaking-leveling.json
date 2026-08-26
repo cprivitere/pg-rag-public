@@ -1,0 +1,15 @@
+{
+  "id": "cheesemaking-leveling",
+  "question": "What is the most efficient way to level Cheesemaking from level 17 to 25?",
+  "type": "entity",
+  "facts": [
+    ["6990", "6,990", "6 990", "six thousand nine hundred ninety"],
+    ["11710", "cumulative 11710", "cumulative 11,710", "11,710", "level 25"],
+    ["4720", "cumulative 4720", "cumulative 4,720", "4,720", "level 17"],
+    ["munster", "munster cheese", "level 17"],
+    ["sharp cheddar", "sharp cheddar cheese", "96", "96 xp"],
+    ["first-time", "first time", "first-craft", "first craft"],
+    ["repeat", "spam", "highest"],
+    ["recipe", "crafts", "craft"]
+  ]
+}

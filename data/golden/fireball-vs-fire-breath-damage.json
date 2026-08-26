@@ -1,0 +1,11 @@
+{
+  "id": "fireball-vs-fire-breath-damage",
+  "question": "Which ability deals more damage, Fireball or Fire Breath?",
+  "type": "comparison",
+  "facts": [
+    ["fire breath"],
+    ["80"],
+    ["fireball"],
+    ["14"]
+  ]
+}

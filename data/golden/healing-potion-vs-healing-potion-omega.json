@@ -1,0 +1,13 @@
+{
+  "id": "healing-potion-vs-healing-potion-omega",
+  "question": "What is the difference between the Healing Potion and Healing Potion Omega recipes?",
+  "type": "comparison",
+  "facts": [
+    ["healing potion"],
+    ["healing potion omega"],
+    ["75"],
+    ["200"],
+    ["alchemy"],
+    ["mycology"]
+  ]
+}

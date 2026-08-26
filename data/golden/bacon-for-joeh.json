@@ -1,0 +1,10 @@
+{
+  "id": "bacon-for-joeh",
+  "question": "What is the Bacon for Joeh quest?",
+  "type": "entity",
+  "facts": [
+    ["bacon"],
+    ["joeh"],
+    ["serbule"]
+  ]
+}

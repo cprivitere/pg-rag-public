@@ -1,0 +1,16 @@
+{
+  "id": "ranalon-den-quests",
+  "question": "Who gives quests in the Ranalon Den area?",
+  "type": "general",
+  "facts": [
+    [
+      "ranalon den"
+    ],
+    [
+      "chirrra"
+    ],
+    [
+      "orrrilund"
+    ]
+  ]
+}

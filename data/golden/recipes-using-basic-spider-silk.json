@@ -1,0 +1,10 @@
+{
+  "id": "recipes-using-basic-spider-silk",
+  "question": "What recipes can I make with Basic Spider Silk at Tailoring 4?",
+  "type": "general",
+  "facts": [
+    ["beginner s tailoring practice", "beginners tailoring practice", "beginner tailoring practice"],
+    ["tailoring"],
+    ["4"]
+  ]
+}
