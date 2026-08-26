@@ -18,6 +18,9 @@ KNOWN_TYPES = {
     "lorebook", "directedgoal", "area", "itemuse", "landmark", "title",
     "vault", "advancementtable", "ai", "attribute", "source", "tsys",
     "xptable", "abilitykeyword", "wiki", "summary", "curated", "skillprofile",
+    # computed leveling dossier (skill_profiles.build_leveling_documents);
+    # the chunker TOKEN_BUDGETED_TYPES treats it as a token-budgeted family.
+    "leveling",
 }
 KNOWN_SOURCES = {"cdn", "wiki", "computed", "curated"}
 

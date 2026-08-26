@@ -304,12 +304,18 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     # recall + wiki expansion as "general" — an answer is a fact, not a
     # comparison, so a 3-doc dense-only window starves it.
     is_wide = query_type in ("general", "lookup")
+    # A creature-location plan narrows Chroma to the `creatures` table, so
+    # every candidate is on-topic. "List all the locations with <animals>"
+    # needs the full spawn-zone table, not a tight top-k: a wider surfaced
+    # count keeps rarer spawns (Wooly Mountain Goat ~rerank-62, Infernal
+    # Buck ~dense-106) instead of dropping valid answers at the cut.
+    plan_count = 80 if (metadata_filter or {}).get("table") == "creatures" else (40 if is_wide else 3)
     results = retrieve(
         question,
         metadata_filter=metadata_filter,
         token_filter=token_filter,
         query_type=query_type,
-        count=40 if is_wide else 3,
+        count=plan_count,
         hybrid=is_wide,
         trace=trace,
     )

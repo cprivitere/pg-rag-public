@@ -70,6 +70,24 @@ _DAMAGE = re.compile(r"\b(?:fire|ice|cold|electric|lightning|acid|poison|"
                      r"holy|nature|nothingness|trauma|demonic|regeneration|"
                      r"smiting)\b", re.I)
 
+# Creature-location listing: "the locations with deer, sheep, goats, ..." /
+# "where do deer live" enumerates spawn zones. The authoritative answer table
+# is `creatures`; restricting the Chroma `where` to it sidesteps top-k
+# similarity starve of rarer spawns (e.g. Infernal Buck at dense-rank ~106)
+# and returns the complete spawn-zone table instead of the usual mixed
+# skill/treasure noise. Both sides must hold — a location phrase AND an
+# animal/creature token — so "the locations of blacksmithing trainers" never
+# traps itself in the creatures table.
+_CREATURE_LOCATION = re.compile(
+    r"\b(?:all\s+)?locations?\s+(?:with|of|containing|featuring|that\s+(?:have|hold))"
+    r"|\bwhere[\s\S]*?\b(?:live|spawn|roam|graze|are found)\b", re.I
+)
+_ANIMAL = re.compile(
+    r"(?:deer|sheep|goats?|cows?|oxen|\box(?:en)?\b|bison|cattle|gazelle|yaks?|"
+    r"bighorn|rams?|ewes?|lambs?|calves?\b|bulls?|pigs?|boars?|turkeys?|"
+    r"moose|elk|caribou|mammoths?|stags?|buffalo|critters?|animals?|creatures?)", re.I
+)
+
 
 def _canonical_skill(token):
     """'flower arrangement' -> FlowerArrangement (exact metadata form)."""
@@ -165,6 +183,14 @@ def plan_query(question):
     q = " ".join(str(question or "").lower().split())
     if not q:
         return None
+
+    # --- Creature-location listing (e.g. "locations with deer, sheep, ...") --
+    if _CREATURE_LOCATION.search(q) and _ANIMAL.search(q):
+        return {
+            "native": {"table": "creatures"},
+            "token": {},
+            "label": "creature locations",
+        }
 
     # --- Ability + damage type ---
     if _ABILITY.search(q):

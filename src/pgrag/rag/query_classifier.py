@@ -80,6 +80,12 @@ AGGREGATION_PATTERNS = [
     r"\bwho\s+gives?\s+quests?\s+in\b",
     r"\blore\s+book\b",
     r"\bsaga\b",
+    # Location-listing intent: "List the locations with deer, sheep, ..." or
+    # "locations containing X" enumerates places (a filter over creature/area
+    # docs), not a comparison of the named skills ("Deer", "Cow") — which
+    # would otherwise route to skill-trainer dossiers instead of spawn zones.
+    r"\b(?:all\s+)?locations?\s+(?:with|of|containing|that\s+(?:have|hold|feature)|in)\b",
+    r"\blist\s+(?:me\s+|all\s+|the\s+)*locations?\b",
 ]
 
 # Category-listing intent: "Which <category> <verb> ...?" enumerates a class

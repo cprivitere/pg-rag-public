@@ -126,6 +126,16 @@ def test_aggregation_recipes_use_stays_general():
     entity is a filter, not the answer — so it must NOT route to the single
     item dossier. Paired inverse: 'make Orcish Flour' IS the entity target."""
     assert classify_query("What recipes use Animal Feces?") == "general"
+
+def test_location_listing_of_animals_stays_general():
+    """'List the locations with deer, sheep, goats, cows, or oxen' enumerates
+    spawn zones (creature docs), NOT a comparison of the 'Deer'/'Cow' skills.
+    The multi-animal list must route to the wide general path, not the
+    multi-entity skill dossiers (which would answer with skill-trainer
+    locations and 0 sources)."""
+    assert classify_query(
+        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
+    ) == "general"
     assert classify_query("What recipes can I make with Spider Silk at Tailoring 4?") == "general"
     assert classify_query("What skill and level do I need to make Orcish Flour?") == "entity"
 

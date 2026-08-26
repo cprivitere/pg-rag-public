@@ -31,7 +31,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
 ```
 
 - **One-shot pipeline**: LLM gets a fixed context and answers once. Only `_gap_fill` / `_stream_answer` re-retrieve (`_AGENTIC_MAX_ROUNDS = 1`, one bounded sibling expansion via `rag/resolve.py`). No agentic tool-calling. `ask()`/`ask_stream()` take `allow_gap_fill=False` by default — re-retrieval on empty/"I don't know" answers is opt-in via `allow_gap_fill=True`.
-- **Freshness contract (avoid stale-document trap)**: `build-documents` stamps `data/derived/documents_version.json` with `DOCUMENTS_VERSION` (config.py, currently `4`). `build-index` only reads the persisted `documents.json` and refuses to embed if the stored version differs — it never regenerates. To converge a source in one command, use `mise sync-*` tasks (they run `build-documents` first). Bump `DOCUMENTS_VERSION` whenever document shape changes.
+- **Freshness contract (avoid stale-document trap)**: `build-documents` stamps `data/derived/documents_version.json` with `DOCUMENTS_VERSION` (config.py, currently `7`). `build-index` only reads the persisted `documents.json` and refuses to embed if the stored version differs — it never regenerates. To converge a source in one command, use `mise sync-*` tasks (they run `build-documents` first). Bump `DOCUMENTS_VERSION` whenever document shape changes.
 
 ## Key Directories
 

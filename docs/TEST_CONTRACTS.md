@@ -65,14 +65,27 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 - **Tests**: `test_documents.py`, `test_chunking.py`, `test_skill_profiles.py`,
   `test_summaries.py`, `test_gathering_summaries.py`, `test_doc_quality.py`,
   `test_flatten.py`, `test_resolve.py`, `test_metadata.py`,
-  `test_wiki_expansion.py`, `test_wiki_builder.py`, `test_leveling.py`
+  `test_wiki_expansion.py`, `test_wiki_builder.py`, `test_leveling.py`,
+  `test_creature_zones.py`
 - **Source**: `src/pgrag/documents/` (`builder.py`, `wiki_builder.py`,
-  `chunking.py`, `resolver.py`, `skill_profiles.py`, `summaries.py`),
-  `src/pgrag/build.py`
+  `chunking.py`, `resolver.py`, `skill_profiles.py`, `summaries.py`,
+  `creature_zones.py`), `src/pgrag/build.py`
 - **Contracts**: doc key shape `{id, type, text, metadata}`; metadata
   Chroma-safety (add-only, scalar-only, multi-value `" | "`-delimited —
   `test_doc_quality.py`); chunk max/overlap + `_chunk_N` ids; summary +
   gathering grouping/ranking; resolver cross-refs; leveling doc shape.
+  `creature_zones.py` (`build_creature_zones_documents`): one
+  `creature_<Name>` wiki doc per MOB page with ≥1 zone, `table=creatures`,
+  `metadata.creature_type`/`locations`; zone order = MOB `area=` then zone
+  categories, deduped; lead description stripped of all `{{`/`}}` wiki
+  residue (hygiene guard — multi-line MOB templates must not leak into the
+  description). `build_leveling_documents` emits `type="leveling"`.
+- **Change ⇒** `uv run pytest tests/test_documents.py tests/test_chunking.py
+  tests/test_metadata.py tests/test_creature_zones.py tests/test_doc_quality.py`
+  (+ the file you edited).
+- **Version coupling**: changing document **shape** means bumping
+  `DOCUMENTS_VERSION` in `src/pgrag/config.py` and re-stamping via
+  `build-documents` — `build-index` refuses a stale generation (see L2).
 - **Change ⇒** `uv run pytest tests/test_documents.py tests/test_chunking.py
   tests/test_metadata.py tests/test_doc_quality.py` (+ the file you edited).
   Then inspect representative docs after `pgrag build-documents` (RULES #7).
@@ -157,7 +170,16 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   fallback keeps lexical order + records failure stats; classifier intents
   (entity/comparison/general/leveling, 50+ parametrized cases); `plan_query`
   native `$and` extraction + ingredient stopword phrasing; entity
-  word-boundary/plural/typo resolution.
+  word-boundary/plural/typo resolution. **Creature-location routing**
+  ("locations with/where … deer|sheep|goats|…"): classifier `AGGREGATION`
+  keeps such listings `general` (not a single-entity skill-trainer hijack),
+  and `plan_query` returns the high-confidence plan
+  `{"native": {"table": "creatures"}, "token": {}, "label": "creature locations"}`
+  when a location phrase AND an animal/creature token co-occur — asserted by
+  `test_query_classifier.py::test_location_listing_of_animals_stays_general`
+  and `test_query_plan.py::test_creature_location_listing_plans_to_creatures_table`.
+- **Change ⇒** `uv run pytest tests/test_rerank*.py tests/test_query_classifier*.py
+  tests/test_query_plan.py tests/test_entity_detection.py`
 - **Change ⇒** `uv run pytest tests/test_rerank*.py tests/test_query_classifier*.py
   tests/test_query_plan.py tests/test_entity_detection.py`
 - Note: this trio is **not** redundant — `test_rerank.py` = lexical scoring +
@@ -176,7 +198,10 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   `_gap_fill` bounds (`_AGENTIC_MAX_ROUNDS = 1`, id-deduped, budget-capped);
   deterministic `temp=0`/`seed=0`; streaming token emission + gap-fill reset;
   prompt fabrication-block directives ("never fabricate"); source citation
-  formatting.
+  formatting. `_prepare_general` widens the surfaced count to **80** (vs 40)
+  when the plan's native filter is `{"table": "creatures"}` so `list-all`
+  spawn queries don't drop rarer spawns at the rerank cut — asserted by
+  `test_pipeline_ask.py::test_creature_location_plan_filters_table_and_widens_count`.
 - **Change ⇒** `uv run pytest tests/test_pipeline_*.py tests/test_llm.py
   tests/test_prompts.py`
 - Note: the `test_pipeline_*.py` files are **not** one contract each — they

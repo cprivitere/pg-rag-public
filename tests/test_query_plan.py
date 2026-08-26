@@ -125,3 +125,26 @@ def test_generic_unrelated_unplanned():
 def test_empty_unplanned():
     assert plan_query("") is None
     assert plan_query(None) is None
+
+
+def test_creature_location_listing_plans_to_creatures_table():
+    """'List the locations with deer, sheep, goats, cows, or oxen' — the
+    authoritative answer table is `creatures`; the Chroma where narrows to it
+    so rarer spawns (Infernal Buck at dense-rank ~106) are not starved out."""
+    p = plan_query(
+        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
+    )
+    assert p == {"native": {"table": "creatures"}, "token": {}, "label": "creature locations"}
+
+
+def test_where_do_animals_live_plans_to_creatures():
+    p = plan_query("where do deer live?")
+    assert p is not None
+    assert p["native"] == {"table": "creatures"}
+
+
+def test_non_creature_location_listing_unplanned():
+    """A location question without an animal/creature token must NOT trap
+    itself in the creatures table (e.g. blacksmithing trainers)."""
+    assert plan_query("the locations of blacksmithing trainers") is None
+    assert plan_query("where can I find the mushroom trainer?") is None

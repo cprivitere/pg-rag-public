@@ -147,3 +147,26 @@ def test_general_user_filter_beats_plan(monkeypatch):
 
     assert seen["mf"] == {"type": "recipe"}
     assert seen["tf"] is None
+
+
+def test_creature_location_plan_filters_table_and_widens_count(monkeypatch):
+    """A creature-location plan ("locations with deer, sheep, ...") must
+    propagate the creatures-table native filter AND a wider surfaced count
+    (80, not the general 40) so "list all" queries don't drop valid spawns."""
+    seen = {}
+
+    def fake_retrieve(question, metadata_filter=None, token_filter=None,
+                      count=None, **kwargs):
+        seen["mf"] = metadata_filter
+        seen["count"] = count
+        return _retrieve_result()
+
+    _setup_general(monkeypatch, lambda p: "Serbule Hills: Valley Sheep")
+    monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
+
+    pipeline.ask(
+        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
+    )
+
+    assert seen["mf"] == {"table": "creatures"}
+    assert seen["count"] == 80

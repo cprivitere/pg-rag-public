@@ -4,6 +4,7 @@ from pathlib import Path
 
 from pgrag.documents.resolver import GameResolver
 from pgrag.documents.wiki_builder import build_wiki_documents
+from pgrag.documents.creature_zones import build_creature_zones_documents
 from pgrag.documents.chunking import chunk_all_documents
 from pgrag.documents.skill_profiles import (
     build_skill_profile_documents,
@@ -1294,6 +1295,7 @@ def _assemble_documents(db):
     documents.extend(build_xptable_documents(db))
     documents.extend(build_abilitykeyword_documents(db))
     documents.extend(build_wiki_documents(db))
+    documents.extend(build_creature_zones_documents(db))
     documents.extend(build_curated_documents())
 
     for doc in documents:
