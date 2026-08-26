@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 # Production model refs — single source is mise.toml [env]. Read the live
 # values so a model swap propagates into the sweep with no literal drift.
 # Falls back to the current values if mise.toml is unreadable.
-_LLM_FALLBACK = "unsloth/Qwen3.5-9B-MTP-GGUF:UD-Q4_K_XL"
+_LLM_FALLBACK = "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
 _RERANK_FALLBACK = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
 _EMBED_FALLBACK = "unsloth/bge-small-en-v1.5-GGUF:f16"
 try:
@@ -57,6 +57,12 @@ WARM_RERANK_D = ["Death is a status effect in Project Gorgon."]
 
 
 def llm_variants():
+    # The swept model is the production gemma-4-12B-it-qat (LLM_MODEL, read
+    # from mise.toml [env]); the variants MUST measure ITS launch config — MTP
+    # draft (auto-discovered head) + gemma-4 native thinking capped @1024
+    # (NOT 4096: verbose thinking empties `content`). A granite-style config
+    # (ngram-mod, no reasoning budget) on gemma would mis-size KV and risk
+    # empty `content`. Variants sweep context window + flash-attention only.
     base = ["-ngl", "999", "-np", "1", "--reasoning-budget", "1024"]
     def v(name, spec=None, fa="auto", c=16384):
         flags = list(base)

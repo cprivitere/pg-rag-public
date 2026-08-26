@@ -27,4 +27,18 @@ DOCUMENTS_VERSION_FILE = DERIVED_DIR / "documents_version.json"
 
 EMBEDDING_DIM = 384
 
-CONTEXT_BUDGET = 68000
+# Max context chars fed to the LLM (output is separate). 80000 is the
+# golden-validated config: the winner (gemma-4-12B-it-qat) measured a
+# 7-facts-missing baseline at this value. A tighter worst-density-safe 54k
+# cap did NOT help golden (8 missing — wide general/lookup contexts lost
+# facts; a later 80k run scored 10, all within run-to-run LLM variance), so
+# the golden-validated value wins and extraction is NOT traded for a
+# theoretical worst-density guarantee. rag/pipeline.py (`_fit_context`) hard-
+# caps prompt context to this budget, so retrieval + sibling expansion can
+# never silently push past it (the reachable overflow). Residual caveat:
+# ~80k chars of the densest content (~2.4 chars/token, measured worst in
+# chunking.py) could approach the 32k window's token edge; never observed in
+# goldens. Entity/dossier path caps at CONTEXT_BUDGET (per-entity split for
+# multi-entity); general queries feed whatever retrieval returns, capped by
+# the guard.
+CONTEXT_BUDGET = 80000

@@ -82,6 +82,28 @@ def test_expand_parents_respects_max_pages(monkeypatch):
     assert out_ids == ["pA0", "pB0", "pC0"]
 
 
+def test_expand_parents_skips_changelog_pages(monkeypatch):
+    """Patch-note changelogs are never sibling-expanded: one ranked chunk
+    must not drag the whole page's chunks into the context (each shares the
+    same `name`, so the low-signal flood lands on top of the real sources).
+    The directly-retrieved changelog chunk itself is still returned."""
+    monkeypatch.setattr("pgrag.rag.resolve.load_parent_index", _fake_load)
+    changelog_meta = {"parent_id": "P", "name": "Game updates/2026-01-28"}
+    out_ids, _, _, _ = resolve.expand_parents(
+        ["pA0"], [A["text"]], [changelog_meta], [0.4]
+    )
+    # No siblings appended — inputs unchanged.
+    assert out_ids == ["pA0"]
+    # Meta-file-missing fallback: a changelog whose name came from the
+    # filename stem (no slash), e.g. "Game updates2026-06-25", is caught by
+    # the `^Game updates\d` regex branch and also never sibling-expanded.
+    stem_meta = {"parent_id": "P", "name": "Game updates2026-06-25"}
+    out_ids2, _, _, _ = resolve.expand_parents(
+        ["pA0"], [A["text"]], [stem_meta], [0.4]
+    )
+    assert out_ids2 == ["pA0"]
+
+
 # --- gap-fill integration (patch the pipeline's expand_parents name) ---
 
 CTX = {

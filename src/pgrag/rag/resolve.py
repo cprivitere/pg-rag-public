@@ -7,12 +7,31 @@ in a *sibling* chunk of the same page, not in a freshly re-retrieved subject.
 full page. It is deliberately bounded (one round, a few pages, a char cap)
 and deterministic — no LLM tool-calling, no corpus rebuild.
 """
+import re
+
 from pgrag.rag.bm25 import load_bm25_index
 
 # Wiki page expansion bounds: at most these pages and chars of appended text.
 EXPAND_MAX_PAGES = 2
-EXPAND_MAX_CHARS = 16000
+EXPAND_MAX_CHARS = 48000
 EXPAND_PLACEHOLDER_DIST = 1.0
+
+
+def _is_changelog_page(meta):
+    """True for anti-answer wiki pages (patch-note changelogs, ...).
+
+    One such page ranking #1 (its text often matches the query's exact
+    wording) previously dragged ALL of its sibling chunks into the context —
+    a low-signal flood that crowded out real sources. Changelogs are still
+    directly retrievable; they're just never sibling-*expanded*.
+    """
+    name = (meta or {}).get("name")
+    return isinstance(name, str) and (
+        name.startswith("Game updates/")
+        # Meta-file-missing fallback: filename stem "Game updates2026-06-25"
+        # (underscore→space, no slash) must also be caught.
+        or bool(re.match(r"^Game updates\d", name))
+    )
 
 _doc_store = None
 _parent_index = None
@@ -51,6 +70,10 @@ def expand_parents(ids, texts, metas, dists, max_chars=EXPAND_MAX_CHARS,
     seen = set()
     for meta in metas:
         if not isinstance(meta, dict):
+            continue
+        if _is_changelog_page(meta):
+            # Patch-note changelogs are never sibling-expanded (see helper);
+            # the directly-retrieved chunk(s) still rank normally.
             continue
         parent = meta.get("parent_id")
         if parent and parent not in seen:

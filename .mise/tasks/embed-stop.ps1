@@ -24,7 +24,13 @@ if (-not $p) {
 }
 
 if ($p) {
-    Stop-Process $p -Force
+    foreach ($proc in @($p)) {
+        taskkill /PID $proc.Id /T /F 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            "Failed to stop PID $($proc.Id) (taskkill exit $LASTEXITCODE)"
+            exit 1
+        }
+    }
     "Stopped embed"
 } else {
     "Not running"

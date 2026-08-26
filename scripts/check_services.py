@@ -20,7 +20,7 @@ def main():
         ("Embedding Server (:8081)", "http://localhost:8081/health"),
         ("LLM Server (:8080)", "http://localhost:8080/health"),
         ("Reranker Server (:8082)", "http://localhost:8082/health"),
-        ("Open WebUI (:3000)", "http://localhost:3000"),
+        ("Chat (Gradio) (:7860)", "http://localhost:7860"),
     ]
     
     for name, url in services:
@@ -35,7 +35,8 @@ def main():
     print("  mise se        - Start embedding server only")
     print("  mise sl        - Start LLM server only")
     print("  mise sr        - Start reranker server only")
-    print("  mise sw        - Start Open WebUI only")
+    print("  mise sc        - Start Chat (Gradio) only")
+    print("  mise xc        - Stop Chat (Gradio) only")
 
 if __name__ == "__main__":
     main()

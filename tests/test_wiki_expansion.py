@@ -165,7 +165,10 @@ def test_prepare_lookup_uses_wide_retrieval(
     _prepare_general("Where can I find Field Mushrooms?", "lookup")
     kw = mock_retrieve.call_args.kwargs
     assert kw["hybrid"] is True
-    assert kw["count"] == 20
+    # Wide (lookup/general) queries pull a Top-K of 40 for hybrid RRF recall,
+    # not a 3-doc dense-only window (bumped by the "Raise context budget/Top-K"
+    # change; expansion then widens wiki pages within it).
+    assert kw["count"] == 40
     mock_expand.assert_called_once()
 
 

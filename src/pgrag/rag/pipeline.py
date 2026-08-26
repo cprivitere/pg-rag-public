@@ -3,7 +3,7 @@ import re
 
 import chromadb
 
-from pgrag.embeddings.llama_embeddings import embed_text
+from pgrag.config import CONTEXT_BUDGET
 from pgrag.rag.query_classifier import classify_query, find_entity, find_entities, is_leveling_intent
 from pgrag.rag.entity_retrieval import build_entity_context
 from pgrag.rag.retriever import retrieve
@@ -111,8 +111,23 @@ def _find_matching_summary(question):
     return "\n\n".join(best_texts)
 
 
+def _fit_context(documents, max_chars=CONTEXT_BUDGET):
+    """Trim the retrieved/expanded docs to at most max_chars total (keeping
+    whole docs from the head, dropping only the overflow tail) so retrieval +
+    sibling expansion can never silently push the prompt past the LLM window.
+    The retrieval-ranked head and its spliced siblings are preserved; only the
+    tail is dropped. Returns a (possibly unchanged) new list."""
+    used, kept = 0, []
+    for doc in documents:
+        if used and used + len(doc) > max_chars:
+            break
+        kept.append(doc)
+        used += len(doc)
+    return kept
+
+
 def _generate_with(question, documents, query_type, generation=None):
-    context = "\n\n---\n\n".join(documents)
+    context = "\n\n---\n\n".join(_fit_context(documents))
     prompt = build_prompt(question, context, query_type=query_type)
     return generate(prompt, **(generation or {}))
 
@@ -365,7 +380,7 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
 
 
 def _stream_generation(question, documents, query_type, generation=None):
-    context = "\n\n---\n\n".join(documents)
+    context = "\n\n---\n\n".join(_fit_context(documents))
     prompt = build_prompt(question, context, query_type=query_type)
     return stream_generate(prompt, **(generation or {}))
 
@@ -548,7 +563,7 @@ def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_f
         question, query_type, mf, token_filter=tf, trace=trace, generation=generation
     )
 
-    context = "\n\n---\n\n".join(documents)
+    context = "\n\n---\n\n".join(_fit_context(documents))
 
     prompt = build_prompt(
         question,

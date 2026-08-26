@@ -13,14 +13,45 @@ HSA_OVERRIDE_GFX_VERSION = "11.0.0"
 # Swap a model (ref + its tuning flags) here; nothing else should change.
 # Launchers append their own host/port/-np/batch/log-file assembly.
 # `mise drift` fails if any consumer hardcodes a model literal.
-# Thinking is ON (default) with `--reasoning-budget 4096`: caps deliberation so
-# a bigger context (CONTEXT_BUDGET=68000, ~2x) can't starve the answer — verified
-# that unbounded thinking over >10k tokens emits empty `content`, and the budget
-# fixes it (content guaranteed, `finish=stop`). -c 32768 covers the larger prompt
-# (~16k tok) plus 8192 output; VRAM is flat (~8 GB) 16K → native 262144, so more
-# context is free if CONTEXT_BUDGET ever rises or for plain chat.
-LLM_MODEL = "unsloth/Qwen3.5-9B-MTP-GGUF:UD-Q4_K_XL"
-LLM_FLAGS = "--spec-type draft-mtp --spec-draft-n-max 6 -ngl 999 -fa on -c 32768 --reasoning-budget 4096"
+# Qwen3.5-9B (MTP variant) — native THINKING model + multi-token-prediction
+# spec decode. `--reasoning-budget 4096` caps deliberation (native reasoning
+# path — granite has none). `--spec-type draft-mtp --spec-draft-n-max 6`
+# gemma-4-26B-A4B-it-qat (30L MoE, 3.8B active) — native thinking + MTP. MTP head
+# `mtp-gemma-4-26B-A4B-it.gguf` auto-discovered from -hf (do NOT pass
+# --model-draft); MTP n4. No `--jinja`. `-c 65536` free (hybrid sliding-window
+# /unified-KV attention → tiny KV, native 256k). Q8_0 KV; QAT pixels make
+# UD-Q4_K_XL near-lossless. `--reasoning-budget 1024` (NOT 4096: gemma-4's
+# verbose thinking leaves `content` empty at 4096 — 1024 caps it so facts land
+# in the answer the pipeline reads). Weights 13.27 GB + MTP ≈ ~16-17 GB total —
+# needs Project Gorgon CLOSED. CONTEXT_BUDGET is 80000 (config.py).
+# gemma-4-26B-A4B-it (NON-QAT) at UD-Q2_K_XL — 9.82 GB, no MTP file (so NO
+# --spec-type draft-mtp). gemma4 nano thinking via `--reasoning-budget 1024`.
+# Q2_K_XL on a non-QAT model is aggressive quant → expect quality loss vs the
+# QAT pair. `-c 65536` free (hybrid sliding-window KV). Golden: measured 12
+# facts missing on the QAT Q4 sibling; this Q2 non-QAT is expected lower.
+# Qwen3.8-27B (DENSE, Mamba2-hybrid) at UD-Q2_K_XL — the VRAM-decisive test:
+# 3x the params of the 12B winner at Q2 (9.15 GB file, ~11.5 GiB total) to see
+# if capacity beats quantization loss. Same arch as Qwen3.5-9B (qwen35, 4 KV
+# heads → tiny cache) with MTP head BUNDLED (nextn_predict_layers=1) so
+# `--spec-type draft-mtp --spec-draft-n-max 6` works single-file. Native
+# thinking via `--reasoning-budget 4096` (qwen's thinking is economical, unlike
+# gemma-4's — verified content reliable on the 9B). `-c 65536` free (KV ~4 GiB
+# @64k Q8, still small for a 27B). UD quant (unsloth dynamic), NOT QAT.
+# == PRODUCTION MODEL (golden-verified best: 7 facts missing, lightest VRAM) ==
+# gemma-4-12B-it-qat — dense + QAT-lossless UD-Q4 + native thinking @1024.
+# Beat 6 other models incl. MoE 26B and dense 27B-Q2 on facts extraction, at
+# the LOWEST VRAM (~8.0 GB, PG-open compatible). MTP head auto-discovered from
+# -hf (`--spec-type draft-mtp --spec-draft-n-max 4`, no --model-draft). No
+# --jinja (built-in gemma4 template). `--reasoning-budget 1024` NOT 4096 —
+# gemma-4's verbose thinking leaves `content` empty at 4096. Shaved for text-RAG:
+# `--no-mmproj` (drops 0.16 GiB vision projector) + `-c 32768` (halves KV;
+# reasoning@1024 + ≤19k ctx + ≤8k ans ≈ ≤28.5k < 32k at typical ~4.2 chars/token;
+# densest-content ~2.4 chars/token (config.py note) can approach the 32k edge —
+# accepted residual, never observed in goldens). Measured
+# 8,019 MiB (was 8,741). Q8_0 KV (never Q4 V-axis: fact-extraction axis).
+# CONTEXT_BUDGET is 80000 (config.py).
+LLM_MODEL = "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
+LLM_FLAGS = "--spec-type draft-mtp --spec-draft-n-max 4 --no-mmproj -ngl 999 -fa on -c 32768 -ctk q8_0 -ctv q8_0 --reasoning-budget 1024"
 # Embeddings — bge-small-en; cls pooling; 512-token hard cap (see
 # llama_embeddings.MAX_EMBED_CHARS). Changing the model = full re-embed.
 EMBED_MODEL = "unsloth/bge-small-en-v1.5-GGUF:f16"
@@ -184,19 +215,19 @@ alias = "chat"
 # --- All services (background via file tasks in .mise/tasks/) ---
 
 [tasks."start-all"]
-description = "Start all services (embed + llm + rerank + webui) with logging"
-depends = ["embed-start", "llm-start", "rerank-start", "webui-start"]
+description = "Start all services (embed + llm + rerank + chat) with logging"
+depends = ["embed-start", "llm-start", "rerank-start", "chat-start"]
 alias = "start"
 
 [tasks."stop-all"]
-description = "Stop all services (embed + llm + rerank + webui)"
-depends = ["embed-stop", "llm-stop", "rerank-stop", "webui-stop"]
+description = "Stop all services (embed + llm + rerank + chat)"
+depends = ["embed-stop", "llm-stop", "rerank-stop", "chat-stop"]
 alias = "down"
 
 # --- Status check ---
 
 [tasks.status]
-description = "Check status of all services (embed, llm, rerank, webui)"
+description = "Check status of all services (embed, llm, rerank, chat)"
 run = "uv run python scripts/check_services.py"
 alias = "st"
 

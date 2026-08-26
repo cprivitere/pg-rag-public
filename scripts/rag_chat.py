@@ -6,6 +6,8 @@ Requires the embed (:8081) and LLM (:8080) services to be running.
 Run: mise chat   (uv run --with gradio python scripts/rag_chat.py)
 """
 
+import os
+
 import gradio as gr
 
 from pgrag.rag.pipeline import ask_stream
@@ -55,4 +57,10 @@ demo = gr.ChatInterface(
 
 
 if __name__ == "__main__":
-    demo.launch(server_name="127.0.0.1", server_port=7860, inbrowser=True)
+    demo.launch(
+        server_name="127.0.0.1",
+        server_port=7860,
+        # `mise start` (chat-start.ps1) sets PG_RAG_CHAT_NO_BROWSER=1 so the
+        # serving path doesn't pop a tab; interactive `mise chat` still opens one.
+        inbrowser=not os.environ.get("PG_RAG_CHAT_NO_BROWSER"),
+    )

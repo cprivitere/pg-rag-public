@@ -37,7 +37,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
 
 - `src/pgrag/` — importable package (`uv` installs editable).
   - `cli.py` — CLI: `download-cdn`, `download-wiki`, `build-documents`, `build-index`, `validate`.
-  - `config.py` — paths, `EMBEDDING_DIM=384`, `CONTEXT_BUDGET=68000`, `DOCUMENTS_VERSION`, `TARGET_CATEGORIES`/`RECURSIVE_CATEGORIES`.
+  - `config.py` — paths, `EMBEDDING_DIM=384`, `CONTEXT_BUDGET=80000`, `DOCUMENTS_VERSION`, `TARGET_CATEGORIES`/`RECURSIVE_CATEGORIES`.
   - `build.py` — `generate_documents()` orchestration.
   - `loaders/` — `cdn_loader` (tables from CDN json), `wiki_loader` (wiki text + `.meta.json` title mapping, orphan cleanup), `database.GameDatabase` (in-memory `tables` + `wiki` bag).
   - `documents/` — `builder.py`, `wiki_builder.py` (mwparserfromhell → sections/chunks, `parent_id` links), `chunking.py`, `resolver.py` (internal code → display name), `skill_profiles.py`, `summaries.py` (gathering skill maps).
@@ -46,7 +46,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
   - `rag/` — `retriever.py`, `reranker_client.py`, `bm25.py`, `query_classifier.py`, `query_plan.py`, `spelling.py`, `entity_retrieval.py`, `resolve.py`, `synthesis_detector.py`+`synthesis_generator.py`, `pipeline.py` (+ `ask_stream`), `prompts.py`, `llm.py`.
 - `scripts/` — eval + service tooling (see Important Files).
 - `tests/` — pytest suite, imports the installed `pgrag` package.
-- `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`, `wiki_parsed.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `webui.log`, `rerank.log`).
+- `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`, `wiki_parsed.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `rerank.log`, `chat.log`, and `webui.log` when run).
 - `.omp/` — oh-my-pi config: `RULES.md`, `config.yml`, `WATCHDOG.md`, `skills/` (`pg-rag`, `pg-data`, `retrieval`, `evaluation`, `testing`).
 
 ## Development Commands
@@ -63,7 +63,7 @@ uv run pgrag build-index --source cdn|wiki|computed|curated   # partial rebuild 
 mise sync-wiki / sync-cdn / sync   # build-documents + build-index in one shot (aliases syw/syc/sy)
 mise generate-docs                 # bare idempotent documents rebuild (alias docs)
 mise golden                        # golden eval (needs :8080 + :8081)
-mise chat                          # Gradio chat (needs embed + LLM up)
+mise chat                          # Gradio chat (primary UI; also started by `mise start`; needs embed + LLM up)
 uv run pytest                      # offline test suite
 uv run pytest tests/test_retrieval_unit.py tests/test_bm25.py tests/test_rerank*.py  # retrieval regression
 mise drift                        # check docs/skills against the repo (aliases: dr)
@@ -98,10 +98,10 @@ mise drift                        # check docs/skills against the repo (aliases:
   | svc | port | model / note |
   |-----|------|--------------|
   | Embeddings | 8081 | `EMBED_MODEL` (`[env]`) — bge-small f16, cls pooling, hard 512-token server cap (input chars clipped to `llama_embeddings.MAX_EMBED_CHARS` = 2000); needed for Q&A/eval |
-  | LLM | 8080 | `LLM_MODEL` (`[env]`; `LLM_FLAGS` carries spec/ctx/reasoning) — RAG Q&A; draft model OOMs if already running → `mise down` first |
+  | LLM | 8080 | `LLM_MODEL` (`[env]`; `LLM_FLAGS` carries launch tuning, e.g. `--jinja`) — RAG Q&A; a running instance OOMs before start → `mise down` first |
   | Reranker | 8082 | `RERANK_MODEL` (`[env]`) — bge-reranker cross-encoder; optional, lexical fallback |
-  | OpenWebUI | 3000 | `../mywebui` |
-  | Chat (Gradio) | 7860 | `mise chat`; history in browser localStorage |
+  | Chat (Gradio) | 7860 | primary UI — part of `mise start`; `mise chat` foreground; history in browser localStorage |
+  | OpenWebUI | 3000 | optional (legacy) — `mise webui-start`/`webui-stop`; no longer in `mise start`/`mise down` |
 - **Single-source models**: refs + tuning flags live once in `mise.toml [env]` (`*_MODEL`/`*_FLAGS`); consumed by `.mise/tasks/*-start.ps1` (`$env:`), `mise debug-*` (`{{ env.* }}`), `scripts/vram_sweep.py` and `scripts/embed_eval.py` (tomllib). `mise drift` fails if any consumer hardcodes a model literal.
 - `scripts/rag_chat.py` and `pg_rag.py` assume these services up.
 - Tests import the installed `pgrag` package — after changing `src/pgrag/`, no reinstall needed (editable install).
@@ -109,7 +109,7 @@ mise drift                        # check docs/skills against the repo (aliases:
 ## Testing & QA
 
 - **Framework**: pytest via `uv run pytest`; 547 offline tests pass (561 collected, 14 slow deselected). All offline; temp-dir integration.
-- **Golden eval** (`tests/test_golden_check.py`): parametrized over `data/golden/*.json`; `require_servers` fixture skips unless LLM :8080 + embed :8081 are up; retries once (2 attempts) to damp LLM nondeterminism; both attempts fail = regression.
+- **Golden eval** (`tests/test_golden_check.py`): parametrized over `data/golden/*.json`; `require_servers` fixture skips unless LLM :8080 + embed :8081 are up; retries once (2 attempts) to damp LLM nondeterminism; both attempts fail = regression. `GENERATION = {"temperature":0,"seed":0}` is wired into every `ask()`; observed 7/8/10 single-run variance was **LLM-side** (reasoning-ON thinking trajectory is not greedy-pinned even at temp 0 + seed), not a harness miss. For a byte-reproducible comparison, launch the server with `--reasoning off` (gemma AND qwen proven reproducible); reasoning-ON production runs remain single-sample noisy. See `docs/LLM_MODEL_WIRING.md` → "Card flags & determinism".
 - **Retrieval regression set** (run when changing retrieval): `tests/test_bm25.py`, `tests/test_retrieval_unit.py`, `tests/test_rerank*.py`, `tests/test_retriever_spelling.py`. **`docs/TEST_CONTRACTS.md` is the authoritative layer→tests→contract map** — read L3 before any retrieval change: it flags shared-function facet coverage (`retrieve()` asserted across 5 files; `_hybrid_fuse` across `test_bm25.py`/`test_rerank.py`) and notes the stale-`DOCUMENTS_VERSION` refusal is directly tested in `test_build_index.py`.
 - **Test edits are contract changes.** Editing what a test *asserts* is not a workaround — state the new contract in the test, run the layer's sibling suite (`docs/TEST_CONTRACTS.md`), and never hand-edit a build artifact (`documents.json`, `bm25_index.pkl`, `wiki_parsed.json`) to satisfy a test. If the behavior didn't legitimately change, the failure is a source regression: fix the source, not the test.
 - **Key suites** (from `tests/`): `test_documents.py` (doc shape), `test_chunking.py`, `test_health_check.py` (index integrity incl. no-SQLite-crash on large collections), `test_llm.py` (SSE streaming parse), `test_download_wiki.py` (batching, redirects, orphan cleanup — patches `META_FILE`+`WIKI_DIR` to tmp), `test_query_classifier.py`/`test_query_plan.py`, `test_bm25_persist.py`, `test_rerank_fallback.py`, `test_hashes.py`, `test_embed_validation.py`.
