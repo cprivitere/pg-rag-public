@@ -129,13 +129,23 @@ def test_facet_type_filters(monkeypatch):
     calls = []
 
     def fake_retrieve(question, count=3, metadata_filter=None, hybrid=True, rerank=True, trace=None):
-        calls.append((question, metadata_filter))
+        calls.append((question, metadata_filter, count))
         return _empty_retrieve()
 
     monkeypatch.setattr(er, "retrieve", fake_retrieve)
     er.build_entity_context("what is Dungcrafting", "skillprofile_Pooping")
     filters = [c[1] for c in calls]
     assert {"type": "recipe"} in filters
+    # Leaner per-facet caps are the stated contract (test_facet_type_filters):
+    # recipe pulls 8, every non-recipe facet 6 — a revert to the noisy 20/10
+    # full-set dossier (dungcrafting regression) must fail here.
+    for _q, filt, count in calls:
+        if not filt:
+            continue
+        if filt.get("type") == "recipe":
+            assert count == 8, f"recipe facet count should be 8, got {count}"
+        else:
+            assert count == 6, f"non-recipe facet count should be 6, got {count}"
     assert {"type": "quest"} in filters
     assert {"type": "npc"} in filters
     assert {"type": "advancementtable"} in filters
@@ -367,3 +377,53 @@ def test_build_multi_entity_context_unresolved_recorded_in_trace(monkeypatch):
     )
     assert r is None
     assert "Ghost" in mono["unresolved"]
+
+def test_skill_dossier_pulls_own_abilities_deterministically():
+    # Contract: a skill/skillprofile dossier attaches ALL of its own
+    # standalone ability docs by metadata.skill == hub skill code (the CDN
+    # ability `Skill` field), and excludes off-skill ability docs, rather
+    # than relying on the fuzzy top-N facet query that mis-ranks
+    # combat-flavored but legitimate skills abilities (e.g. Gardening's
+    # Spade Assault 1-6) below the cut. Regression guard for Spade Assault.
+    hub = _mk("skillprofile_Gardening_chunk_0", "Gardening Abilities XP", 0,
+              name="Gardening")
+    own1 = {"id": "ability_ability_9301", "text": "Spade Assault",
+            "metadata": {"type": "ability", "skill": "Gardening",
+                         "table": "abilities"}}
+    own2 = {"id": "ability_ability_9316", "text": "Pumpkin Bomb",
+            "metadata": {"type": "ability", "skill": "Gardening",
+                         "table": "abilities"}}
+    off = {"id": "ability_ability_9485", "text": "Weed Plants",
+           "metadata": {"type": "ability", "skill": "CivilEngineering",
+                        "table": "abilities"}}
+    er._load_docs = lambda: [hub, own1, own2, off]
+    r = er.build_entity_context("Tell me about Gardening", "skillprofile_Gardening")
+    ids = r["ids"][0]
+    assert "ability_ability_9301" in ids
+    assert "ability_ability_9316" in ids
+    assert "ability_ability_9485" not in ids
+
+def test_skill_dossier_bounds_and_level_orders_own_abilities(monkeypatch):
+    # Contract: for high-ability skills (Archery ~257 own ability docs) the
+    # deterministic pull is bounded to _MAX_SKILL_ABILITIES and keeps the
+    # lowest-level (most commonly used) abilities, so the budget cut can't
+    # flood the dossier or drop the useful abilities in favor of an id-order
+    # subset. Exact-ability questions route to the `ability` hub elsewhere.
+    monkeypatch.setattr(er, "_MAX_SKILL_ABILITIES", 2)
+    hub = _mk("skillprofile_Archery_chunk_0", "Archery Abilities", 0,
+              name="Archery")
+    low = {"id": "ability_ability_2501", "text": "Quick Shot",
+           "metadata": {"type": "ability", "skill": "Archery",
+                        "table": "abilities", "level": 1}}
+    mid = {"id": "ability_ability_2601", "text": "Long Shot",
+           "metadata": {"type": "ability", "skill": "Archery",
+                        "table": "abilities", "level": 5}}
+    hi = {"id": "ability_ability_2701", "text": "Multishot 8",
+          "metadata": {"type": "ability", "skill": "Archery",
+                       "table": "abilities", "level": 60}}
+    er._load_docs = lambda: [hub, hi, low, mid]  # deliberately unordered
+    r = er.build_entity_context("Tell me about Archery", "skillprofile_Archery")
+    abilities = [i for i in r["ids"][0] if i.startswith("ability_ability_")]
+    assert len(abilities) == 2                     # bounded by the cap
+    assert "ability_ability_2501" in abilities     # lowest level kept
+    assert "ability_ability_2701" not in abilities  # highest level dropped

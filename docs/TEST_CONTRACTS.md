@@ -119,7 +119,11 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   `n_results` per query type: comparison=20, general=15/3); spelling
   correction **before** embedding; where-predicate operators
   (`== <= >= > < !=`, delimited membership, compound); `_hybrid_fuse` RRF;
-  entity dossier ordering/budget; doc cache invalidation.
+  entity dossier ordering/budget; deterministic skill-ability pull for
+  skill dossiers (all standalone ability docs where metadata.skill == hub
+  skill code — regression guard
+  `test_skill_dossier_pulls_own_abilities_deterministically`); doc cache
+  invalidation.
 - **Change ⇒** (any retrieval change — this is the documented regression set)
   `uv run pytest tests/test_bm25.py tests/test_retrieval_unit.py
   tests/test_rerank.py tests/test_rerank_client.py tests/test_rerank_fallback.py

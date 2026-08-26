@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 # coverage record already summarizes all first cells, and narrative
 # sections are kept — only granular rows are bounded.
 _MAX_WIKI_ROWS = 12
+# Cap the number of the skill's own abilities grafted into a skill dossier.
+# High-ability skills are large (Archery ~257, FireMagic ~198): unbounded,
+# the deterministic ability pull materializes all of them and the budget cut
+# keeps an id-order subset that can drop the asked ability. The dossier is an
+# overview; a bounded, level-ordered subset (low-level, commonly-used
+# abilities survival-biased) is the goal. Exact ability questions route to the
+# `ability` hub dossier, which is unaffected.
+_MAX_SKILL_ABILITIES = 30
 
 FACET_PLANS = {
     "skill": [
@@ -302,13 +310,55 @@ def build_entity_context(question, hub_id, budget=None,
             _leveling_included = True
 
     rerank_used = False
-    FACET_COUNTS = {"recipe": 20}
+    # Per-facet caps: recipe is the heaviest pull. A full-set dossier used a
+    # fixed 20 recipes + 5x10 other facet docs (~70 CDN rows) wrapped around
+    # the entity's own few hub chunks — noise that drowned a small LLM's
+    # extraction of the hub's own facts (dungcrafting regression). Trimmed
+    # 2026-08-24 to give a leaner dossier; facts-of-record live in the hub
+    # doc, so the facets are recall-boost not the source of truth. Validate
+    # with the golden fact-audit + golden eval.
+    FACET_COUNTS = {"recipe": 8}
     for facet_q, ftype in FACET_PLANS.get(dtype, []):
+        if dtype == "skill" and ftype == "ability":
+            # Deterministic skill-ability pull. The skill's own standalone
+            # ability docs (metadata.skill == hub skill code, per the CDN
+            # ability `Skill` field) are facts classified to the skill, so
+            # they belong in its dossier rather than at the mercy of the
+            # fuzzy top-N facet query, which mis-ranks combat-flavored but
+            # legitimate skill abilities (e.g. Gardening's Spade Assault
+            # 1-6) below the cut. Bounded by _MAX_SKILL_ABILITIES so
+            # high-ability skills (Archery ~257, FireMagic ~198) can't flood
+            # the dossier; ascending level keeps the commonly-used abilities
+            # survival-biased under the budget cut.
+            skill_code = hub_id[len("skillprofile_"):].split("_chunk_")[0]
+            _own = []
+            for _ability_doc in docs:
+                _am = _ability_doc.get("metadata")
+                if not isinstance(_am, dict):
+                    continue
+                if _am.get("type") != "ability":
+                    continue
+                if _am.get("skill") != skill_code:
+                    continue
+                if _ability_doc["id"] in seen:
+                    continue
+                _own.append(_ability_doc)
+            _own.sort(
+                key=lambda d: (d["metadata"].get("level", 10**9), d["id"])
+            )
+            for _ability_doc in _own[:_MAX_SKILL_ABILITIES]:
+                _am = _ability_doc["metadata"]
+                seen.add(_ability_doc["id"])
+                ids.append(_ability_doc["id"])
+                texts.append(_ability_doc["text"])
+                metas.append(_am)
+                dists.append(0.0)
+            continue
         facet_query = f"{facet_q} {entity_name}"
         try:
             res = retrieve(
                 facet_query,
-                count=FACET_COUNTS.get(ftype, 10),
+                count=FACET_COUNTS.get(ftype, 6),
                 metadata_filter={"type": ftype},
                 hybrid=True,
                 rerank=True,
