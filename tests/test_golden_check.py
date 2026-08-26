@@ -38,7 +38,7 @@ def test_golden_facts(path, require_servers):
     # LLM answers are sampled: retry once to damp nondeterminism. A real
     # regression still fails both attempts.
     for _attempt in range(2):
-        _, misses = check_golden(golden)
+        _, misses, _ = check_golden(golden)
         if not misses:
             return
     assert misses == [], f"missing facts: {misses}"
