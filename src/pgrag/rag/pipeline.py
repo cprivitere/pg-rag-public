@@ -4,6 +4,7 @@ import re
 import chromadb
 
 from pgrag.config import CONTEXT_BUDGET
+from pgrag.embeddings.llama_embeddings import embed_text
 from pgrag.rag.query_classifier import classify_query, find_entity, find_entities, is_leveling_intent
 from pgrag.rag.entity_retrieval import build_entity_context
 from pgrag.rag.retriever import retrieve
