@@ -268,3 +268,25 @@ Hi.
     db = FakeDB({"TestPage": raw})
     docs = build_wiki_documents(db)
     assert len(docs) == 0
+
+
+def test_wiki_page_strips_stray_midline_double_braces_keeps_single():
+    """A page whose section carries a stray mid-line `}}`/`{{` (e.g. from a
+    half-stripped {{Icon|...}} shell that strip_code leaves as real text) must
+    emit docs with NO `{{`/`}}` residue, while preserving legitimate single
+    `{`/`}` prose — the hygiene-guard contract (_WIKI_RESIDUE) is only about
+    double-brace markup residue."""
+    raw = """__NOTOC__
+== Summary ==
+Irkima asks you to gather a phoenix feather from the far mountain valley, and
+the trek is long but the phoenix feather}} is worth it, so use a knife
+{carefully} when you lift it free. There is more than enough text to clear the
+minimum section length without any trouble at all.
+"""
+    db = FakeDB({"Broken Wings": raw})
+    docs = build_wiki_documents(db)
+    texts = [d["text"] for d in docs]
+    assert texts, "section should emit a doc"
+    for t in texts:
+        assert "{{" not in t and "}}" not in t
+    assert any("{carefully}" in t for t in texts)

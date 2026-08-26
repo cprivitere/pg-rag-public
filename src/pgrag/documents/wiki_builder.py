@@ -12,7 +12,7 @@ CACHE_FILE = WIKI_PARSED_CACHE
 # Bump when the cached doc shape OR generated text changes, so stale cache
 # entries are rebuilt instead of served with old content (a mtime-equal page
 # with a changed section-cleanup step would otherwise keep residue forever).
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 
 # CDN tables whose entity names wiki pages can link to.
 _ENTITY_TABLES = {
@@ -224,12 +224,14 @@ def _parse_page(page_name, raw_text, entity_info=None):
         ).strip()
 
         # mwparserfromhell glitch: unclosed ''' before a == heading leaves
-        # preceding template shells intact (B16). A half-stripped template
-        # (e.g. a nested/{{Icon}} shell) can also leave a stray trailing
-        # `}}` mid-line that the open/close-only sweeps below miss. After
-        # strip_code any surviving brace is markup residue, so drop them all
-        # outright — no wiki doc may carry `{{`/`}}` (hygiene guard).
-        text = re.sub(r"[{}]+", " ", text).strip()
+        # preceding template shells intact (B16); a half-stripped/nested
+        # {{Icon}} shell can leave a stray `}}` (or `{{`) mid-line. Well-formed
+        # {{...}} templates are already fully removed by strip_code above, so
+        # what survives here is real text (e.g. "phoenix feather") that must
+        # stay — just without braces. The hygiene guard forbids `{{`/`}}` in
+        # any wiki doc, so strip only the double-brace residues and leave
+        # literal single `{`/`}` (non-markup) prose untouched.
+        text = re.sub(r"\{\{|\}\}", " ", text).strip()
 
         if not text or len(text) < MIN_SECTION_CHARS:
             continue
