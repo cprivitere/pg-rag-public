@@ -1,10 +1,16 @@
-import sys
 import json
+import sys
+
 import chromadb
 
-from pgrag.config import EMBEDDING_DIM
-from pgrag.config import DOCUMENTS_VERSION, DOCUMENTS_VERSION_FILE
-from pgrag.embeddings.llama_embeddings import embed_batch, validate_embeddings
+from pgrag.config import DOCUMENTS_VERSION, DOCUMENTS_VERSION_FILE, EMBEDDING_DIM
+from pgrag.documents.tokenizer import token_count
+from pgrag.embeddings.llama_embeddings import (
+    MAX_EMBED_CHARS,
+    MAX_EMBED_TOKENS,
+    embed_batch,
+    validate_embeddings,
+)
 from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 
 try:
@@ -119,9 +125,7 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
                         "metadata_hash": metadata["metadata_hash"],
                     }
 
-    current_ids = set(
-        doc["id"] for doc in documents
-    )
+    current_ids = {doc["id"] for doc in documents}
 
     if source is None:
         deleted_ids = existing_ids - current_ids
@@ -203,6 +207,22 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
         print(
             f"Embedding {len(documents_to_embed)} documents..."
         )
+
+        # Pre-embed window guard: fail fast on a chunking regression instead
+        # of letting an over-window doc fall silently into the (now-bounded)
+        # embed_batch fallback. token_count is None when the tokenizer is
+        # unavailable (offline) -> char-only check.
+        over = [
+            doc["id"] for doc in documents_to_embed
+            if len(doc["text"]) > MAX_EMBED_CHARS
+            or (token_count(doc["text"]) or 0) > MAX_EMBED_TOKENS
+        ]
+        if over:
+            raise ValueError(
+                f"{len(over)} document(s) exceed the embed window "
+                f"(>{MAX_EMBED_CHARS}c or >{MAX_EMBED_TOKENS} tokens); "
+                f"chunking regression? First: {over[:3]}"
+            )
 
         for start in range(0, len(documents_to_embed), EMBED_BATCH_SIZE):
 

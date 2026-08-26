@@ -202,13 +202,15 @@ the artifact instead of serving a fragment:
 changed docs with **no** shrink-fallback triggers; `validate` all-clean. Tests
 520 pass (contracts updated).
 
-**Residual — `embed_batch`'s overflow fallback is O(n) sequential.** On ANY
-text over the window, `embed_batch` re-embeds the WHOLE batch one request at a
-time via `_embed_one` (pre-existing from the ccc2cda fix, not introduced here).
-With ~600 dense docs this turned a batch into ~2000 serial round-trips (≈30–40
-min). Worth a per-text-isolation or sub-batch retry fix independent of chunking.
-Also an environment-hygiene note: multiple leftover `build-index` processes
-(run/poll/`nohup` across turns) contended on the single embed server until
+**RESOLVED (this pass) — `embed_batch`'s overflow fallback is now O(k log n)
+bisection.** `_embed_batch_recursive` splits the batch on `_InputTooLong`,
+retrying each half at the full budget; only a single-text leaf falls through to
+the per-text `_embed_one` shrink. Now bounded ~O(k log n) leaf requests, order
+preserved, in-window siblings keep their full budget. Covered by
+`tests/test_embed_fallback.py`. `build_index` also gained a pre-embed window
+guard that fails fast on any over-window doc (chunking regression) instead of
+silently feeding the fallback. Environment-hygiene note retained below: multiple
+leftover `build-index` processes contended on the single embed server until
 40+ timed-out clients were observed; `taskkill /F /IM python.exe` is the only
 reliable Windows kill (embed runs as `llama-server.exe`).
 

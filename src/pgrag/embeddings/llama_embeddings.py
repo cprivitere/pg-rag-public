@@ -1,6 +1,5 @@
 import requests
 
-
 EMBEDDING_URL = "http://localhost:8081/embedding"
 
 # The production encoder (bge-small-en-v1.5) has a hard 512-token position
@@ -11,6 +10,10 @@ EMBEDDING_URL = "http://localhost:8081/embedding"
 # 2000-char cap stays well under 512 tokens; a per-text shrink fallback covers
 # the rare denser-tokenized input without over-truncating siblings.
 MAX_EMBED_CHARS = 2000
+# The encoder's hard position cap (bge-small-en-v1.5). A chunking regression
+# or non-chunked doc should fail fast at the build guard rather than silently
+# taking the shrink fallback, so this is exposed for callers to assert on.
+MAX_EMBED_TOKENS = 512
 _TRUNC_STEPS = (MAX_EMBED_CHARS, 1000, 512, 256)
 
 # bge-small-en-v1.5 is instruction-tuned and asymmetric: the BGE v1.5 card
@@ -79,12 +82,30 @@ def embed_text(text):
 
 
 def embed_batch(texts):
-    try:
-        data = _post(texts, MAX_EMBED_CHARS)
-        vectors = [item["embedding"][0] for item in data]
-    except _InputTooLong:
-        vectors = [_embed_one(t) for t in texts]
+    vectors = _embed_batch_recursive(texts, MAX_EMBED_CHARS)
     return validate_embeddings(vectors)
+
+
+def _embed_batch_recursive(texts, budget):
+    """Embed a batch, isolating the texts that exceed the window.
+
+    Bisection: on _InputTooLong, split the batch and retry each half. A
+    single-text batch that still 400s falls through to _embed_one (per-text
+    shrink). This bounds the API request count to O(k log n) where k is the
+    number of genuinely over-window texts — not O(n) serial round-trips for
+    the whole batch — and keeps in-window siblings at their full budget.
+    """
+    if len(texts) == 1:
+        return [_embed_one(texts[0])]
+    try:
+        data = _post(texts, budget)
+        return [item["embedding"][0] for item in data]
+    except _InputTooLong:
+        mid = len(texts) // 2
+        return (
+            _embed_batch_recursive(texts[:mid], budget)
+            + _embed_batch_recursive(texts[mid:], budget)
+        )
 
 
 class EmbeddingValidationError(ValueError):
