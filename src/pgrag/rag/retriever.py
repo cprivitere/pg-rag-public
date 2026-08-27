@@ -466,6 +466,19 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
             i for i in range(len(results["ids"][0]))
             if _where_matches(results["metadatas"][0][i], post_filter)
         ]
+        if not filtered and token_filter:
+            # Soft fallback: drop the token refinement so results aren't
+            # emptied by an over-narrowing ingredient name mismatch
+            # (e.g. "Animal Feces" vs "Animal Poop").
+            if metadata_filter is not None:
+                filtered = [
+                    i for i in range(len(results["ids"][0]))
+                    if _where_matches(results["metadatas"][0][i], metadata_filter)
+                ]
+            else:
+                filtered = list(range(len(results["ids"][0])))
+            if trace_rec is not None:
+                trace_rec["token_filter_fallback"] = True
         results["ids"] = [[results["ids"][0][i] for i in filtered]]
         results["documents"] = [[results["documents"][0][i] for i in filtered]]
         results["metadatas"] = [[results["metadatas"][0][i] for i in filtered]]

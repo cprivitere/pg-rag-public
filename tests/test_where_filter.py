@@ -235,3 +235,61 @@ def test_retrieve_hybrid_filters_fused_docs_by_operator(
     assert {"skill_level_req": 10} in kept  # 10 <= 25 -> kept
     assert {"skill_level_req": 40} not in kept  # dense 40 -> dropped
     assert {"skill_level_req": 50} not in kept  # bm25 50 -> dropped
+
+@patch("pgrag.rag.retriever.embed_text")
+@patch("pgrag.rag.retriever.chromadb.PersistentClient")
+@patch("pgrag.rag.bm25.load_bm25_index")
+def test_token_filter_fallback_on_empty(
+    mock_load, mock_client, mock_embed
+):
+    """When token_filter alone would drop all results, fall back to
+    metadata_filter only so the query isn't emptied by an over-narrowing
+    ingredient name mismatch (e.g. "Animal Feces" vs "Animal Poop")."""
+    mock_embed.return_value = [0.1] * 384
+    inst = mock_client.return_value
+    col = inst.get_collection.return_value
+    # Two docs: one matches metadata_filter (type="recipe"), one does NOT (type="other").
+    # Only the one with type="recipe" should survive the fallback.
+    col.query.return_value = {
+        "ids": [["dense_1", "dense_2"]],
+        "documents": [["recipe with Animal Poop", "not a recipe"]],
+        "metadatas": [[
+            {"type": "recipe", "ingredients": "Animal Poop"},
+            {"type": "other", "ingredients": "Spider Silk"},
+        ]],
+        "distances": [[0.2, 0.3]],
+    }
+
+    bm25_docs = [
+        {"id": "dense_1", "text": "a",
+         "metadata": {"type": "recipe", "ingredients": "Animal Poop"}},
+        {"id": "dense_2", "text": "b",
+         "metadata": {"type": "other", "ingredients": "Spider Silk"}},
+    ]
+    fake_model = MagicMock()
+    fake_model.search.return_value = ([1, 0], [0.9, 0.8])
+    mock_load.return_value = (fake_model, bm25_docs)
+
+    trace: dict = {}
+    results = retrieve(
+        "recipes using Animal Feces",
+        count=3,
+        metadata_filter={"type": "recipe"},
+        token_filter={"ingredients": "Animal Feces"},
+        hybrid=True,
+        trace=trace,
+    )
+
+    # token filter alone would empty the pool (neither doc has "Animal Feces"
+    # in its delimited ingredients field), so fallback fires using metadata_filter only.
+    # Only dense_1 (type="recipe") should survive; dense_2 (type="other") should be dropped.
+    assert len(results["ids"][0]) == 1, f"Expected 1 result after fallback, got {len(results['ids'][0])}"
+    assert results["metadatas"][0][0].get("ingredients") == "Animal Poop", \
+        f"Expected 'Animal Poop' in metadatas, got {results['metadatas'][0]}"
+
+    # trace should record the fallback fired
+    rec = trace["retrieval_calls"][0]
+    assert rec.get("token_filter_fallback") is True, \
+        f"token_filter_fallback not recorded: {rec.get('token_filter_fallback')}"
+    # fallback survivors land in post_filter_ids, never an emptied token-only set
+    assert rec.get("post_filter_ids") == ["dense_1"], rec.get("post_filter_ids")
