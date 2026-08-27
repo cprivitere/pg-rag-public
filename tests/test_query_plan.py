@@ -66,9 +66,32 @@ def test_ingredient_stopword_phrase_is_unplanned():
 
 def test_mass_noun_ingredient_not_singularized():
     # "feces" is not "fece"; only consonant-final plurals get singularized.
+    # The token is the $or synonym clause, whose first branch keeps the
+    # exact (non-singularized) "Animal Feces".
     p = plan_query("what recipes use animal feces?")
     assert p is not None
-    assert p["token"] == {"ingredients": "Animal Feces"}
+    assert p["token"] == {"ingredients": {"$or": [
+        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
+    ]}}
+
+
+def test_recipe_ingredient_synonym_token():
+    """Ingredient names that mismatch the stored tokens (Animal Feces ->
+    Animal Poop) expand to an $or token clause so the stored form matches."""
+    p = plan_query("What recipes use Animal Feces?")
+    assert p is not None
+    assert p["native"] == {"type": "recipe"}
+    assert p["token"] == {"ingredients": {"$or": [
+        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
+    ]}}
+    assert p["label"] == "recipe ingredient=Animal Feces (syn: Animal Poop)"
+
+
+def test_recipe_ingredient_no_synonym_stays_scalar():
+    # Ingredients without a synonym entry keep the bare-scalar token clause.
+    p = plan_query("recipes crafted with spider silk")
+    assert p["token"] == {"ingredients": "Spider Silk"}
+    assert p["label"] == "recipe ingredient=Spider Silk"
 
 
 # --- ability + damage type ---

@@ -53,6 +53,17 @@ _INGREDIENT_INTRO = re.compile(
     r"made\s+from|made\s+with|asked\s+for)\b", re.I
 )
 
+# Player-facing ingredient names that don't match the canonical token
+# stored in recipe metadata.ingredients (the " | "-delimited field). The
+# key is the query-side name; the value lists every stored form the
+# token filter should accept. Add entries only for names verified
+# absent from the ingredient tokens (grep metadata.ingredients), not
+# for every known synonym — an entry that matches the stored form
+# exactly is a no-op.
+_INGREDIENT_SYNONYMS: dict[str, list[str]] = {
+    "Animal Feces": ["Animal Poop"],
+}
+
 # Element/damage tokens -> canonical metadata value (title-case, exact).
 _DAMAGE_WORDS = [
     ("fire", "Fire"), ("ice", "Cold"), ("cold", "Cold"),
@@ -225,10 +236,19 @@ def plan_query(question):
         # --- Recipe ingredient (post-fusion delimited token) ---
         ing = _find_ingredient(q)
         if ing:
+            syns = _INGREDIENT_SYNONYMS.get(ing)
+            if syns:
+                token = {"ingredients": {"$or": [
+                    {"$eq": v} for v in [ing, *syns]
+                ]}}
+                label = f"recipe ingredient={ing} (syn: {','.join(syns)})"
+            else:
+                token = {"ingredients": ing}
+                label = f"recipe ingredient={ing}"
             return {
                 "native": {"type": "recipe"},
-                "token": {"ingredients": ing},
-                "label": f"recipe ingredient={ing}",
+                "token": token,
+                "label": label,
             }
 
     # Ambiguous or unsupported -> broad hybrid retrieval beats a false

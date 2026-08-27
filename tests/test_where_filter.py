@@ -55,6 +55,41 @@ def test_where_delimited_membership():
     assert not _where_matches(meta, {"ingredients": "Silk"})
 
 
+def test_where_or_synonym_membership():
+    """An $or of $eq token clauses lets a stored ingredient form match a
+    query-side synonym name (e.g. recipe stores 'Animal Poop', query asks
+    'Animal Feces'). The bare scalar clause alone must NOT match."""
+    clause = {"ingredients": {"$or": [
+        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
+    ]}}
+    meta_synonym = {"type": "recipe", "ingredients": "Bottle of Water | Animal Poop"}
+    assert _where_matches(meta_synonym, clause)
+    scalar_clause = {"ingredients": "Animal Feces"}
+    assert not _where_matches(meta_synonym, scalar_clause)
+
+
+def test_where_or_synonym_neither_branch_matches():
+    """An $or synonym clause whose branches all fail keeps the doc filtered
+    out (the any(...) short-circuits False inside the nested $or branch)."""
+    clause = {"ingredients": {"$or": [
+        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
+    ]}}
+    meta_unrelated = {"type": "recipe", "ingredients": "Bottle of Water | Silk"}
+    assert not _where_matches(meta_unrelated, clause)
+
+
+def test_where_field_nested_and_membership():
+    """Field-nested $and of $eq clauses on a delimited field: all branches
+    must match the stored tokens (mirrors Chroma's server-side semantics)."""
+    clause = {"ingredients": {"$and": [
+        {"$eq": "Animal Poop"}, {"$eq": "Bottle of Water"}
+    ]}}
+    meta_both = {"type": "recipe", "ingredients": "Bottle of Water | Animal Poop"}
+    assert _where_matches(meta_both, clause)
+    meta_one = {"type": "recipe", "ingredients": "Animal Poop"}
+    assert not _where_matches(meta_one, clause)
+
+
 def test_scalar_eq_handles_numeric_strings():
     assert _scalar_eq(25, "25")
     assert not _scalar_eq(25, "26")

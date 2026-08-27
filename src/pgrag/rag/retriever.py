@@ -268,6 +268,19 @@ def _where_matches(metadata, clause):
             continue
         value = metadata.get(key)
         if isinstance(condition, dict):
+            # Field-nested $or/$and: {"ingredients": {"$or": [{$eq: a},
+            # {$eq: b}]}} for a single delimited field, e.g. a synonym-clause
+            # token filter. Each branch is a mini-clause over this same field.
+            if "$or" in condition:
+                if not any(_where_matches(metadata, {key: c})
+                           for c in condition["$or"]):
+                    return False
+                continue
+            if "$and" in condition:
+                if not all(_where_matches(metadata, {key: c})
+                           for c in condition["$and"]):
+                    return False
+                continue
             for op, target in condition.items():
                 fn = _WHERE_OPS.get(op)
                 if fn is None or not fn(value, target):
