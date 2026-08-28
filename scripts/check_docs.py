@@ -125,7 +125,7 @@ def main() -> int:
             for f in golden_files
         )
         text = eval_skill.read_text(encoding="utf-8")
-        expected = {"entity": 18, "general": 12, "recipe": 3, "comparison": 1}
+        expected = {"entity": 18, "general": 12, "recipe": 3, "comparison": 5}
         mismatches = []
         if f"{len(golden_files)} files exist today" not in text:
             mismatches.append(f"count ({len(golden_files)})")

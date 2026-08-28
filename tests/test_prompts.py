@@ -75,3 +75,14 @@ def test_old_overrestrictive_wording_removed():
     made the model refuse to synthesize. It must not come back."""
     prompt = build_prompt("tell me about cheese", "ctx", query_type="general")
     assert "Do NOT guess, infer" not in prompt
+
+
+def test_entity_prompt_lists_all_named_characters():
+    prompt = build_prompt("Tell me about the Gardening skill.", "ctx", query_type="entity")
+    assert "reproduce EVERY name" in prompt
+
+
+def test_comparison_prompt_quotes_descriptions_and_concludes_firmly():
+    prompt = build_prompt("Which is more damaging, Sword or Unarmed?", "ctx", query_type="comparison")
+    assert "Quote each compared item's own description verbatim" in prompt
+    assert "Conclude firmly" in prompt

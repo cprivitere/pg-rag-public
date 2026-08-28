@@ -101,17 +101,21 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 
 - **Tests**: `test_build_index.py`, `test_build_integration.py`,
   `test_hashes.py`, `test_health_check.py`, `test_embed_validation.py`,
-  `test_bm25_persist.py`
+  `test_embed_fallback.py`, `test_bm25_persist.py`
 - **Source**: `src/pgrag/vectorstore/build_index.py`, `hashes.py`,
-  `health_check.py`; `src/pgrag/rag/bm25.py` (persistence)
+  `health_check.py`; `src/pgrag/rag/bm25.py` (persistence);
+  `src/pgrag/embeddings/llama_embeddings.py` (embed client + validation)
 - **Contracts**: `EMBEDDING_DIM=384` validation on upsert; incremental
   re-embed skip (embedding_hash = id+text only → metadata-only changes never
   re-embed); metadata add-only (`collection.update` merges, never replaces);
   health_check as documents↔index gatekeeper; bm25 persisted index ≡ in-memory
-  rankings and mtime-derived cache invalidation.
+  rankings and mtime-derived cache invalidation; embed overflow fallback
+  (batch bisection on `_InputTooLong` isolating the over-window text, not
+  serializing the whole batch) and `validate_embeddings` dim/type checks.
 - **Change ⇒** `uv run pytest tests/test_build_index.py tests/test_hashes.py
   tests/test_health_check.py tests/test_embed_validation.py
-  tests/test_bm25_persist.py`, then `uv run pgrag validate`.
+  tests/test_embed_fallback.py tests/test_bm25_persist.py`, then
+  `uv run pgrag validate`.
 - **Covered directly**: `load_documents()`'s refusal of a stale/missing
   `DOCUMENTS_VERSION` (`build_index.py:20-39`) is asserted by
   `test_build_index.py::test_documents_version_refuses_stale` and

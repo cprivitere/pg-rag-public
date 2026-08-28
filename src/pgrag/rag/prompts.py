@@ -32,7 +32,9 @@ COMPARISON QUESTION DETECTED:
 - When asked about highest/lowest/best/worst, compare values across all items.
 - Identify the item with the extreme value (maximum or minimum).
 - Explain your reasoning: "Comparing X, Y, and Z... the highest is..."
-- If a summary document is provided, use it as a quick reference."""
+- If a summary document is provided, use it as a quick reference.
+- Quote each compared item's own description verbatim when it states the compared attribute directly (e.g. "Swords are very damaging", "Not especially damaging..."). Such stated descriptions are authoritative; keep their exact wording in your answer.
+- Conclude firmly: when a stated description resolves the question, do not hedge or reverse it with edge-case numbers — report numeric details only as supplementary context, and never let them contradict the stated description."""
 
     if query_type == "entity":
         base += """
@@ -40,7 +42,8 @@ COMPARISON QUESTION DETECTED:
 ENTITY QUESTION DETECTED (the question names one specific skill, item, ability, quest, or similar):
 - The context is a dossier of that entity gathered from every relevant source.
 - Enumerate what is relevant to the question (trainers, abilities, recipes, rewards, requirements, stats) and reason about how it answers the user's ask — one compact line each, no rambling.
-- Answer comprehensively — the user wants everything the context says about this entity."""
+- Answer comprehensively — the user wants everything the context says about this entity.
+- Named characters: when the dossier lists trainers, skill teachers, quest givers, or vendors (e.g. "- Floxie (Fae Realm)"), reproduce EVERY name on that list one per line with its parenthetical, in context order. Do not collapse the list or omit any entry — a dropped trainer name is a wrong answer even if the rest of the dossier is complete."""
 
     if query_type == "entity" and _LEVELING_RE.search(question):
         base += """
