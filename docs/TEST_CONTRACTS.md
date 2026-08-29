@@ -224,10 +224,12 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 - **Contracts**: golden shape `{id, question, type, facts: [[variants…]], xfail?: bool}` — `xfail: true` marks a known-gap probe: runner+test treat a persistent miss as expected, but a pass (gap just closed) is a FAIL forcing unflagging; offline guard in test_golden_xfail_gate.py.
   (changing it breaks offline auto-collection — RULES/WATCHDOG trap); IR
   metric canonical-unit counting (`_row_`/`_coverage`/`_chunk_` collapse);
+  Tiered split: `test_golden_facts_short` (`-m short`, 9 files, ~3-5 min) and `test_golden_facts_long` (`-m long`, 33 files, ~11-23 min); bare run includes all 42.
   trace field set + `ask()`-fill no-payload-mutation; bakeoff corpus
   type-stratified queries.
 - **Change ⇒** `uv run pytest tests/test_golden_check.py tests/test_retrieval_eval.py
   tests/test_retrieval_trace.py tests/test_bakeoff_corpus.py`
+  Use `-m short` for the quick tier (9 files, ~3-5 min) or `-m long` for the full tier (33 files).
 
 ### L7 — Loaders, wiki sync, curation, source guards
 

@@ -33,6 +33,8 @@ dev = [
 [tool.pytest.ini_options]
 markers = [
     "slow: tests that load real CDN/wiki data (deselect with '-m \"not slow\"')",
+    "short: fast golden evaluation subset (~9 representative queries)",
+    "long: full golden evaluation set (33 files, ~11-23 min, excludes short tier)",
 ]
 addopts = "-m 'not slow'"
 filterwarnings = [

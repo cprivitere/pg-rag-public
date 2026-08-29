@@ -152,9 +152,14 @@ run = "uv run pgrag validate && echo 'Index healthy' || (echo 'Rebuilding...' &&
 alias = "va"
 
 [tasks.golden]
-description = "Run golden eval set (needs embed + llm services up). Exits 1 on missing facts"
+description = "Run golden eval set (needs embed + llm services up). Exits 1 on missing facts. `mise golden-short`/`mise gds` for quick tier (9 files, ~3-5 min)"
 run = "uv run python scripts/golden_check.py"
 alias = "gd"
+
+[tasks."golden-short"]
+description = "Run short golden eval tier (9 representative queries, ~3-5 min)"
+run = "uv run pytest -m short tests/test_golden_check.py"
+alias = "gds"
 
 [tasks."eval-retrieval"]
 description = "Run pre-LLM retrieval evaluation suite (IR metrics: Recall@k, MRR, NDCG@k, Reranker Uplift)"

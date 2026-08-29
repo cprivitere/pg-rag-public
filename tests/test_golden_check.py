@@ -1,15 +1,34 @@
 """Tests scripts.golden_check.check_golden against the golden JSON files in
 GOLDEN_DIR; requires the LLM (:8080) and embedding (:8081) servers and retries
-sampled LLM answers to damp nondeterminism."""
+sampled LLM answers to damp nondeterminism.
+
+Tiered by marker: -m short (9 representative queries, ~3-5 min) or
+-m long (remaining 33, ~11-23 min). Default (no -m) runs all 42."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from scripts.golden_check import check_golden, GOLDEN_DIR
 
-_GOLDEN_FILES = sorted(GOLDEN_DIR.glob("*.json"))
+_ALL_FILES = sorted(GOLDEN_DIR.glob("*.json"))
+
+_SHORT_FILES = [
+    GOLDEN_DIR / "bacon-for-joeh.json",               # entity: simplest, 3 facts
+    GOLDEN_DIR / "fireball-ability.json",              # entity: variant normalization
+    GOLDEN_DIR / "moonstone-item.json",                # entity: 2 facts, quick
+    GOLDEN_DIR / "blacksmithing-leveling-25-30.json",  # entity: XP ranges
+    GOLDEN_DIR / "fireball-vs-fire-breath-damage.json",# comparison: damage numbers
+    GOLDEN_DIR / "healing-potion-omega.json",          # recipe: crafting/effects
+    GOLDEN_DIR / "cheesemaking-leveling.json",         # entity: arithmetic, 8 facts, hardest
+    GOLDEN_DIR / "il2cpp-mechanic-curse-remedy.json",  # general: xfail gate
+    GOLDEN_DIR / "grow-field-mushrooms.json",          # general: 5 facts, medium
+]
+
+_LONG_FILES = [
+    f for f in sorted(GOLDEN_DIR.glob("*.json"))
+    if f not in _SHORT_FILES
+]
 
 
 def _servers_up():
@@ -32,8 +51,9 @@ def require_servers():
         pytest.skip("V38: golden check needs LLM (:8080) + embedding (:8081) servers")
 
 
-@pytest.mark.parametrize("path", _GOLDEN_FILES, ids=lambda p: p.stem)
-def test_golden_facts(path, require_servers):
+def _check_golden_file(path):
+    """Run check_golden against one golden file with retry logic and xfail
+    handling. Shared by both short and long tier tests."""
     golden = json.loads(path.read_text(encoding="utf-8"))
     # LLM answers are sampled: retry once to damp nondeterminism. A real
     # regression still fails both attempts.
@@ -52,3 +72,19 @@ def test_golden_facts(path, require_servers):
             )
         return
     assert misses == [], f"missing facts: {misses}"
+
+
+@pytest.mark.short
+@pytest.mark.parametrize("path", _SHORT_FILES, ids=lambda p: p.stem)
+def test_golden_facts_short(path, require_servers):
+    """Short golden tier: 9 representative queries covering all types
+    (entity, comparison, recipe, general). ~3-5 min. Filter: -m short."""
+    _check_golden_file(path)
+
+
+@pytest.mark.long
+@pytest.mark.parametrize("path", _LONG_FILES, ids=lambda p: p.stem)
+def test_golden_facts_long(path, require_servers):
+    """Long golden tier: remaining 33 queries. ~11-23 min. Filter: -m long.
+    Default (no -m) runs both tiers = all 42 files exactly once."""
+    _check_golden_file(path)
