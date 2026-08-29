@@ -15,6 +15,8 @@ is exact-match.
 
 import re
 
+from pgrag.documents.combat_xp import MAX_LEVEL
+
 # Recipe/ability verbs that make a structured filter worth attempting.
 _RECIPE = re.compile(r"\b(?:recipe|recipes|craft|crafter|crafting|make|"
                      r"making|produce|produces|crafted)\b", re.I)
@@ -46,6 +48,16 @@ _SKILL = re.compile(
 _LEVEL = re.compile(
     r"\b(?:(\d{1,3})\s*(?:lv|level|lvl)|(?:lv|level|lvl)\s*(\d{1,3}))\b",
     re.I,
+)
+# Combat-XP efficiency lookup: "most efficient combat exp at level 40" —
+# the authoritative data is the per-level cross-archetype comparison doc (type
+# ``combatxp``, metadata ``level``). Narrowing the Chroma where to it makes the
+# max-value answer deterministic instead of top-k noise across the full level
+# range (1..MAX_LEVEL). Values beyond MAX_LEVEL have no matching doc ->
+# the plan returns None (avoid an exact-$eq false negative on out-of-range levels).
+_COMBAT_XP_LEVEL = re.compile(
+    r"\bcombat\s+(?:xp|exp)\b.*?\blevel\s*(\d{1,3})\b",
+    re.IGNORECASE,
 )
 
 _INGREDIENT_INTRO = re.compile(
@@ -183,6 +195,21 @@ def _and(clauses):
     return {"$and": list(clauses)}
 
 
+def _plan_combat_xp_level(q):
+    """High-confidence plan for combat-XP level comparisons, or None."""
+    m = _COMBAT_XP_LEVEL.search(q)
+    if not m:
+        return None
+    level = int(m.group(1))
+    if level <= 0 or level > MAX_LEVEL:
+        return None
+    return {
+        "native": {"$and": [{"type": "combatxp"}, {"level": level}]},
+        "token": {},
+        "label": f"combatxp level={level}",
+    }
+
+
 def plan_query(question):
     """Return a high-confidence plan dict or None.
 
@@ -202,6 +229,11 @@ def plan_query(question):
             "token": {},
             "label": "creature locations",
         }
+
+    # --- Combat XP level comparison (max/efficient per archetype at a level) ---
+    combat_xp_plan = _plan_combat_xp_level(q )
+    if combat_xp_plan is not None:
+        return combat_xp_plan
 
     # --- Ability + damage type ---
     if _ABILITY.search(q):

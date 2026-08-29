@@ -52,6 +52,7 @@ def main():
 
     total_miss = 0
     capture_trace = os.environ.get("PGRAG_TRACE") == "1"
+    total_xpass = 0
     for path in sorted(GOLDEN_DIR.glob("*.json")):
         golden = json.loads(path.read_text(encoding="utf-8"))
         trace = {} if capture_trace else None
@@ -66,6 +67,13 @@ def main():
                 )
             except OSError as exc:
                 print(f"    (trace write failed: {exc})")
+        if golden.get("xfail"):
+            if misses:
+                print("[KNOWN-GAP] %s (%s, %s)" % (golden["id"], golden["type"], result["query_type"]))
+                continue
+            print("[XPASS] %s — gap closed; remove the 'xfail' flag" % golden["id"])
+            total_xpass += 1
+            continue
         status = "PASS" if not misses else "FAIL"
         print("[%s] %s (%s, %s)" % (
             status,
@@ -87,8 +95,11 @@ def main():
         total_miss += len(misses)
 
     print()
-    if total_miss:
-        print("FAIL: %d fact(s) missing" % total_miss)
+    if total_miss or total_xpass:
+        if total_miss:
+            print("FAIL: %d fact(s) missing" % total_miss)
+        if total_xpass:
+            print("FAIL: %d known-gap probe(s) now pass — remove 'xfail' flag(s)" % total_xpass)
         sys.exit(1)
     print("OK: all golden facts present")
 

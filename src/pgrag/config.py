@@ -14,6 +14,7 @@ WIKI_DIR = DATA_DIR / "wiki"
 DERIVED_DIR = DATA_DIR / "derived"
 WIKI_PARSED_CACHE = DERIVED_DIR / "wiki_parsed.json"
 CURATED_DIR = WIKI_DIR / "curated"
+IL2CPP_DIR = DATA_DIR / "il2cpp"
 
 # Document-shape version. generate_documents() stamps
 # DERIVED/documents_version.json with this; build-index refuses to embed a
@@ -21,14 +22,14 @@ CURATED_DIR = WIKI_DIR / "curated"
 # serve stale docs — the classic build-index-vs-build-documents trap).
 # Bump whenever document generation changes shape (new metadata keys, table
 # records, chunking) so a stale persist is surfaced, not re-embedded.
-DOCUMENTS_VERSION = 7
+DOCUMENTS_VERSION = 11
 
 DOCUMENTS_VERSION_FILE = DERIVED_DIR / "documents_version.json"
 
 EMBEDDING_DIM = 384
 
 # Max context chars fed to the LLM (output is separate). 80000 is the
-# golden-validated config: the winner (gemma-4-12B-it-qat) measured a
+# golden-validated config: the then-current production winner (gemma-4-12B-it-qat) measured a
 # 7-facts-missing baseline at this value. A tighter worst-density-safe 54k
 # cap did NOT help golden (8 missing — wide general/lookup contexts lost
 # facts; a later 80k run scored 10, all within run-to-run LLM variance), so

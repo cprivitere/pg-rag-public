@@ -1,23 +1,25 @@
-import mwparserfromhell
 import re
 from pathlib import Path
 
-from pgrag.documents.resolver import GameResolver
-from pgrag.documents.wiki_builder import build_wiki_documents
-from pgrag.documents.creature_zones import build_creature_zones_documents
+import mwparserfromhell
+
+from pgrag.config import CURATED_DIR
 from pgrag.documents.chunking import chunk_all_documents
+from pgrag.documents.combat_xp import build_combat_xp_documents
+from pgrag.documents.creature_zones import build_creature_zones_documents
+from pgrag.documents.decomp_builder import build_il2cpp_documents
+from pgrag.documents.resolver import GameResolver
 from pgrag.documents.skill_profiles import (
-    build_skill_profile_documents,
     build_leveling_documents,
+    build_skill_profile_documents,
 )
 from pgrag.documents.summaries import (
-    build_summary_documents,
     build_gathering_summaries,
+    build_summary_documents,
     build_wiki_gathering_summaries,
     build_wiki_harvest_map,
 )
-from pgrag.config import CURATED_DIR
-from pathlib import Path
+from pgrag.documents.wiki_builder import build_wiki_documents
 
 
 def _str_or(value, default=""):
@@ -1288,6 +1290,7 @@ def _assemble_documents(db):
     documents.extend(build_title_documents(db))
     documents.extend(build_vault_documents(db))
     documents.extend(build_advancementtable_documents(db))
+    documents.extend(build_combat_xp_documents(db))
     documents.extend(build_ai_documents(db))
     documents.extend(build_attribute_documents(db))
     documents.extend(build_source_documents(db))
@@ -1297,6 +1300,7 @@ def _assemble_documents(db):
     documents.extend(build_wiki_documents(db))
     documents.extend(build_creature_zones_documents(db))
     documents.extend(build_curated_documents())
+    documents.extend(build_il2cpp_documents())
 
     for doc in documents:
         doc.setdefault("metadata", {})

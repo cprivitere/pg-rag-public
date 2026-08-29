@@ -37,21 +37,14 @@ HSA_OVERRIDE_GFX_VERSION = "11.0.0"
 # thinking via `--reasoning-budget 4096` (qwen's thinking is economical, unlike
 # gemma-4's — verified content reliable on the 9B). `-c 65536` free (KV ~4 GiB
 # @64k Q8, still small for a 27B). UD quant (unsloth dynamic), NOT QAT.
-# == PRODUCTION MODEL (golden-verified best: 7 facts missing, lightest VRAM) ==
-# gemma-4-12B-it-qat — dense + QAT-lossless UD-Q4 + native thinking @1024.
-# Beat 6 other models incl. MoE 26B and dense 27B-Q2 on facts extraction, at
-# the LOWEST VRAM (~8.0 GB, PG-open compatible). MTP head auto-discovered from
-# -hf (`--spec-type draft-mtp --spec-draft-n-max 4`, no --model-draft). No
-# --jinja (built-in gemma4 template). `--reasoning-budget 1024` NOT 4096 —
-# gemma-4's verbose thinking leaves `content` empty at 4096. Shaved for text-RAG:
-# `--no-mmproj` (drops 0.16 GiB vision projector) + `-c 32768` (halves KV;
-# reasoning@1024 + ≤19k ctx + ≤8k ans ≈ ≤28.5k < 32k at typical ~4.2 chars/token;
-# densest-content ~2.4 chars/token (config.py note) can approach the 32k edge —
-# accepted residual, never observed in goldens). Measured
-# 8,019 MiB (was 8,741). Q8_0 KV (never Q4 V-axis: fact-extraction axis).
-# CONTEXT_BUDGET is 80000 (config.py).
-LLM_MODEL = "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
-LLM_FLAGS = "--spec-type draft-mtp --spec-draft-n-max 4 --no-mmproj -ngl 999 -fa on -c 32768 -ctk q8_0 -ctv q8_0 --reasoning-budget 1024"
+# == PRODUCTION MODEL ==
+# Active values live in LLM_MODEL / LLM_FLAGS directly below;swap a model
+# here and nothing else should change — consumers read via env vars/tomllib.
+# Tuning rationale lives in docs/LLM_MODEL_WIRING.md — do not duplicate
+# per-model prose here.
+
+LLM_MODEL = "ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M"
+LLM_FLAGS = "--no-mmproj -ngl 999 -fa on -c 65536 -ctk q8_0 -ctv q8_0 --reasoning-budget 4096"
 # Embeddings — bge-small-en; cls pooling; 512-token hard cap (see
 # llama_embeddings.MAX_EMBED_CHARS). Changing the model = full re-embed.
 EMBED_MODEL = "unsloth/bge-small-en-v1.5-GGUF:f16"

@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 # Production model refs — single source is mise.toml [env]. Read the live
 # values so a model swap propagates into the sweep with no literal drift.
 # Falls back to the current values if mise.toml is unreadable.
-_LLM_FALLBACK = "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
+_LLM_FALLBACK = "ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M"
 _RERANK_FALLBACK = "gpustack/bge-reranker-v2-m3-GGUF:Q4_K_M"
 _EMBED_FALLBACK = "unsloth/bge-small-en-v1.5-GGUF:f16"
 try:
@@ -57,27 +57,22 @@ WARM_RERANK_D = ["Death is a status effect in Project Gorgon."]
 
 
 def llm_variants():
-    # The swept model is the production gemma-4-12B-it-qat (LLM_MODEL, read
-    # from mise.toml [env]); the variants MUST measure ITS launch config — MTP
-    # draft (auto-discovered head) + gemma-4 native thinking capped @1024
-    # (NOT 4096: verbose thinking empties `content`). A granite-style config
-    # (ngram-mod, no reasoning budget) on gemma would mis-size KV and risk
-    # empty `content`. Variants sweep context window + flash-attention only.
-    base = ["-ngl", "999", "-np", "1", "--reasoning-budget", "1024"]
-    def v(name, spec=None, fa="auto", c=16384):
+    # The swept model is the production Ornith-1.5-9B (LLM_MODEL, read
+    # from mise.toml [env];the variants MUST measure ITS launch config — native
+    # thinking @4096,in the flags;;no MTP draft (LLM_FLAGS carries no --spec-type;;the
+    # swept dimensions are context window + flash-attention only.
+    base = ["-ngl", "999", "-np", "1", "--reasoning-budget", "4096"]
+    def v(name, fa="auto", c=16384):
         flags = list(base)
-        if spec is not None:
-            flags += ["--spec-type", spec, "--spec-draft-n-max", "4"]
         if fa:
             flags += ["-fa", fa]
         flags += ["-c", str(c)]
         return (name, flags)
     return [
-        v("baseline", spec="draft-mtp", fa="on", c=16384),
-        v("ctx-8192", spec="draft-mtp", fa="on", c=8192),
-        v("ctx-12288", spec="draft-mtp", fa="on", c=12288),
-        v("fa-off", spec="draft-mtp", fa="off", c=16384),
-        v("no-spec", fa="on", c=16384),
+        v("baseline", fa="on", c=16384),
+        v("ctx-8192", fa="on", c=8192),
+        v("ctx-12288", fa="on", c=12288),
+        v("fa-off", fa="off", c=16384),
     ]
 
 

@@ -171,3 +171,13 @@ def test_non_creature_location_listing_unplanned():
     itself in the creatures table (e.g. blacksmithing trainers)."""
     assert plan_query("the locations of blacksmithing trainers") is None
     assert plan_query("where can I find the mushroom trainer?") is None
+
+def test_combat_xp_level_plans_to_comparison_doc():
+    p = plan_query("most efficient combat exp at level   40")
+    assert p is not None
+    assert p["native"] == {"$and": [{"type": "combatxp"}, {"level": 40}]}
+    assert p["token"] == {}
+
+
+def test_combat_xp_without_level_unplanned():
+    assert plan_query("what is the best combat exp?") is None

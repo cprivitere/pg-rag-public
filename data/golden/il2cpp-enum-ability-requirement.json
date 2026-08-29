@@ -1,0 +1,10 @@
+{
+  "id": "il2cpp-enum-ability-requirement",
+  "question": "What ability requirements are defined in the game code?",
+  "type": "entity",
+  "xfail": true,
+  "facts": [
+    ["dancing on pole", "dancingonpole"],
+    ["in music performance", "inmusicperformance"]
+  ]
+}

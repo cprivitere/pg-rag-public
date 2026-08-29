@@ -28,6 +28,34 @@ re-baseline (gemma 8, qwen 12) is in "Card flags & determinism" below.
 - `--no-mmproj` (double-dash; build rejects `-no-mmproj`) — drop the vision
   projector for text-only RAG (~0.16 GiB). Add to any model bundled with an
   `mmproj` whose RAG path never sends images.
+
+## Ornith-1.5-9B (trial 2026-08-28)
+
+Dense ~9B reasoning model (built on Qwen3.5 + Gemma4; Qwen chat
+template adjusted — GGUF's embedded template renders correctly, NO `--jinja`)
+with a vision projector bundled in repo (dropped via `--no-mmproj`). NO MTP`
+head (dense — the qwen35-9B-MTP's spec-decode does NOT apply); native thinking
+via `--reasoning-budget 4096` (qwen-style economical — verified content clean,
+unlike gemma-4's verbose thinking).
+
+```toml
+LLM_MODEL = "ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M"
+LLM_FLAGS = "--no-mmproj -ngl 999 -fa on -c 65536 -ctk q8_0 -ctv q8_0 --reasoning-budget 4096"
+```
+
+- Weights 5.78 GiB (Q4_K_M). KV Q8 @64k; measured **6,580 MiB** (≈6.6 GB —
+  lightest of all contenders).). 64k over the winner's 32k because reasoning@4096 +
+  <=19k ctx + <=8k ans ≈ <=31.5k,and the densest-content edge (~2.4 chars/
+  token) can approach 32k — 64k keeps the headroom and stays the lightest).
+- Golden (current 38-case set,: **38/38 PASS —0 facts missing** — first clean
+  sweep, INCLUDING the shared-hard cases (`recipes_using_animal_feces` (the
+  qwen 0/5 stalemate, `dungcrafting`, `gardening`, `field-mushroom-locations`,
+  `pig_poop`). Single noisy reasoning-ON draw; presence-only fact check
+  (verbosity gamesthe metric; hallucination unp penalized.. Deterministic reasoning-
+  OFF re-baseline + a same-set gemma-12B control are both stillpending.
+
+
+
 ## Card flags & determinism (empirically validated 2026-08)
 
 Unsloth's llama-server launch guide recommends `--chat-template-kwargs
@@ -187,6 +215,7 @@ are within one draw's variance). Deterministic reasoning-OFF re-baseline
 a real 4-fact margin — see "Card flags & determinism". Rows 3–7 were not
 deterministically re-measured.*
 
-Winner: **gemma-4-12B-it-qat** — best extraction AND lightest VRAM. Dense +
-QAT-lossless-Q4 + thinking@1024 is the formula; MoE (26B) and over-quantized
-dense (27B-Q2) both underperform it.
+
+Winner: **Ornith-1.5-9B** — current production selection (LLM_MODEL/LLM_FLAGS shipped in mise.toml;wiring + flags documented in its section above(. Its record golden run reported 0-missing on  38 cases (~6.6 GiB),sthe cleanest on file — determinism/same-set control re-baseline was still pending as of this doc's note.
+
+The prior winner,**gemma-4-12B-it-qat**, stays the documented dense+QAT benchmark (7-facts-missing on the older  34-case set();its leaderboard row above is historical,superseded only in the production slot。 lhe swap decision lives in mise.toml [env] — treat that file as the source of truth for what ships。

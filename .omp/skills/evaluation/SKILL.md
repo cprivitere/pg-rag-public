@@ -26,11 +26,11 @@ Each file:
 
 - `facts` is a list of variant groups: the answer PASSES if ANY variant in
   each group appears (normalized substring) in the LLM answer.
-- 38 files exist today (18 entity / 12 general / 3 recipe / 5 comparison),
+- 42 files exist today (20 entity / 14 general / /3 recipe / /5 comparison),
   spanning recipes-by-ingredient, level-gated crafting, item acquisition/drops,
   ability lookups, comparisons, quest requirements, wiki lore, wiki how-to
   assembly. Future additions should favor the balanced categories (recipe is
-  3/38 today — the thinnest bucket).
+  3/42 today — the thinnest bucket).
 
 ## Running it
 
@@ -115,8 +115,8 @@ Each file:
 
 ## Planned direction
 
-- Golden set is **at target (38)** — future additions should fill the thinnest
-  buckets (recipe is 3/38 today) or capture a *named regression case*,
+- Golden set is **at target (42)** — future additions should fill the thinnest
+  buckets (recipe is 3/42 today) or capture a *named regression case*,
   e.g.:
   - `grow-field-mushrooms` ("How do I grow Field Mushrooms?") — fails before
     wiki page expansion, passes after (already present).

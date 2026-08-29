@@ -40,5 +40,15 @@ def test_golden_facts(path, require_servers):
     for _attempt in range(2):
         _, misses, _ = check_golden(golden)
         if not misses:
-            return
+            break
+    if golden.get("xfail"):
+        # Known corpus gap (tracked via 'xfail: true' in the golden JSON):
+        # a persistent miss is expected; the moment it clears, FAIL
+        # to force unflagging(strict-xfail parity with scripts/golden_check.py).
+        if not misses:
+            pytest.fail(
+                f"xfail golden {path.stem} now passes — gap closed; "
+                "remove the 'xfail' flag from its golden JSON"
+            )
+        return
     assert misses == [], f"missing facts: {misses}"

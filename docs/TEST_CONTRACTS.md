@@ -66,7 +66,8 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   `test_summaries.py`, `test_gathering_summaries.py`, `test_doc_quality.py`,
   `test_flatten.py`, `test_resolve.py`, `test_metadata.py`,
   `test_wiki_expansion.py`, `test_wiki_builder.py`, `test_leveling.py`,
-  `test_creature_zones.py`
+  `test_creature_zones.py`,
+  `test_combat_xp.py`, `test_decomp_builder.py`
 - **Source**: `src/pgrag/documents/` (`builder.py`, `wiki_builder.py`,
   `chunking.py`, `resolver.py`, `skill_profiles.py`, `summaries.py`,
   `creature_zones.py`), `src/pgrag/build.py`
@@ -216,11 +217,11 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 
 ### L6 — Golden + IR evaluation
 
-- **Tests**: `test_golden_check.py`, `test_retrieval_eval.py`,
+- **Tests**: `test_golden_check.py`, `test_golden_xfail_gate.py`, `test_retrieval_eval.py`,
   `test_retrieval_trace.py`, `test_bakeoff_corpus.py`
 - **Source**: `scripts/golden_check.py`, `src/pgrag/rag/retrieval_eval.py`,
   `rag/retriever.retrieve` (trace), `scripts/bakeoff_corpus.py`
-- **Contracts**: golden shape `{id, question, type, facts: [[variants…]]}`
+- **Contracts**: golden shape `{id, question, type, facts: [[variants…]], xfail?: bool}` — `xfail: true` marks a known-gap probe: runner+test treat a persistent miss as expected, but a pass (gap just closed) is a FAIL forcing unflagging; offline guard in test_golden_xfail_gate.py.
   (changing it breaks offline auto-collection — RULES/WATCHDOG trap); IR
   metric canonical-unit counting (`_row_`/`_coverage`/`_chunk_` collapse);
   trace field set + `ask()`-fill no-payload-mutation; bakeoff corpus

@@ -1,0 +1,10 @@
+{
+  "id": "il2cpp-mechanic-combat-xp",
+  "question": "What does the game say happens to XP when you win a fight?",
+  "type": "general",
+  "facts": [
+    ["skills you used"],
+    ["experience points"],
+    ["both of your combat bars"]
+  ]
+}

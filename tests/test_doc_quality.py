@@ -21,8 +21,9 @@ KNOWN_TYPES = {
     # computed leveling dossier (skill_profiles.build_leveling_documents);
     # the chunker TOKEN_BUDGETED_TYPES treats it as a token-budgeted family.
     "leveling",
+    "enum", "schema", "mechanic", "combatxp",
 }
-KNOWN_SOURCES = {"cdn", "wiki", "computed", "curated"}
+KNOWN_SOURCES = {"cdn", "wiki", "computed", "curated", "il2cpp"}
 
 _CDN_RESIDUE = ["{{", "}}", "[[", "]]", "{|"]
 _WIKI_RESIDUE = ["{{", "}}"]
