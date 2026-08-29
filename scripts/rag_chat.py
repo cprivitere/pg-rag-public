@@ -39,10 +39,17 @@ def respond(message, history):
         return
 
     sources = result["sources"]
-    source_block = "\n".join(
-        f"- {s['citation']}" for s in sources
-    ) or "No sources found."
-    yield full + f"\n\n---\n**Sources:**\n{source_block}"
+    if sources:
+        shown = sources[:5]
+        source_block = "\n".join(
+            f"- {s['citation']}" for s in shown
+        )
+        hidden = len(sources) - len(shown)
+        if hidden > 0:
+            source_block += f"\n\n…and {hidden} more not shown."
+    else:
+        source_block = "No sources found."
+    yield full + f"\n\n---\n**Sources ({len(sources)} total):**\n{source_block}"
 
 
 demo = gr.ChatInterface(
