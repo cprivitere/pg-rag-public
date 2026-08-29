@@ -67,24 +67,26 @@ run = "uv run -m pytest tests/"
 alias = "te"
 
 # --- Pipeline tasks ---
-
-[tasks.refresh]
-description = "Fast refresh: CDN data + rebuild documents + update vectorstore (skips slow wiki fetch)"
+[tasks.sync]
+description = "Fast sync: CDN data + rebuild documents + full index + BM25 (skips slow wiki fetch)"
 run = [
   "uv run pgrag download-cdn",
   "uv run pgrag build-documents",
   "uv run pgrag build-index",
+  "uv run python -m pgrag.rag.bm25",
 ]
-alias = "rf"
+alias = "sy, rf"
 
-[tasks."refresh-full"]
-description = "Full refresh: CDN + wiki data + rebuild documents + update vectorstore"
+[tasks."sync-full"]
+description = "Full sync: CDN + wiki data + rebuild documents + full index + BM25"
 run = [
   "uv run pgrag download-cdn",
   "uv run pgrag download-wiki",
   "uv run pgrag build-documents",
   "uv run pgrag build-index",
+  "uv run python -m pgrag.rag.bm25",
 ]
+alias = "syf"
 
 [tasks."refresh-cdn"]
 description = "Download CDN data to data/cdn/"
@@ -93,14 +95,6 @@ run = "uv run pgrag download-cdn"
 [tasks."refresh-wiki"]
 description = "Download wiki pages to data/wiki/ (slow)"
 run = "uv run pgrag download-wiki"
-
-[tasks."refresh-documents"]
-description = "Build data/documents.json from CDN + wiki data"
-run = "uv run pgrag build-documents"
-
-[tasks."refresh-vectors"]
-description = "Upsert documents into ChromaDB index (refuses stale documents.json — run generate-docs or a sync-* task first)"
-run = "uv run pgrag build-index"
 
 [tasks."generate-docs"]
 description = "Regenerate data/documents.json from CDN + wiki source (idempotent; stamps the generator version build-index checks)"
@@ -134,17 +128,6 @@ run = [
   "uv run python -m pgrag.rag.bm25",
 ]
 alias = "syc"
-
-[tasks."sync"]
-description = "Converge the whole index to current sources: fetch CDN + wiki, regenerate documents, full re-embed, then BM25"
-run = [
-  "uv run pgrag download-cdn",
-  "uv run pgrag download-wiki",
-  "uv run pgrag build-documents",
-  "uv run pgrag build-index",
-  "uv run python -m pgrag.rag.bm25",
-]
-alias = "sy"
 
 [tasks.validate]
 description = "Validate vectorstore health; rebuild if issues found"

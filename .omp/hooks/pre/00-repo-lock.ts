@@ -23,7 +23,7 @@ const TTL_MS = 3 * 60 * 60 * 1000;
 
 // Destructive corpus commands. Match on the token that actually rewrites
 // shared build state; deliberately conservative so reads/greps pass.
-const DESTRUCTIVE = /(?:\b|_)(build-index|build-documents|generate-docs)(?:\b|\s|\s-|$)|mise\s+(refresh|sync)\b|\b(?:uv\s+run\s+)?pgrag\s+build-/;
+const DESTRUCTIVE = /(?:\b|_)(build-index|build-documents|generate-docs)(?:\b|\s|\s-|$)|mise\s+sync\b|\b(?:uv\s+run\s+)?pgrag\s+build-/;
 
 type Owner = { pid: number; startedAt: number };
 const EMPTY: Owner = { pid: -1, startedAt: 0 };
