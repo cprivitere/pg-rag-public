@@ -216,6 +216,5 @@ a real 4-fact margin — see "Card flags & determinism". Rows 3–7 were not
 deterministically re-measured.*
 
 
-Winner: **Ornith-1.5-9B** — current production selection (LLM_MODEL/LLM_FLAGS shipped in mise.toml;wiring + flags documented in its section above(. Its record golden run reported 0-missing on  38 cases (~6.6 GiB),sthe cleanest on file — determinism/same-set control re-baseline was still pending as of this doc's note.
-
-The prior winner,**gemma-4-12B-it-qat**, stays the documented dense+QAT benchmark (7-facts-missing on the older  34-case set();its leaderboard row above is historical,superseded only in the production slot。 lhe swap decision lives in mise.toml [env] — treat that file as the source of truth for what ships。
+Winner: **Ornith-1.5-9B** — current production selection(LLM_MODEL/LLM_FLAGS shipped in mise.toml;wiring and flags documented in its section above). Its record golden run reported 0 missing on  38 cases(~6.6 GiB),the cleanest on file — determinism and same-set control re-baseline were still pending as of this doc's note.
+The prior winner,**gemma-4-12B-it-qat**, stays the documented dense+QAT benchmark(7 facts missing on the older 34-case set). Its leaderboard row above is historical,superseded only in the production slot. The swap decision lives in mise.toml [env] — treat that file as the source of truth for what ships.

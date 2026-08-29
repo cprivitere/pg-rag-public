@@ -58,9 +58,9 @@ WARM_RERANK_D = ["Death is a status effect in Project Gorgon."]
 
 def llm_variants():
     # The swept model is the production Ornith-1.5-9B (LLM_MODEL, read
-    # from mise.toml [env];the variants MUST measure ITS launch config — native
-    # thinking @4096,in the flags;;no MTP draft (LLM_FLAGS carries no --spec-type;;the
-    # swept dimensions are context window + flash-attention only.
+    # from mise.toml [env]). The variants MUST measure ITS launch config — native
+    # thinking capped at @4096(no MTP draft;the production LLM_FLAGS carries no
+    # --spec-type). The swept dimensions are context window + flash-attention only.
     base = ["-ngl", "999", "-np", "1", "--reasoning-budget", "4096"]
     def v(name, fa="auto", c=16384):
         flags = list(base)
