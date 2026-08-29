@@ -91,8 +91,12 @@ seed 0)
 Former noisy "7 vs 8" was a single lucky-draw for qwen; deterministically gemma
 leads by a real 4-fact margin. Production reasoning-ON spot-check on the FAIL
 set: gemma recovers `recipes_using_animal_feces` **5/5** (all ingredients +
-level); qwen **0/5** even with reasoning. Only `gardening/spade assault`
-persists for both (retrieval-coverage gap, reasoning cannot fix). Winner
+level); qwen **0/5** even with reasoning. `gardening/spade assault` was labeled
+a "retrieval-coverage gap, reasoning cannot fix" here originally, but that is
+**stale**: the entity-retrieval ability-injection (`entity_retrieval.py`
+lines 322-356, added 2026-08-25) explicitly grafts Spade Assault 1-6 into the
+Gardening skill dossier by reading `metadata.skill` — the fact IS in the fed
+context. A miss there is GEN-side (model omits it), not RET-side. Winner
 confirmed: **gemma-4-12B-it-qat**.
 
 ## Qwen3.5-9B-MTP
