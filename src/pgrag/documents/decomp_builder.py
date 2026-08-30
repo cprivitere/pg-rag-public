@@ -22,17 +22,38 @@ SCHEMA_CLASSES = {
     "Effect",
     "AreaInfo",
     "ItemUseInfo",
+    # New: discovered by schema survey (fields not fully in CDN)
+    "StorageVault",         # CDN missing: InternalName, GroupingName, AreaName, RequiredItemKeyword, RequirementFriendlyDescription
+    "AIConfig",             # CDN missing: name, comment, desc
+    "AbilityDoTDisplayInfo",# CDN missing: Preface (unique DoT description)
+    "TSysPower",            # CDN missing: Name, Prefix, Keywords
+    "ItemInfo",             # No CDN; StaticName, TooltipName, Description, FoodDesc
+    "ShopSearchResult",     # No CDN; ShopName, ShopDescription, VendorName
+    "AbilityConditionalKeyword",  # CDN partial; conditional keyword logic
+    "AbilityKeywordInfo",   # CDN partial; keyword constraint data model
 }
 
 #: Mechanic-prose allowlist -- (topic, title, regex pattern); first match wins per string.
 MECHANIC_TOPICS = [
     ("combat-xp-attribution", "Combat XP attribution", r"both of your combat bars"),
-    ("dying-skill-xp", "Dying skill XP", r"Dyingis a learning experience"),
+    ("dying-skill-xp", "Dying skill XP", r"Dying is a learning experience"),
     ("curse-remedy", "Curse remedy", r"Curses don't wear off|easiest way to break a curse"),
     ("curse-silver-lining", "Curse silver lining", r"silver lining, though"),
     ("armor-damage-halving", "Armor damage halving", r"half the damage monsters"),
     ("tab-cycling-hate", "Tab target cycling", r"When pressing tab to cycle through enemies"),
     ("corpse-loot-sorting", "Corpse loot sorting", r"un-looted corpses"),
+    ("food-regeneration", "Food and regeneration", r"Without food, you'll regenerate almost no health"),
+    ("sitting-no-regen", "Sitting doesn't aid regeneration", r"sitting down doesn't increase the rate"),
+    ("fairy-fae-energy", "Fairy Fae Energy", r"Fae Energy is needed for special recipes"),
+    ("fairy-flight", "Fairy flight", r"Fairies have the innate ability to fly"),
+    ("transmutation-attune", "Transmutation attunement", r"Transmuting this item will attune it to you"),
+    ("hangout-npcs", "Hangouts with NPCs", r"Hangouts are a great way to improve your favor"),
+    ("parry-rage", "Parry and rage mechanics", r"Parry ability depletes a monster's Rage"),
+    ("sprint-power", "Sprinting power consumption", r"sprinting while fighting.*consumes Power quickly"),
+    ("gift-highlight", "Gift item highlighting", r"items that seem to be good gifts are highlighted"),
+    ("tutorial-welcome", "Welcome and first tasks", r"This is a game about exploration.*your first task"),
+    ("death-low-hp-respawn", "Low health respawn", r"Your maximum health is too low to respawn"),
+    ("knockback-frontkick", "Front Kick knockback", r"Front Kick ability will propel a monster"),
 ]
 
 #: Line shapes in dump.cs (Il2CppDumper output)
