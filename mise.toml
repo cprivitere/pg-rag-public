@@ -178,6 +178,11 @@ description = "Start LLM server in foreground (debug)"
 run = "llama-server -hf {{ env.LLM_MODEL }} {{ env.LLM_FLAGS }} --host 0.0.0.0 --port 8080"
 alias = "dsl"
 
+[tasks."llm-pick"]
+description = "Pick the default LLM model from tested candidates"
+run = "uv run python scripts/llm_pick.py"
+alias = "lp"
+
 # --- Open WebUI ---
 
 [tasks."debug-webui"]
