@@ -63,6 +63,9 @@ uv run pgrag build-index --source cdn|wiki|computed|curated   # partial rebuild 
 mise sync-wiki / sync-cdn / sync   # build-documents + build-index in one shot (aliases syw/syc/sy)
 mise generate-docs                 # bare idempotent documents rebuild (alias docs)
 mise golden                        # golden eval (needs :8080 + :8081)
+mise golden-short                  # quick tier (~3-5 min; alias gds)
+mise golden-one -- fireball-ability   # rerun named golden case(s) fast (alias go; comma-separate ids)
+mise golden-flaky / golden-flaky-list # focus on historically-troublesome golden cases / audit stats
 mise chat                          # Gradio chat (primary UI; also started by `mise start`; needs embed + LLM up)
 uv run pytest                      # offline test suite
 uv run pytest tests/test_retrieval_unit.py tests/test_bm25.py tests/test_rerank*.py  # retrieval regression
@@ -86,7 +89,7 @@ mise drift                        # check docs/skills against the repo (aliases:
 - `src/pgrag/cli.py` — entry point; `config.py` — constants/paths; `build.py` — document orchestration; `rag/pipeline.py` — query path (deterministic temp=0/seed=0).
 - `scripts/pg_rag.py` — OpenWebUI pipe, `PG_ROOT = os.environ.get("PG_RAG_ROOT", r"F:\ProjectGorgon\pg-rag-builder")` (env override, Windows default) + `os.chdir()`, adds `PG_ROOT/src` to `sys.path` — the default path is what moves if the repo relocates. Valves: `TOP_K=40`, `USE_HYBRID=True`, `USE_RERANK=True`.
 - `scripts/curator.py` + `curator_scheduler.py` — heuristic (non-LLM) curation: regex-detect fragmented knowledge (area_levels, skill_trainers, crafting_progressions), write template docs to `data/wiki/curated/`, scheduler persists state to `data/curator_state.json` and rebuilds doc/index on change. Deterministic by design — no LLM, so curated docs are stable anchors.
-- `scripts/golden_check.py` — fact-presence golden eval → `data/golden/`; `scripts/embed_eval.py` (+`bakeoff_corpus.py`; VRAM helpers in `embed_vram_probe.py`) — embedding bake-offs.
+- `scripts/golden_check.py` — fact-presence golden eval → `data/golden/`; `scripts/golden_rerun.py` — quick named-case rerun + flaky focus (`mise golden-one`/`golden-flaky`; appends miss history to `data/golden/history.jsonl`); `scripts/embed_eval.py` (+`bakeoff_corpus.py`; VRAM helpers in `embed_vram_probe.py`) — embedding bake-offs.
 - `docs/TEST_CONTRACTS.md` — layer→tests→contract map + regression-triage protocol (read before changing behavior/tests); `docs/REVIEW.md` — audit findings + improvement backlog.
 - `scripts/check_services.py` — [OK]/[DOWN] probes for all services.
 - `mise.toml` `[env]`: `WEBUI_DIR`, `LOGS_DIR` — update if paths move.

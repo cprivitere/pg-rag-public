@@ -292,6 +292,42 @@ def test_real_source_names_resolved(real_docs):
 
 
 @pytest.mark.slow
+def test_real_npc_gift_sources_named_and_gifted_to(real_docs):
+    """sources_items NpcGift entries render as "- Gifted to <NPC Name>"
+    (CDN npcs table resolved from the NPC_<key> id). Keys pointing at an
+    existing npcs.json record must never leak raw into the text — key-only
+    text cannot answer "who likes X gifts". (Unimplemented NPC keys absent
+    from npcs.json are allowed to fall through to the raw key.)
+    """
+    import json
+    npc_keys = set(json.load(open(CDN_DIR / "npcs.json", encoding="utf-8")))
+    bad_key_exposed = []
+    for doc in real_docs:
+        if doc["metadata"].get("table") not in ("sources_items", "sources_abilities", "sources_recipes"):
+            continue
+        for m in re.finditer(r"\b(NPC_[A-Za-z0-9_]+)", doc["text"]):
+            raw = m.group(0)
+            if raw in npc_keys:
+                bad_key_exposed.append(doc["id"])
+                break
+    assert not bad_key_exposed, f"resolvable NPC keys leaked into source docs ({len(bad_key_exposed)}): {bad_key_exposed[:10]}"
+
+
+@pytest.mark.slow
+def test_real_peening_hammer_gifted_to_amutasa(real_docs):
+    """Regression anchor for the gift-recipients failure mode: Peening
+    Hammer's source doc must read 'Gifted to Amutasa' (display name), which
+    is what lets retrieval answer 'who can I gift hammers to?'."""
+    peening = next(
+        (d for d in real_docs
+         if d["metadata"].get("table") == "sources_items"
+         and d["metadata"].get("name", "").startswith("Peening Hammer Sources")),
+        None)
+    assert peening is not None, "Peening Hammer source doc missing"
+    assert "Gifted to Amutasa" in peening["text"], peening["text"]
+
+
+@pytest.mark.slow
 def test_real_skill_rewards_spotcheck(real_docs):
     alchemy = next(
         (d for d in real_docs if d["type"] == "skill" and d["id"] == "skill_Alchemy"),

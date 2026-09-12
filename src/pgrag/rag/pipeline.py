@@ -210,6 +210,21 @@ def _gap_fill(question, answer, ids, docs, metas, dists, query_type, generation=
     return answer, ids, docs, metas, dists, extra.get("rerank_used", False)
 
 
+def _expand_synonyms(query: str) -> str:
+    """Replace user-facing synonyms with game terminology before classification.
+
+    Runs before classify_query so the classifier, spelling correction, and
+    retrieval all see the canonical game term rather than the synonym.
+    """
+    _SYNONYM_MAP = {
+        r"\blycanthropes\b": "werewolf",
+        r"\blycanthrope\b": "werewolf",
+    }
+    for pattern, replacement in _SYNONYM_MAP.items():
+        query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+    return query
+
+
 def _prepare_entity(question):
     """Retrieve an entity dossier without generating. Returns
     (ids, docs, metas, dists, rerank_used) or None if no hub found."""
@@ -305,12 +320,15 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     # recall + wiki expansion as "general" — an answer is a fact, not a
     # comparison, so a 3-doc dense-only window starves it.
     is_wide = query_type in ("general", "lookup")
-    # A creature-location plan narrows Chroma to the `creatures` table, so
-    # every candidate is on-topic. "List all the locations with <animals>"
-    # needs the full spawn-zone table, not a tight top-k: a wider surfaced
-    # count keeps rarer spawns (Wooly Mountain Goat ~rerank-62, Infernal
-    # Buck ~dense-106) instead of dropping valid answers at the cut.
-    plan_count = 80 if (metadata_filter or {}).get("table") == "creatures" else (40 if is_wide else 3)
+    # A plan that narrows Chroma to one table needs a wider surfaced count —
+    # every candidate is on-topic, and the family's full set (creature spawn
+    # table, per-NPC gift summaries) is what enumeration questions need.
+    # "List all the locations with <animals>" / "who can I gift X to?" must
+    # surface their complete member list, not a tight generic top-k.
+    mf_tables = {
+        c.get("table") for c in (metadata_filter or {}).get("$and", [])
+    } | {(metadata_filter or {}).get("table")}
+    plan_count = 80 if mf_tables & {"creatures", "summaries"} else (40 if is_wide else 3)
     results = retrieve(
         question,
         metadata_filter=metadata_filter,
@@ -473,6 +491,7 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
     gap-fill re-answers) and finally {"type": "final", "result": {...}}
     where result mirrors ask()'s return value.
     """
+    question = _expand_synonyms(question)
     query_type = classify_query(question)
     if trace is not None:
         trace.setdefault("query", question)
@@ -511,11 +530,22 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
                     trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get("query", question)
                 yield {"type": "final", "result": multi}
                 return
+        # No entities found → widen comparison to general retrieval for
+        # hybrid (BM25 + dense) recall, so a synonym-expanded query like
+        # "best armor for werewolf" matches werewolf armor items lexically.
+        _comparison_fallback = True
+        query_type = "general"
+    else:
+        _comparison_fallback = False
 
     mf, tf = _apply_plan(question, metadata_filter, trace=trace)
     qt, ids, documents, metadatas, distances, rerank_used = _prepare_general(
         question, query_type, mf, token_filter=tf, trace=trace, generation=generation
     )
+
+    if _comparison_fallback:
+        qt = "comparison"
+
     answer, ids, documents, metadatas, distances, gap_used = yield from _stream_answer(
         question, ids, documents, metadatas, distances, qt,
         generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
@@ -545,6 +575,7 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
 
 
 def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_fill=False):
+    question = _expand_synonyms(question)
     query_type = classify_query(question)
     if trace is not None:
         trace.setdefault("query", question)
@@ -564,11 +595,20 @@ def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_f
             )
             if multi is not None:
                 return multi
+        # No entities found → widen comparison to general retrieval for
+        # hybrid (BM25 + dense) recall.
+        _comparison_fallback = True
+        query_type = "general"
+    else:
+        _comparison_fallback = False
 
     mf, tf = _apply_plan(question, metadata_filter, trace=trace)
     qt, ids, documents, metadatas, distances, rerank_used = _prepare_general(
         question, query_type, mf, token_filter=tf, trace=trace, generation=generation
     )
+
+    if _comparison_fallback:
+        qt = "comparison"
 
     context = "\n\n---\n\n".join(_fit_context(documents))
 

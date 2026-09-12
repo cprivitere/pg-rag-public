@@ -86,6 +86,48 @@ AGGREGATION_PATTERNS = [
     # would otherwise route to skill-trainer dossiers instead of spawn zones.
     r"\b(?:all\s+)?locations?\s+(?:with|of|containing|that\s+(?:have|hold|feature)|in)\b",
     r"\blist\s+(?:me\s+|all\s+|the\s+)*locations?\b",
+    # Gift-recipient listing: "Who can I gift X to?" / "which NPC likes X
+    # as a gift?" enumerates NPCs; the item named is the filter, not the
+    # answer. A single-"entity" match ("Hammer" -> the Hammer skill
+    # dossier) hides the gifting facts (sources_items docs and the computed
+    # gift summaries) — route general so hybrid recall can surface them.
+    r"\b(?:gift|giftable|gifted|gifting)\b.{0,40}\bto\b",
+    r"\bgiftable\b",
+    r"as a gift",
+]
+
+_EXCLUSION_PATTERNS = [
+    # "Who likes hammers, other than Otis?" / "besides Otis" / "apart from X"
+    # / "excluding X" — the named entities are EXCLUDED from the answer, so
+    # building one dossier per name is categorically wrong (dossiers
+    # re-introduce exactly what was asked to exclude). The named things can
+    # still be filters/hints, so route general (hybrid recall) rather than
+    # forcing a single entity either.
+    r"\bother than\b",
+    r"\bbesides\b",
+    r"\bapart from\b",
+    r"\bexcluding\b",
+]
+
+_EXCLUSION_PATTERNS = [
+    # "Who likes hammers, other than Otis?" / "besides Otis" / "apart from" —
+    # the named entities are EXCLUDED from the answer, so building one dossier
+    # per name is categorically wrong (dossiers re-introduce exactly what was
+    # asked to exclude). The named things can still be filters/hints, so route
+    # general (hybrid recall) rather than forcing a single entity either.
+    r"\bother than\b",
+    r"\bbesides\b",
+    r"\bapart from\b",
+    # "Which NPC likes X as a gift?" enumerates gift recipients; the named
+    # item is the filter. Same trap as the per-item source docs: a
+    # single-"entity" match ("Hammer" -> skill profile) hides the gifting
+    # facts from the exclusion route as well.
+    # "Which NPC likes X as a gift?" is listing intent (the item is the
+    # filter), not an exclusion — but checking it here keeps the two
+    # anti-hijack guards adjacent; classification routes general either way
+    # because both loops check before comparison.
+    r"as a gift",
+    r"\bexcluding\b",
 ]
 
 # Category-listing intent: "Which <category> <verb> ...?" enumerates a class
@@ -326,6 +368,12 @@ def classify_query(query: str) -> str:
     # make with Spider Silk at Tailoring 4" is a list of recipes (general),
     # not an item comparison even though two entities appear.
     for pattern in AGGREGATION_PATTERNS:
+        if re.search(pattern, lower):
+            return "general"
+    # Exclusion intent ("other than Otis", "besides Otis") wins over
+    # comparison: the named entities are the ones to EXCLUDE, so per-entity
+    # dossiers would re-introduce exactly what was asked to exclude.
+    for pattern in _EXCLUSION_PATTERNS:
         if re.search(pattern, lower):
             return "general"
 

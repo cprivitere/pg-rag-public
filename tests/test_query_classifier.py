@@ -161,6 +161,26 @@ def test_which_abilities_deal_stays_general():
     assert classify_query("Which Sword abilities deal Slashing damage?") == "general"
     assert classify_query("Which abilities deal damage, Punch or Front Kick?") == "comparison"
 
+def test_gift_recipient_listing_routes_general():
+    """'Who can I gift a hammer to?' enumerates NPC gift recipients; the named
+    item is the filter, not the answer. A single-entity route opens the HAMMER
+    SKILL dossier, which contains no gifting facts — the ground truth lives in
+    sources_items docs ('- Gifted to Amutasa')."""
+    assert classify_query("Who can you gift hammers to?") == "general"
+    assert classify_query("Who can I gift a hammer to?") == "general"
+
+
+def test_exclusion_phrasing_does_not_break_real_comparisons():
+    """No exclusion/gift-recipient phrase present → genuine two-entity
+    comparisons and genuine entity questions keep their routing (the guard
+    must not widen its blast radius)."""
+    assert classify_query("Which ability deals more damage, Punch or Front Kick?") == "comparison"
+    assert classify_query("What is the difference between Fireball and Fire Breath?") == "comparison"
+    assert classify_query("What is the best armor?") == "comparison"
+    assert classify_query("Tell me about Foretold Hammer") == "entity"
+    assert classify_query("what can improve my Hammer skill?") == "entity"
+
+
 
 def test_lorebook_series_stays_general():
     """Lore series/books are multi-part narrative synthesis with no single-hub

@@ -14,6 +14,7 @@ from pgrag.documents.skill_profiles import (
     build_skill_profile_documents,
 )
 from pgrag.documents.summaries import (
+    build_gift_summaries,
     build_gathering_summaries,
     build_summary_documents,
     build_wiki_gathering_summaries,
@@ -1091,13 +1092,20 @@ def build_source_documents(db):
 
             entry_lines = []
             for entry in entries:
-                entry_type = entry.get("Type", entry.get("type", ""))
                 npc = entry.get("Npc", entry.get("npc", ""))
-                skill = entry.get("skill", "")
+                npc_disp = resolver.npc_name(npc) if npc else ""
+                skill = entry.get("Skill", entry.get("skill", ""))
+                entry_type = entry.get("Type", entry.get("type", ""))
 
-                line = f"- {entry_type}"
-                if npc:
-                    line += f" from {npc}"
+                if entry_type == "NpcGift":
+                    # Gift tables point AT the receiving NPC — "to" reads as
+                    # who accepts the item ("Gifted to Amutasa"), and only a
+                    # display name is searchable ("from NPC_Amutasa" is not).
+                    line = f"- Gifted to {npc_disp}" if npc else f"- {entry_type}"
+                else:
+                    line = f"- {entry_type}"
+                    if npc:
+                        line += f" from {npc_disp}"
                 if skill:
                     line += f" ({skill} skill)"
                 entry_lines.append(line)
@@ -1383,6 +1391,7 @@ def _assemble_documents(db):
     ]
     documents.extend(gathering)
     documents.extend(wiki_gathering)
+    documents.extend(build_gift_summaries(db.tables))
 
     return documents
 

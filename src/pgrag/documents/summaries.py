@@ -243,3 +243,101 @@ def build_wiki_gathering_summaries(wiki):
         })
 
     return summaries
+
+
+# ---------------------------------------------------------------------------
+# Gift summaries: one per-NPC doc listing items they accept as gifts
+# ---------------------------------------------------------------------------
+
+_CAMEL_SPLIT_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z]+|[a-z]+")
+
+# CDN Keywords too generic to sharpen gift-question matching.
+_GIFT_KEYWORD_SKIP = {
+    "Loot", "Equipment", "Consumable", "Document", "Book", "MacGuffin",
+    "QuestItem", "NotForSale", "Unusual", "Undeletable",
+}
+
+
+def _keyword_label(kw: str) -> str:
+    """ToolHammer -> "Tool Hammer"; WeaponMainHand -> "Weapon Main Hand"."""
+    return " ".join(_CAMEL_SPLIT_RE.findall(kw.split("=", 1)[0]))
+
+
+def build_gift_summaries(db_tables):
+    """Build one summary per NPC listing the items they accept as gifts.
+
+    Ground truth is the CDN `sources_items` NpcGift entries; NPC keys are
+    resolved through the `npcs` table. Deterministic (sorted), no LLM. These
+    summaries answer "who can I gift X to?" — the per-item reverse view buries
+    one "- Gifted to <NPC>" line among dozens of other sources, and per-item
+    retrieval cannot compose a who-accepts-what answer. Each item line gains a
+    "(type: <Category>)" gloss from the item's CDN Keywords, so a summary
+    about a ToolHammer recipient matches gift-questions worded in natural
+    language ("who likes hammers").
+
+    Keys without an npcs.json record (unimplemented NPCs) are skipped — a
+    summary under a raw internal key has no display name to answer with.
+    """
+    sources_items = db_tables.get("sources_items", {})
+    items = db_tables.get("items", {})
+    npcs = db_tables.get("npcs", {})
+
+    item_name = {
+        iid: it.get("Name", "")
+        for iid, it in items.items() if isinstance(it, dict)
+    }
+    item_keywords = {
+        iid: it.get("Keywords") if isinstance(it.get("Keywords"), list) else []
+        for iid, it in items.items() if isinstance(it, dict)
+    }
+
+    npcs_gifts: dict[str, set[str]] = {}
+    for iid, src in sources_items.items():
+        if not isinstance(src, dict):
+            continue
+        name = item_name.get(iid)
+        if not name:
+            continue
+        for entry in src.get("entries", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type", entry.get("Type")) != "NpcGift":
+                continue
+            npc_key = entry.get("npc", entry.get("Npc"))
+            npc_record = npcs.get(npc_key) if isinstance(npcs, dict) else None
+            npc_disp = npc_record.get("Name") if isinstance(npc_record, dict) else None
+            if npc_disp:
+                npcs_gifts.setdefault(npc_disp, set()).add(name)
+
+    summaries = []
+    for npc in sorted(npcs_gifts):
+        gifts = sorted(npcs_gifts[npc])
+        lines = [f"{npc} accepts these items as gifts:"]
+        for name in gifts:
+            lines.append(f"- {name}")
+            # Same display name can cover several item ids ('Daisy' flower
+            # vs lute); union ALL their keyword labels so the gloss is
+            # order-stable (never dict-iteration dependent) and complete.
+            ids = sorted(k for k, v in item_name.items() if v == name)
+            labels = set()
+            for iid in ids:
+                labels.update(
+                    _keyword_label(kw)
+                    for kw in item_keywords.get(iid, [])
+                    if not kw.startswith("Lint_") and "=" not in kw
+                    and kw not in _GIFT_KEYWORD_SKIP
+                )
+            lines.extend(f"  (type: {label})" for label in sorted(labels))
+        summary_id = f"summary_gifts_{npc.lower().replace(' ', '_').replace(chr(39), '')}"
+        summaries.append({
+            "id": summary_id,
+            "type": "summary",
+            "text": "\n".join(lines),
+            "metadata": {
+                "source": "computed",
+                "table": "summaries",
+                "name": f"{npc} Gift Preferences",
+                "type": "summary",
+            }
+        })
+    return summaries

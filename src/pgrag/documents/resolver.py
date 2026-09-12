@@ -16,6 +16,19 @@ class GameResolver:
 
         return f"Unknown Item ({item_code})"
 
+    def npc_name(self, npc_key):
+        """Resolve an NPC key ("NPC_Amutasa") to its display name (CDN `npcs`).
+
+        Sources tables reference NPCs by internal key only, so the raw key
+        would otherwise leak into generated text unsearchable by name.
+        Mirrors the sibling resolvers' Unknown fallback so a record with a
+        falsy Name doesn't render "- NpcGift from " with no name.
+        """
+        npc = self.db.tables.get("npcs", {}).get(npc_key)
+        if npc and npc.get("Name"):
+            return npc["Name"]
+        return f"Unknown NPC ({npc_key})"
+
     def ability(self, ability_code):
         return self.db.tables["abilities"].get(
             f"ability_{ability_code}"

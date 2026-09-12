@@ -144,6 +144,21 @@ description = "Run short golden eval tier (9 representative queries, ~3-5 min)"
 run = "uv run pytest -m short tests/test_golden_check.py"
 alias = "gds"
 
+[tasks."golden-one"]
+description = "Rerun named golden case(s) for quick verification: `mise golden-one -- fireball-ability` (comma-separated ids allowed; appends to data/golden/history.jsonl)"
+run = "uv run python scripts/golden_rerun.py --id {{ arg(name='ids', var=true) }}"
+alias = "go"
+
+[tasks."golden-flaky"]
+description = "Focus on historically troublesome golden cases (>50% recent miss-rate via history.jsonl, plus manual data/golden/FLAKY.txt). Records accrue on every golden run"
+run = "uv run python scripts/golden_rerun.py --selection flaky"
+alias = "gf"
+
+[tasks."golden-flaky-list"]
+description = "Audit golden miss statistics per id (recent-miss%% over the last 10 records; no classification runs)"
+run = "uv run python scripts/golden_rerun.py --selection list"
+alias = "gfl"
+
 [tasks."eval-retrieval"]
 description = "Run pre-LLM retrieval evaluation suite (IR metrics: Recall@k, MRR, NDCG@k, Reranker Uplift)"
 run = "uv run python scripts/retrieval_eval.py"

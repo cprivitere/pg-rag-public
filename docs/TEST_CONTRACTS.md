@@ -196,16 +196,21 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 - **Tests**: `test_pipeline_ask.py`, `test_pipeline_stream.py`,
   `test_pipeline_entity.py`, `test_pipeline_lookup.py`,
   `test_pipeline_comparison.py`, `test_pipeline_summary.py`,
-  `test_pipeline_synthesis.py`, `test_llm.py`, `test_prompts.py`
-- **Source**: `src/pgrag/rag/pipeline.py`, `llm.py`, `prompts.py`,
+  `test_pipeline_synthesis.py`, `test_pipeline_synonyms.py`, `test_llm.py`,
+  `test_prompts.py`
+- **Source**: `src/pgrag/rag/pipeline.py` (incl. `_expand_synonyms`,
+  covered by `test_pipeline_synonyms.py`), `llm.py`, `prompts.py`,
   `resolve.py`
 - **Contracts**: `ask()` end-to-end (entity dossier vs general top-k);
   `_gap_fill` bounds (`_AGENTIC_MAX_ROUNDS = 1`, id-deduped, budget-capped);
   deterministic `temp=0`/`seed=0`; streaming token emission + gap-fill reset;
   prompt fabrication-block directives ("never fabricate"); source citation
   formatting. `_prepare_general` widens the surfaced count to **80** (vs 40)
-  when the plan's native filter is `{"table": "creatures"}` so `list-all`
-  spawn queries don't drop rarer spawns at the rerank cut — asserted by
+  when the plan's native filter narrows Chroma to a single enumeration
+  family table (`creatures` spawn zones, or `summaries` for the computed
+  per-NPC gift summaries) so list-all queries — "locations with deer…",
+  "who can I gift X to?" — surface the family's complete member list
+  instead of dropping rarer members at the rerank cut — asserted by
   `test_pipeline_ask.py::test_creature_location_plan_filters_table_and_widens_count`.
 - **Change ⇒** `uv run pytest tests/test_pipeline_*.py tests/test_llm.py
   tests/test_prompts.py`
@@ -217,9 +222,11 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 
 ### L6 — Golden + IR evaluation
 
-- **Tests**: `test_golden_check.py`, `test_golden_xfail_gate.py`, `test_retrieval_eval.py`,
+- **Tests**: `test_golden_check.py`, `test_golden_xfail_gate.py`,
+  `test_golden_rerun.py`, `test_retrieval_eval.py`,
   `test_retrieval_trace.py`, `test_bakeoff_corpus.py`
-- **Source**: `scripts/golden_check.py`, `src/pgrag/rag/retrieval_eval.py`,
+- **Source**: `scripts/golden_check.py`, `scripts/golden_rerun.py`,
+  `src/pgrag/rag/retrieval_eval.py`,
   `rag/retriever.retrieve` (trace), `scripts/bakeoff_corpus.py`
 - **Contracts**: golden shape `{id, question, type, facts: [[variants…]], xfail?: bool}` — `xfail: true` marks a known-gap probe: runner+test treat a persistent miss as expected, but a pass (gap just closed) is a FAIL forcing unflagging; offline guard in test_golden_xfail_gate.py.
   (changing it breaks offline auto-collection — RULES/WATCHDOG trap); IR
@@ -230,6 +237,21 @@ Legend: a contract listed under a layer is asserted by the tests named there.
 - **Change ⇒** `uv run pytest tests/test_golden_check.py tests/test_retrieval_eval.py
   tests/test_retrieval_trace.py tests/test_bakeoff_corpus.py`
   Use `-m short` for the quick tier (9 files, ~3-5 min) or `-m long` for the full tier (33 files).
+  Include `tests/test_golden_rerun.py` in the sibling run when the rerun
+  tooling shape changes.
+  **Golden-rerun tooling** (`scripts/golden_rerun.py`, offline tests in
+  `test_golden_rerun.py`): `mise golden-one -- <id[,id2]>` reruns named
+  case(s) fast; every harness run appends one
+  `{id, missing, missing_facts, query_type, attempt_n, ts}` record to
+  `data/golden/history.jsonl`; `mise golden-flaky` selects ids whose
+  recent-10 miss-share exceeds 50% (plus manual entries in
+  `data/golden/FLAKY.txt`); `mise golden-flaky-list` audits shares.
+  history.jsonl is an accumulating ledger, **not a build output** — its
+  tests use tmp paths only. Fact specs are *variant lists* exactly so
+  inflections of the same phrase (e.g. fireball-ability's
+  "throw"/"throws a ball of fire") count as the same fact: add a variant,
+  never delete one, when the corpus wording legitimately differs from the
+  fact's first form.
 
 ### L7 — Loaders, wiki sync, curation, source guards
 

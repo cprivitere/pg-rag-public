@@ -168,6 +168,36 @@ def test_cdn_gathering_summary_kept_when_no_wiki_summary():
     assert "summary_gathering_tanning" in summary_ids
 
 
+def test_gift_summary_built_from_sources_items():
+    """'Who can I gift X to?' needs a who-accepts-what listing; the per-NPC
+    gift summary is built from CDN sources_items NpcGift entries, resolves
+    NPC keys to display names, and is deterministic (sorted)."""
+    from pgrag.documents.builder import build_documents
+
+    db = _make_db(
+        items={"item_4651": {"Name": "Peening Hammer"}},
+        npcs={"NPC_Amutasa": {"Name": "Amutasa"}},
+    )
+    db.tables["sources_items"] = {"item_4651": {"entries": [{"type": "NpcGift", "npc": "NPC_Amutasa"}]}}
+    docs = build_documents(db)
+    gift = next(d for d in docs if d["metadata"]["name"] == "Amutasa Gift Preferences")
+    assert "Amutasa accepts these items as gifts:" in gift["text"]
+    assert "- Peening Hammer" in gift["text"]
+    assert gift["metadata"]["source"] == "computed"
+    assert gift["id"] == "summary_gifts_amutasa"
+
+
+def test_gift_summary_skips_unresolvable_npc_keys():
+    """Keys with no matching npcs.json record (unimplemented NPCs) must not
+    create a summary under the raw key."""
+    from pgrag.documents.builder import build_documents
+
+    db = _make_db(items={"item_1": {"Name": "Cheese"}})
+    db.tables["sources_items"] = {"item_1": {"entries": [{"type": "NpcGift", "npc": "NPC_OrcStuff"}]}}
+    docs = build_documents(db)
+    assert not [d for d in docs if "Gift Preferences" in d["metadata"].get("name", "")]
+
+
 def test_item_document_includes_wiki_gather_requirement():
     items = {
         "item_11022": {"Name": "Mortaferus Mushroom", "Description": "A large mushroom"},

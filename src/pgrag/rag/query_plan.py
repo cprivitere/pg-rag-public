@@ -17,6 +17,28 @@ import re
 
 from pgrag.documents.combat_xp import MAX_LEVEL
 
+# Gift-recipient listing: "who can I gift hammers to", "which NPC likes
+# hammers as a gift". AUTHORITATIVE data is the per-NPC gift summaries
+# (computed, metadata.name "<NPC> Gift Preferences"). The dense arm cannot
+# compose "who accepts X" across ~280 one-NPC summaries, so a true
+# recipient-shaped query gets the summary family as a filter. The gate is
+# deliberately CONJUNCTIVE on recipient shape ("gift <item> to <who>" verb
+# pattern, or "likes/loves ... gift(s)") AND a non-gift item noun — the bare
+# word "gift" alone must never filter: "gift ideas", "Gift Bonus effect",
+# "gift wrapping item" are effect/item questions, not recipient listings.
+_GIFT_RECIPIENT = re.compile(
+    r"\b(?:gift|giftable|gifted|gifting)\b.{0,40}\bto\b"
+    r"|\b(?:likes?|loves?|accepts?)\b.{0,40}\bgifts?\b",
+    re.I,
+)
+# The item the recipients would receive — an actual item-kind noun, NOT the
+# word "gift" itself (that is the recipient side of the phrase).
+_GIFT_ITEM = re.compile(
+    r"\b(?:items?|weapons?|tools?|equipment|potions?|drinks?|dishes?|"
+    r"gear|hammers?|clubs?|swords?|knives?|axes?|staves?|shields?|"
+    r"armou?rs?|books?|materials?)\b",
+    re.I,
+)
 # Recipe/ability verbs that make a structured filter worth attempting.
 _RECIPE = re.compile(r"\b(?:recipe|recipes|craft|crafter|crafting|make|"
                      r"making|produce|produces|crafted)\b", re.I)
@@ -228,6 +250,20 @@ def plan_query(question):
             "native": {"table": "creatures"},
             "token": {},
             "label": "creature locations",
+        }
+
+
+    # --- Gift-recipient listing ("who can I gift hammers to") ---------------
+    if _GIFT_RECIPIENT.search(q) and _GIFT_ITEM.search(q):
+        # Native filter narrows to the computed summary family; no token
+        # arm — per-NPC names are "<NPC> Gift Preferences" and
+        # _where_matches does exact equality instead of a suffix/contains
+        # match, so any 'name' token clause would never satisfy and would
+        # just trip retrieve()'s soft-fallback (keep family + ranking).
+        return {
+            "native": {"$and": [{"type": "summary"}, {"table": "summaries"}]},
+            "token": {},
+            "label": "gift recipients",
         }
 
     # --- Combat XP level comparison (max/efficient per archetype at a level) ---
