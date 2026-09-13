@@ -262,3 +262,6 @@ alias = "tlw"
 description = "Tail reranker server log (live, last 20 lines)"
 run = "Get-Content '{{ env.LOGS_DIR }}/rerank.log' -ErrorAction SilentlyContinue -Wait -Tail 20"
 alias = "tlr"
+
+[tools]
+ruff = "latest"
