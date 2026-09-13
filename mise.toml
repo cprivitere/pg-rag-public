@@ -1,6 +1,8 @@
 [env]
 # Portable paths - update this if mywebui moves
 WEBUI_DIR = "F:/ProjectGorgon/mywebui"
+# Live Steam client used to re-stage IL2CPP binaries for the decomp source
+GAME_INSTALL_DIR = "C:/Program Files (x86)/Steam/steamapps/common/Project Gorgon"
 # Logs directory
 LOGS_DIR = "{{ config_root }}/logs"
 # Point PATH to your uv virtual environment's ROCm libraries
@@ -128,6 +130,16 @@ run = [
   "uv run python -m pgrag.rag.bm25",
 ]
 alias = "syc"
+
+[tasks."sync-il2cpp"]
+description = "Converge the IL2CPP decomp source to the current Steam client: stage fresh binaries, run the IL2CPP dumper, regenerate documents, partial il2cpp re-embed, then BM25"
+run = [
+  "uv run python scripts/sync_il2cpp.py",
+  "uv run pgrag build-documents",
+  "uv run pgrag build-index --source il2cpp",
+  "uv run python -m pgrag.rag.bm25",
+]
+alias = "syi"
 
 [tasks.validate]
 description = "Validate vectorstore health; rebuild if issues found"

@@ -32,7 +32,9 @@ re-retrieves (`_AGENTIC_MAX_ROUNDS = 1`, bounded sibling expansion via
   families lorebook/skillprofile/leveling/summary/curated budget by **tokens**
   at `EMBED_WINDOW_TOKENS` — bge-small hard-rejects >512 tokens — and
   reassemble at retrieval via `parent_id`), `resolver.py` + `skill_profiles.py`
-  + `summaries.py` (cross-refs, leveling dossiers, gathering summaries).
+  + `summaries.py` (cross-refs, leveling dossiers, gathering summaries),
+  `decomp_builder.py` (game enums/schema/mechanic cards straight off the
+  IL2CPP dump; artifacts refreshed by `mise sync-il2cpp`).
 - `embeddings/llama_embeddings.py` → :8081.
 - `vectorstore/build_index.py` — incremental hash-based upsert; refuses a
   stale `DOCUMENTS_VERSION`; validates the collection dim.

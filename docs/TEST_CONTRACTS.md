@@ -57,7 +57,6 @@ test (prove the source is fine) or recording a deliberate contract change
 
 ## The map
 
-Legend: a contract listed under a layer is asserted by the tests named there.
 "Change ⇒ run" is the minimum command set after touching that layer.
 
 ### L1 — Document generation (builders)
@@ -67,7 +66,8 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   `test_flatten.py`, `test_resolve.py`, `test_metadata.py`,
   `test_wiki_expansion.py`, `test_wiki_builder.py`, `test_leveling.py`,
   `test_creature_zones.py`,
-  `test_combat_xp.py`, `test_decomp_builder.py`
+  `test_combat_xp.py`, `test_decomp_builder.py`, `test_sync_il2cpp.py`
+  (last one covers `scripts/sync_il2cpp.py` staging/swap, not generation)
 - **Source**: `src/pgrag/documents/` (`builder.py`, `wiki_builder.py`,
   `chunking.py`, `resolver.py`, `skill_profiles.py`, `summaries.py`,
   `creature_zones.py`), `src/pgrag/build.py`
@@ -97,6 +97,12 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   *three* files — `test_documents.py`, `test_summaries.py`,
   `test_gathering_summaries.py`. Their module docstrings name which
   function each owns; if you edit summary generation, run all three.
+- **Refresh tooling**: binary staging in `scripts/sync_il2cpp.py` is
+  idempotent (same size + mtime → no copy); dumper-missing and bad-dump
+  (payload below `PAYLOAD_MIN_DUMP_BYTES`) both exit ≥1 and leave the
+  previous `out_lean/Dump0` intact (restore-on-failure); success swaps
+  `out_lean/Dump0` to the fresh dump and removes `out_new`/`Dump0_prev`.
+  Discovered via `mise sync-il2cpp`.
 
 ### L2 — Index / build / persistence
 

@@ -32,6 +32,20 @@ the "ideal" schema, and dropping them is wrong.
   filtering; multi-value fields MUST be joined (`" | ".join(...)`) because
   Chroma can store but not filter lists.
 
+## IL2CPP decomp source
+
+Provenance: Steam client binaries (`GameAssembly.dll` +
+`global-metadata.dat`) are staged verbatim into `data/il2cpp/` by
+`scripts/sync_il2cpp.py` (`mise sync-il2cpp`, reads `GAME_INSTALL_DIR`),
+dumped by il2cpp-dumper-rs, and read from
+`data/il2cpp/out_lean/Dump0/{dump.cs,stringliteral.json}` by
+`documents/decomp_builder.py`. Three tables: `enums`, `schema`,
+`mechanic` — the allowlists (`SCHEMA_CLASSES`, `MECHANIC_TOPICS`) are
+code-owned in `decomp_builder.py`. A clean checkout without `data/il2cpp`
+yields zero il2cpp docs (additive-only source). Post-dump discovery for
+extending the allowlists: `scripts/analyze_schemas.py` +
+`scripts/analyze_stringliteral.py`.
+
 ## Record examples
 
 Item: `{"Name": "Bunny Juice", "Keywords": [...], "MaxStackSize": 9,
