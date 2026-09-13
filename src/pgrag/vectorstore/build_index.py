@@ -1,3 +1,4 @@
+import contextlib
 import json
 import sys
 
@@ -13,10 +14,9 @@ from pgrag.embeddings.llama_embeddings import (
 )
 from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 
-try:
+with contextlib.suppress(AttributeError, ValueError):
+    # not a real stream (e.g. captured by pytest)
     sys.stdout.reconfigure(line_buffering=True)
-except (AttributeError, ValueError):
-    pass  # not a real stream (e.g. captured by pytest)
 
 BATCH_SIZE = 5000
 EMBED_BATCH_SIZE = 10000
@@ -33,7 +33,7 @@ def load_documents():
     try:
         meta = json.loads(DOCUMENTS_VERSION_FILE.read_text(encoding="utf-8"))
         stored = meta.get("version")
-    except (OSError, ValueError):
+    except OSError, ValueError:
         stored = None
     if stored != DOCUMENTS_VERSION:
         raise ValueError(
@@ -43,7 +43,7 @@ def load_documents():
             "build-index only embeds what documents.json already holds "
             "and cannot regenerate it."
         )
-    with open("data/documents.json", "r", encoding="utf-8") as f:
+    with open("data/documents.json", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -70,26 +70,15 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
         documents = load_documents()
 
     if source is not None:
-        scoped = [
-            doc for doc in documents
-            if doc.get("metadata", {}).get("source") == source
-        ]
+        scoped = [doc for doc in documents if doc.get("metadata", {}).get("source") == source]
         if not scoped:
-            raise ValueError(
-                f"No documents with source='{source}' in documents.json"
-            )
-        print(
-            f"Partial rebuild: source='{source}' ({len(scoped)} of {len(documents)} documents)"
-        )
+            raise ValueError(f"No documents with source='{source}' in documents.json")
+        print(f"Partial rebuild: source='{source}' ({len(scoped)} of {len(documents)} documents)")
         documents = scoped
 
-    client = chromadb.PersistentClient(
-        path=chroma_path
-    )
+    client = chromadb.PersistentClient(path=chroma_path)
 
-    collection = client.get_or_create_collection(
-        name="project_gorgon"
-    )
+    collection = client.get_or_create_collection(name="project_gorgon")
 
     expected_dim = _get_existing_dim(collection)
     if expected_dim is not None:
@@ -107,15 +96,8 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
     existing_sources = {}
 
     for start in range(0, collection.count(), BATCH_SIZE):
-        batch = collection.get(
-            limit=BATCH_SIZE,
-            offset=start,
-            include=["metadatas"]
-        )
-        for doc_id, metadata in zip(
-            batch["ids"],
-            batch["metadatas"]
-        ):
+        batch = collection.get(limit=BATCH_SIZE, offset=start, include=["metadatas"])
+        for doc_id, metadata in zip(batch["ids"], batch["metadatas"], strict=False):
             existing_ids.add(doc_id)
             if metadata:
                 existing_sources[doc_id] = metadata.get("source")
@@ -131,17 +113,15 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
         deleted_ids = existing_ids - current_ids
     else:
         deleted_ids = {
-            doc_id for doc_id in existing_ids
-            if existing_sources.get(doc_id) == source
-            and doc_id not in current_ids
+            doc_id
+            for doc_id in existing_ids
+            if existing_sources.get(doc_id) == source and doc_id not in current_ids
         }
 
     if deleted_ids:
         print(f"Deleting {len(deleted_ids)} removed documents")
 
-        collection.delete(
-            ids=list(deleted_ids)
-        )
+        collection.delete(ids=list(deleted_ids))
     else:
         print("No deleted documents found")
 
@@ -172,9 +152,7 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
 
         documents_to_embed.append(doc)
 
-    print(
-        f"Need to embed {len(documents_to_embed)} of {len(documents)} documents"
-    )
+    print(f"Need to embed {len(documents_to_embed)} of {len(documents)} documents")
 
     if metadata_only_updates:
         print(f"Metadata-only updates: {len(metadata_only_updates)} documents")
@@ -192,28 +170,24 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
             meta_metadatas.append(metadata)
 
         for i in range(0, len(meta_ids), BATCH_SIZE):
-            print(
-                f"Updating metadata {i} - {min(i + BATCH_SIZE, len(meta_ids))}"
-            )
+            print(f"Updating metadata {i} - {min(i + BATCH_SIZE, len(meta_ids))}")
 
             collection.update(
-                ids=meta_ids[i:i + BATCH_SIZE],
-                metadatas=meta_metadatas[i:i + BATCH_SIZE]
+                ids=meta_ids[i : i + BATCH_SIZE], metadatas=meta_metadatas[i : i + BATCH_SIZE]
             )
 
     if not documents_to_embed:
         print("No documents need embedding.")
     else:
-        print(
-            f"Embedding {len(documents_to_embed)} documents..."
-        )
+        print(f"Embedding {len(documents_to_embed)} documents...")
 
         # Pre-embed window guard: fail fast on a chunking regression instead
         # of letting an over-window doc fall silently into the (now-bounded)
         # embed_batch fallback. token_count is None when the tokenizer is
         # unavailable (offline) -> char-only check.
         over = [
-            doc["id"] for doc in documents_to_embed
+            doc["id"]
+            for doc in documents_to_embed
             if len(doc["text"]) > MAX_EMBED_CHARS
             or (token_count(doc["text"]) or 0) > MAX_EMBED_TOKENS
         ]
@@ -225,16 +199,11 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
             )
 
         for start in range(0, len(documents_to_embed), EMBED_BATCH_SIZE):
+            batch = documents_to_embed[start : start + EMBED_BATCH_SIZE]
 
-            batch = documents_to_embed[start:start + EMBED_BATCH_SIZE]
+            print(f"Embedding {start}/{len(documents_to_embed)}")
 
-            print(
-                f"Embedding {start}/{len(documents_to_embed)}"
-            )
-
-            batch_embeddings = embed_batch(
-                [doc["text"] for doc in batch]
-            )
+            batch_embeddings = embed_batch([doc["text"] for doc in batch])
 
             validate_embeddings(batch_embeddings, expected_dim=EMBEDDING_DIM)
 
@@ -243,15 +212,12 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
             texts = []
             metadatas = []
 
-            for doc, embedding in zip(batch, batch_embeddings):
-
+            for doc, embedding in zip(batch, batch_embeddings, strict=False):
                 ids.append(doc["id"])
                 embeddings.append(embedding)
                 texts.append(doc["text"])
 
-                metadata = dict(
-                    doc["metadata"]
-                )
+                metadata = dict(doc["metadata"])
 
                 metadata["type"] = doc["type"]
                 metadata["embedding_hash"] = embedding_hash(doc)
@@ -260,16 +226,13 @@ def build_index(documents=None, chroma_path="data/chroma", source=None):
                 metadatas.append(metadata)
 
             for i in range(0, len(ids), BATCH_SIZE):
-                print(
-                    f"Adding vectors {start + i} - "
-                    f"{start + min(i + BATCH_SIZE, len(ids))}"
-                )
+                print(f"Adding vectors {start + i} - {start + min(i + BATCH_SIZE, len(ids))}")
 
                 collection.upsert(
-                    ids=ids[i:i + BATCH_SIZE],
-                    embeddings=embeddings[i:i + BATCH_SIZE],
-                    documents=texts[i:i + BATCH_SIZE],
-                    metadatas=metadatas[i:i + BATCH_SIZE]
+                    ids=ids[i : i + BATCH_SIZE],
+                    embeddings=embeddings[i : i + BATCH_SIZE],
+                    documents=texts[i : i + BATCH_SIZE],
+                    metadatas=metadatas[i : i + BATCH_SIZE],
                 )
 
     print("Done.")

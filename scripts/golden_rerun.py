@@ -15,7 +15,7 @@ fact-presence harness the pytest golden tests use):
    ({ts, id, missing, query_type, attempt_n}). Non-xfail MISSes get counted;
    `history.jsonl` is the "failed a lot over time" ledger:
 
-       uv run python scripts/golden_rerun.py --selection flaky 
+       uv run python scripts/golden_rerun.py --selection flaky
 
    selects ids whose *recent* miss ratio (>50% of last 10 harness-run records)
    past a threshold, or ids listed manually in data/golden/FLAKY.txt (one id
@@ -29,6 +29,7 @@ you freeze it into FLAKY.txt (or delete it).
 Requires the LLM (:8080) + embed (:8081) servers, like the golden pytest.
 Offline contract tests cover the selection/history logic without servers.
 """
+
 import argparse
 import collections
 import datetime as dt
@@ -38,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from golden_check import (  # noqa: E402  (path bootstrap above)
+from golden_check import (
     GOLDEN_DIR,
     TRACE_DIR,
     check_golden,
@@ -80,9 +81,7 @@ def load_history(path: Path = HISTORY_FILE) -> list[dict]:
     return records
 
 
-def record_history(
-    outcome: dict, path: Path = HISTORY_FILE
-) -> None:
+def record_history(outcome: dict, path: Path = HISTORY_FILE) -> None:
     """Append one record per golden case. outcome: {id, missing: bool,
     missing_facts: [..'], query_type, attempt_n}."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,15 +161,19 @@ def resolve_ids(args) -> list[tuple[Path, dict]]:
     if args.selection == "flaky":
         ids = flaky_ids(explicit_manual=True)
         if not ids:
-            print("No flaky ids (history + FLAKY.txt empty / ratios below "
-                  f"{_FLAKY_MISSING_SHARE:.0%}). Run --selection list to audit.")
+            print(
+                "No flaky ids (history + FLAKY.txt empty / ratios below "
+                f"{_FLAKY_MISSING_SHARE:.0%}). Run --selection list to audit."
+            )
             return []
         print(f"Flaky selection: {', '.join(ids)}")
-        return [(all_golden[g], json.loads(all_golden[g].read_text(encoding="utf8")))
-                for g in ids if g in all_golden]
+        return [
+            (all_golden[g], json.loads(all_golden[g].read_text(encoding="utf8")))
+            for g in ids
+            if g in all_golden
+        ]
     if args.selection == "all":
-        return [(p, json.loads(p.read_text(encoding="utf8")))
-                for p in all_golden.values()]
+        return [(p, json.loads(p.read_text(encoding="utf8"))) for p in all_golden.values()]
     # explicit --id list
     wanted = [s.strip() for s in (args.ids or "").split(",") if s.strip()]
     missing = [w for w in wanted if w not in all_golden]
@@ -178,12 +181,12 @@ def resolve_ids(args) -> list[tuple[Path, dict]]:
         print(f"Unknown golden id(s): {missing}")
         print(f"Valid ids: {sorted(all_golden)}")
         sys.exit(2)
-    return [(all_golden[w], json.loads(all_golden[w].read_text(encoding="utf8")))
-            for w in wanted]
+    return [(all_golden[w], json.loads(all_golden[w].read_text(encoding="utf8"))) for w in wanted]
 
 
-def run_cases(cases, max_attempts: int, diagnose: bool, trace: bool,
-              history_path: Path | None = None) -> int:
+def run_cases(
+    cases, max_attempts: int, diagnose: bool, trace: bool, history_path: Path | None = None
+) -> int:
     """Run golden cases and persist one history record per case.
 
     history_path: explicit ledger override (main passes None -> module
@@ -200,7 +203,10 @@ def run_cases(cases, max_attempts: int, diagnose: bool, trace: bool,
         attempt = 0
         result = None
         context = ""
-        for attempt in range(1, max_attempts + 1):
+        # contract: attempt_n = the attempt on which the final check ran (or 0
+        # if the harness errored every round); the loop reverts `attempt` from
+        # the original `for attempt in range(...)` name — B007 intended no rename.
+        for attempt in range(1, max_attempts + 1):  # noqa: B007 - attempt is the loop-carried attempt counter
             rec_trace = {} if trace else None
             try:
                 result, misses, context = check_golden(golden, trace=rec_trace)
@@ -212,24 +218,28 @@ def run_cases(cases, max_attempts: int, diagnose: bool, trace: bool,
                 TRACE_DIR.mkdir(parents=True, exist_ok=True)
                 try:
                     (TRACE_DIR / f"{path.stem}.json").write_text(
-                        json.dumps(rec_trace, indent=2, ensure_ascii=False),
-                        encoding="utf8")
+                        json.dumps(rec_trace, indent=2, ensure_ascii=False), encoding="utf8"
+                    )
                 except OSError as exc:
                     print(f"    (trace write failed: {exc})")
             if not misses:
                 break
         missing = bool(misses)
         query_type = (result or {}).get("query_type", "?")
-        _persist({
-            "id": golden["id"],
-            "missing": missing,
-            "missing_facts": [first for _, first in misses] if misses else [],
-            "query_type": query_type,
-            "attempt_n": attempt,
-        })
+        _persist(
+            {
+                "id": golden["id"],
+                "missing": missing,
+                "missing_facts": [first for _, first in misses] if misses else [],
+                "query_type": query_type,
+                "attempt_n": attempt,
+            }
+        )
         if golden.get("xfail"):
             if misses:
-                print(f"[KNOWN-GAP] {golden['id']} ({golden['type']}, {query_type}) after {attempt} attempt(s)")
+                print(
+                    f"[KNOWN-GAP] {golden['id']} ({golden['type']}, {query_type}) after {attempt} attempt(s)"
+                )
                 continue
             print(f"[XPASS] {golden['id']} - gap closed; remove xfail flag")
             xfail_gap_closed += 1
@@ -254,28 +264,40 @@ def run_cases(cases, max_attempts: int, diagnose: bool, trace: bool,
 
 
 def main() -> int | None:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sel = parser.add_mutually_exclusive_group(required=True)
-    sel.add_argument("--id", dest="ids",
-                     help="comma-separated golden id(s) (file stems under data/golden/)")
-    sel.add_argument("--selection", choices=["flaky", "all", "list"],
-                     help="flaky: only historically-troublesome ids; "
-                          "all: full set; list: print miss statistics and exit")
-    parser.add_argument("--attempts", type=int, default=2,
-                        help="max attempts per case (default: 2, harness parity)")
-    parser.add_argument("--diagnose", action="store_true",
-                        help="tag each MISS as GEN-side (fact in context) or RET-side")
-    parser.add_argument("--trace", action="store_true",
-                        help="write retrieval traces to data/retrieval_traces/")
+    sel.add_argument(
+        "--id", dest="ids", help="comma-separated golden id(s) (file stems under data/golden/)"
+    )
+    sel.add_argument(
+        "--selection",
+        choices=["flaky", "all", "list"],
+        help="flaky: only historically-troublesome ids; "
+        "all: full set; list: print miss statistics and exit",
+    )
+    parser.add_argument(
+        "--attempts", type=int, default=2, help="max attempts per case (default: 2, harness parity)"
+    )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="tag each MISS as GEN-side (fact in context) or RET-side",
+    )
+    parser.add_argument(
+        "--trace", action="store_true", help="write retrieval traces to data/retrieval_traces/"
+    )
     args = parser.parse_args()
 
     if args.selection == "list":
         history = load_history()
         if not history:
-            print("No history yet (data/golden/history.jsonl absent or empty). "
-                  "Records accrue automatically on every golden rerun here or "
-                  "via tests/test_golden_check.py hook when misses occur.")
+            print(
+                "No history yet (data/golden/history.jsonl absent or empty). "
+                "Records accrue automatically on every golden rerun here or "
+                "via tests/test_golden_check.py hook when misses occur."
+            )
             return 0
         print(f"{'id':40s} {'recent-miss%':>12s} {'records':>8s}")
         for gid, share, n in miss_stats(history):

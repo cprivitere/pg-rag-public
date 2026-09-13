@@ -11,10 +11,7 @@ from pgrag.rag import query_classifier as qc
 
 
 def _docs(name, base_id):
-    return [
-        {"id": f"{base_id}_chunk_0",
-         "metadata": {"name": name, "type": "skill"}}
-    ]
+    return [{"id": f"{base_id}_chunk_0", "metadata": {"name": name, "type": "skill"}}]
 
 
 class _FakePath:

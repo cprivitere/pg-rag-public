@@ -7,6 +7,7 @@ in a *sibling* chunk of the same page, not in a freshly re-retrieved subject.
 full page. It is deliberately bounded (one round, a few pages, a char cap)
 and deterministic — no LLM tool-calling, no corpus rebuild.
 """
+
 import re
 
 from pgrag.rag.bm25 import load_bm25_index
@@ -33,6 +34,7 @@ def _is_changelog_page(meta):
         or bool(re.match(r"^Game updates\d", name))
     )
 
+
 _doc_store = None
 _parent_index = None
 
@@ -54,8 +56,9 @@ def load_parent_index():
     return _doc_store, _parent_index
 
 
-def expand_parents(ids, texts, metas, dists, max_chars=EXPAND_MAX_CHARS,
-                   max_pages=EXPAND_MAX_PAGES):
+def expand_parents(
+    ids, texts, metas, dists, max_chars=EXPAND_MAX_CHARS, max_pages=EXPAND_MAX_PAGES
+):
     """Return `(ids, texts, metas, dists)` with sibling wiki chunks of the
     already-retrieved docs appended (bounded, id-deduped, index-aligned), or
     the inputs unchanged when no `parent_id`'d wiki doc yields new siblings.
@@ -104,7 +107,10 @@ def expand_parents(ids, texts, metas, dists, max_chars=EXPAND_MAX_CHARS,
             used_chars += len(doc["text"])
         if added_ids:
             per_parent[pid] = (
-                added_ids, added_texts, added_metas, added_dists,
+                added_ids,
+                added_texts,
+                added_metas,
+                added_dists,
             )
 
     if not per_parent:
@@ -117,10 +123,7 @@ def expand_parents(ids, texts, metas, dists, max_chars=EXPAND_MAX_CHARS,
         result_texts.append(texts[i])
         result_metas.append(metas[i])
         result_dists.append(dists[i])
-        pid = (
-            metas[i].get("parent_id")
-            if isinstance(metas[i], dict) else None
-        )
+        pid = metas[i].get("parent_id") if isinstance(metas[i], dict) else None
         if pid in per_parent and pid not in spliced:
             spliced.add(pid)
             a_ids, a_texts, a_metas, a_dists = per_parent[pid]

@@ -11,8 +11,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from pgrag.config import DOCUMENTS_VERSION, EMBEDDING_DIM
-from pgrag.vectorstore.build_index import build_index
 from pgrag.validation import validate_all
+from pgrag.vectorstore.build_index import build_index
 
 META = {"source": "cdn", "table": "items", "type": "item"}
 
@@ -34,9 +34,7 @@ def _fixture(tmp):
     wiki_dir = Path(tmp) / "wiki"
     cdn_dir.mkdir()
     wiki_dir.mkdir()
-    (cdn_dir / "items.json").write_text(
-        json.dumps([{"Id": 1, "Name": "alpha"}]), encoding="utf-8"
-    )
+    (cdn_dir / "items.json").write_text(json.dumps([{"Id": 1, "Name": "alpha"}]), encoding="utf-8")
     (wiki_dir / "AlphaPage_abcdef12.txt").write_text("# Alpha\n", encoding="utf-8")
     (wiki_dir / ".meta.json").write_text(
         json.dumps({"pages": {"AlphaPage": {"filename": "AlphaPage_abcdef12.txt"}}}),

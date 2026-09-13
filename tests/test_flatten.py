@@ -2,14 +2,16 @@
 dropoff fields, item equip/skill/effect/crafting fields, and churn/hash
 stability of the generated text."""
 
+from typing import ClassVar
+
 from pgrag.documents.builder import build_item_documents, build_recipe_documents
 from pgrag.vectorstore.hashes import embedding_hash
 
 
 def _make_db(items=None, recipes=None, attributes=None):
     class FakeDB:
-        tables = {}
-        wiki = {}
+        tables: ClassVar[dict] = {}
+        wiki: ClassVar[dict] = {}
 
     db = FakeDB()
     if items is not None:
@@ -63,6 +65,7 @@ def _single(builder_fn, db):
 
 # ---------- T70: recipe reward fields ----------
 
+
 def test_recipe_fused_xp_line():
     db = _make_db(recipes={"recipe_1": BASIC_RECIPE})
     text = _single(build_recipe_documents, db)
@@ -90,14 +93,16 @@ def test_recipe_reward_skill_line_when_different():
 
 
 def test_recipe_dropoff_fields():
-    db = _make_db(recipes={
-        "recipe_1": {
-            **BASIC_RECIPE,
-            "RewardSkillXpDropOffLevel": 15,
-            "RewardSkillXpDropOffPct": 0.1,
-            "RewardSkillXpDropOffRate": 5,
+    db = _make_db(
+        recipes={
+            "recipe_1": {
+                **BASIC_RECIPE,
+                "RewardSkillXpDropOffLevel": 15,
+                "RewardSkillXpDropOffPct": 0.1,
+                "RewardSkillXpDropOffRate": 5,
+            }
         }
-    })
+    )
     text = _single(build_recipe_documents, db)
     assert "after level 15" in text
     assert "10%" in text
@@ -123,6 +128,7 @@ def test_recipe_no_brace_residue():
 
 
 # ---------- T71: item equip/combat fields ----------
+
 
 def test_item_equip_slot():
     db = _make_db(items={"item_1": BASIC_ITEM})
@@ -161,7 +167,9 @@ def test_item_no_brace_residue():
 
 
 def test_item_bestow_recipes_resolved():
-    db = _make_db(items={"item_1": BASIC_ITEM}, recipes={"recipe_m5": {"Name": "But the Scab Repair"}})
+    db = _make_db(
+        items={"item_1": BASIC_ITEM}, recipes={"recipe_m5": {"Name": "But the Scab Repair"}}
+    )
     text = _single(build_item_documents, db)
     assert "Scab Repair" in text
 
@@ -180,6 +188,7 @@ def test_item_omits_absent_fields():
 
 
 # ---------- T72: churn / hash stability ----------
+
 
 def test_churn_identical_source_identical_text():
     db1 = _make_db(
@@ -206,8 +215,14 @@ def test_churn_single_field_change_only_target_hash():
         recipes={**base_recipes, "recipe_1": {**BASIC_RECIPE, "RewardSkillXp": 99}},
         attributes=ATTRIBUTES,
     )
-    base = {d["id"]: embedding_hash(d) for d in build_item_documents(db_base) + build_recipe_documents(db_base)}
-    changed = {d["id"]: embedding_hash(d) for d in build_item_documents(db_changed) + build_recipe_documents(db_changed)}
+    base = {
+        d["id"]: embedding_hash(d)
+        for d in build_item_documents(db_base) + build_recipe_documents(db_base)
+    }
+    changed = {
+        d["id"]: embedding_hash(d)
+        for d in build_item_documents(db_changed) + build_recipe_documents(db_changed)
+    }
     assert base["recipe_1"] != changed["recipe_1"]
     assert base["recipe_2"] == changed["recipe_2"]
     assert base["item_1"] == changed["item_1"]

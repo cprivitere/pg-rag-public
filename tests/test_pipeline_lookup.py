@@ -4,8 +4,6 @@ Covers a lookup-classified query passing count=20 and hybrid=True through to
 retrieve and returning the generated answer.
 """
 
-import pytest
-
 from pgrag.rag import pipeline
 
 
@@ -21,7 +19,15 @@ def _lookup_result():
 def test_lookup_query_passes_valid_count(monkeypatch):
     captured = {}
 
-    def fake_retrieve(question, metadata_filter=None, token_filter=None, query_type=None, count=None, hybrid=None, trace=None):
+    def fake_retrieve(
+        question,
+        metadata_filter=None,
+        token_filter=None,
+        query_type=None,
+        count=None,
+        hybrid=None,
+        trace=None,
+    ):
         captured["count"] = count
         captured["hybrid"] = hybrid
         return _lookup_result()

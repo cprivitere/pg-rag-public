@@ -21,9 +21,7 @@ HUB_CTX = {
 
 
 def _set_entity(monkeypatch, ctx=HUB_CTX):
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.classify_query", lambda q: "entity"
-    )
+    monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "entity")
     monkeypatch.setattr(
         "pgrag.rag.pipeline.find_entity",
         lambda q: ("skillprofile_Pooping", "skill"),

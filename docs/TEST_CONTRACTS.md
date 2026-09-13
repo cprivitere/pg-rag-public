@@ -291,6 +291,26 @@ Legend: a contract listed under a layer is asserted by the tests named there.
   then `uv run pgrag validate`.
 
 
+### L9 — Lint gate (`ruff`)
+
+- **Tests**: `test_lint.py`
+- **Source**: `ruff.toml` (repo root — the single rule source), `mise.toml`
+  `[tasks.lint]/[tasks.fmt]`, `pyproject.toml` `[dependency-groups].dev`
+  (ruff pinned there, not in runtime deps)
+- **Contracts**: `uv run ruff check src scripts tests` returns 0 — any new
+  finding in the linted trees fails `mise test`. `ruff.toml` `extend-exclude`
+  (`notebooks/`, `data/`, caches) plus per-file-ignores (`scripts/**`:
+  BLE001/PLW1510/S110/S112/DTZ005/RUF059/F841; `scripts/pg_rag.py`: E402;
+  `tests/**`: BLE001/RUF059) are deliberate, not drift. Re-export lines
+  (`chunking.py` MAX_EMBED_CHARS) use `as`-form so F401 fix doesn't strip
+  them.
+- **Change ⇒** `uv run pytest tests/test_lint.py -q`; adding a rule =
+  clean the new findings in the same commit (never raise the gate then
+  violate it elsewhere). Format-only work is `mise fmt` — the gate does not
+  check formatting.
+- This layer replaces **none**: it guards hygiene across all layers; the
+  functional layers above remain the authority on behavior.
+
 ## Hard rules (no exceptions)
 
 ---

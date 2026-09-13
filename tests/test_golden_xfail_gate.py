@@ -6,8 +6,6 @@ known gap (exit 0, `[KNOWN-GAP]`);once it passes, exit 1 with
 import json
 import sys
 
-import pytest
-
 import scripts.golden_check as gc
 
 
@@ -17,7 +15,7 @@ def _run_main(monkeypatch, tmp_path, files):
     files: {filename: (misses, xfail_flag)}"""
     gc_dir = tmp_path / "golden"
     gc_dir.mkdir(parents=True, exist_ok=True)
-    for name, (misses, xfail) in files.items():
+    for name, (_misses, xfail) in files.items():
         golden = {
             "id": name.rsplit(".", 1)[0],
             "question": "q",
@@ -63,6 +61,8 @@ def test_xfail_gap_closed_main_exits_one(tmp_path, monkeypatch, capsys):
 
 
 def test_real_fail_main_exits_one(tmp_path, monkeypatch, capsys):
-    code = _run_main(monkeypatch, tmp_path, {"regress.json": ([(["probe-fact"], "probe-fact")], False)})
-    assert code ==  1
+    code = _run_main(
+        monkeypatch, tmp_path, {"regress.json": ([(["probe-fact"], "probe-fact")], False)}
+    )
+    assert code == 1
     assert "[FAIL]" in capsys.readouterr().out

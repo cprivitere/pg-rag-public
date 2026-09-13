@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import re
 
@@ -91,10 +92,7 @@ def _entity_name_match(query: str, doc_name: str | None) -> bool:
     q = _tokenize(query)
     if len(name) < 2 or len(name) > len(q):
         return False
-    for i in range(len(q) - len(name) + 1):
-        if q[i:i + len(name)] == name:
-            return True
-    return False
+    return any(q[i : i + len(name)] == name for i in range(len(q) - len(name) + 1))
 
 
 def _load_name_index(docs=None) -> dict:
@@ -103,6 +101,7 @@ def _load_name_index(docs=None) -> dict:
     if _NAME_INDEX is None:
         if docs is None:
             from pgrag.rag.bm25 import load_bm25_index
+
             docs = load_bm25_index()[1]
         idx = {}
         for d in docs:
@@ -127,7 +126,7 @@ def _name_injection_ids(query: str, docs=None) -> list[str]:
         cur = []
         seen = set()
         for i in range(len(q) - size + 1):
-            key = " ".join(q[i:i + size])
+            key = " ".join(q[i : i + size])
             for did in idx.get(key, ()):
                 if did not in seen:
                     seen.add(did)
@@ -137,8 +136,18 @@ def _name_injection_ids(query: str, docs=None) -> list[str]:
     return []
 
 
-def _apply_name_promotion(query, pool_ids, pool_docs, pool_metas, pool_dists,
-                          ranked_ids, ranked_docs, ranked_metas, ranked_dists, count):
+def _apply_name_promotion(
+    query,
+    pool_ids,
+    pool_docs,
+    pool_metas,
+    pool_dists,
+    ranked_ids,
+    ranked_docs,
+    ranked_metas,
+    ranked_dists,
+    count,
+):
     """Float the exact-entity docs to the front of the reranked top-N.
 
     A pool doc whose full name equals the longest multi-token query span (the
@@ -174,13 +183,11 @@ def _apply_name_promotion(query, pool_ids, pool_docs, pool_metas, pool_dists,
 
     matched_set = {pool_ids[i] for i in matched_pool}
     ordered = (
-        [x for x in result if x in matched_set]
-        + [x for x in result if x not in matched_set]
+        [x for x in result if x in matched_set] + [x for x in result if x not in matched_set]
     )[:count]
 
     by_id = {
-        pool_ids[i]: (pool_docs[i], pool_metas[i], pool_dists[i])
-        for i in range(len(pool_ids))
+        pool_ids[i]: (pool_docs[i], pool_metas[i], pool_dists[i]) for i in range(len(pool_ids))
     }
     new_docs, new_metas, new_dists = [], [], []
     for x in ordered:
@@ -208,7 +215,7 @@ def _rerank(query, ids, documents, metadatas, distances, count):
     ``count`` quads."""
     scored = []
     for rank, (doc_id, doc, meta, dist) in enumerate(
-        zip(ids, documents, metadatas, distances)
+        zip(ids, documents, metadatas, distances, strict=False)
     ):
         orig_score = 1.0 / (rank + 1)
         term_score = _term_overlap(query, doc)
@@ -272,13 +279,11 @@ def _where_matches(metadata, clause):
             # {$eq: b}]}} for a single delimited field, e.g. a synonym-clause
             # token filter. Each branch is a mini-clause over this same field.
             if "$or" in condition:
-                if not any(_where_matches(metadata, {key: c})
-                           for c in condition["$or"]):
+                if not any(_where_matches(metadata, {key: c}) for c in condition["$or"]):
                     return False
                 continue
             if "$and" in condition:
-                if not all(_where_matches(metadata, {key: c})
-                           for c in condition["$and"]):
+                if not all(_where_matches(metadata, {key: c}) for c in condition["$and"]):
                     return False
                 continue
             for op, target in condition.items():
@@ -290,8 +295,9 @@ def _where_matches(metadata, clause):
     return True
 
 
-def _hybrid_fuse(dense_ids, dense_texts, dense_metadatas, dense_distances,
-                  bm25_ids, all_docs, count):
+def _hybrid_fuse(
+    dense_ids, dense_texts, dense_metadatas, dense_distances, bm25_ids, all_docs, count
+):
     """RRF-fuse the dense and BM25 rank lists (RRF_K=60), then apply the
     tsys_power_* caps (per-base chunk members, distinct-base origins) so a
     treasure-suffix mechanics swarm cannot crowd unrelated targets out of the
@@ -299,7 +305,7 @@ def _hybrid_fuse(dense_ids, dense_texts, dense_metadatas, dense_distances,
     BM25-only docs get dist 0.0."""
     dense_info = {}
     for rank, (doc_id, text, meta, dist) in enumerate(
-        zip(dense_ids, dense_texts, dense_metadatas, dense_distances)
+        zip(dense_ids, dense_texts, dense_metadatas, dense_distances, strict=False)
     ):
         dense_info[doc_id] = (rank, text, meta, dist)
 
@@ -366,7 +372,16 @@ def _hybrid_fuse(dense_ids, dense_texts, dense_metadatas, dense_distances,
     return ids, texts, metas, dists
 
 
-def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=True, hybrid=False, query_type="general", trace=None):
+def retrieve(
+    question,
+    count=3,
+    metadata_filter=None,
+    token_filter=None,
+    rerank=True,
+    hybrid=False,
+    query_type="general",
+    trace=None,
+):
     """Run the retrieval stage: spell-correct, embed + query Chroma (count
     effective = 20 for comparison, else ``count or 3``), optionally RRF-fuse BM25
     (_hybrid_fuse) and inject/promote exact-name entities, apply post-fusion
@@ -376,13 +391,9 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
     id list to ``trace`` when given."""
     raw_question = question
     question = correct_query(question)
-    client = chromadb.PersistentClient(
-        path="data/chroma"
-    )
+    client = chromadb.PersistentClient(path="data/chroma")
 
-    collection = client.get_collection(
-        name="project_gorgon"
-    )
+    collection = client.get_collection(name="project_gorgon")
 
     embedding = embed_text(question)
 
@@ -397,11 +408,7 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
     query_kwargs = dict(
         query_embeddings=[embedding],
         n_results=dense_count,
-        include=[
-            "documents",
-            "metadatas",
-            "distances"
-        ]
+        include=["documents", "metadatas", "distances"],
     )
 
     if metadata_filter is not None:
@@ -423,6 +430,7 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
 
     if hybrid:
         from pgrag.rag.bm25 import load_bm25_index
+
         fuse_target = effective_count * RERANK_MULTIPLIER if rerank else effective_count
         bm25_model, all_docs = load_bm25_index()
         bm25_indices, _ = bm25_model.search(question, k=fuse_target)
@@ -476,7 +484,8 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
         post_filter = {**(metadata_filter or {}), **(token_filter or {})}
     if post_filter and results["ids"][0]:
         filtered = [
-            i for i in range(len(results["ids"][0]))
+            i
+            for i in range(len(results["ids"][0]))
             if _where_matches(results["metadatas"][0][i], post_filter)
         ]
         if not filtered and token_filter:
@@ -485,7 +494,8 @@ def retrieve(question, count=3, metadata_filter=None, token_filter=None, rerank=
             # (e.g. "Animal Feces" vs "Animal Poop").
             if metadata_filter is not None:
                 filtered = [
-                    i for i in range(len(results["ids"][0]))
+                    i
+                    for i in range(len(results["ids"][0]))
                     if _where_matches(results["metadatas"][0][i], metadata_filter)
                 ]
             else:
@@ -536,7 +546,7 @@ def _rerank_or_cross_encoder(query, ids, documents, metadatas, distances, count,
     if name_query is None:
         name_query = query
     try:
-        from pgrag.rag.reranker_client import rerank_documents, record_failure, record_success
+        from pgrag.rag.reranker_client import record_failure, record_success, rerank_documents
 
         indices = rerank_documents(query, documents, count)
         reranked = (
@@ -546,20 +556,28 @@ def _rerank_or_cross_encoder(query, ids, documents, metadatas, distances, count,
             [distances[i] for i in indices],
         )
         reranked = _apply_name_promotion(
-            name_query, ids, documents, metadatas, distances,
-            *reranked, count,
+            name_query,
+            ids,
+            documents,
+            metadatas,
+            distances,
+            *reranked,
+            count,
         )
         record_success()
-        return reranked + (True,)
+        return (*reranked, True)
     except Exception as exc:
         logger.warning("[WARN] reranker (:8082) unavailable/failed: %s", exc)
-        try:  # stats update must not break retrieval (V64)
+        with contextlib.suppress(Exception):  # stats update must not break retrieval (V64)
             record_failure()
-        except Exception:
-            pass
         fallback = _rerank(query, ids, documents, metadatas, distances, count)
         fallback = _apply_name_promotion(
-            name_query, ids, documents, metadatas, distances,
-            *fallback, count,
+            name_query,
+            ids,
+            documents,
+            metadatas,
+            distances,
+            *fallback,
+            count,
         )
-        return fallback + (False,)
+        return (*fallback, False)

@@ -12,7 +12,6 @@ from pgrag.documents.summaries import (
     build_wiki_harvest_map,
 )
 
-
 # --- build_gathering_summaries tests ---
 
 
@@ -217,7 +216,7 @@ def test_myconic_deduped_into_mycology():
     summaries = build_wiki_gathering_summaries(wiki)
     # Both pages map to Mycology, but Parasol should appear only once
     myco = next(s for s in summaries if s["metadata"]["name"] == "Mycology Wiki Gathering Summary")
-    lines = [l for l in myco["text"].splitlines() if "Parasol" in l]
+    lines = [line for line in myco["text"].splitlines() if "Parasol" in line]
     assert len(lines) == 1
 
 

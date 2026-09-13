@@ -29,7 +29,7 @@ def _level_number(level_key: str) -> int | None:
     if not level_key.startswith(LEVEL_PREFIX):
         return None
     try:
-        number = int(level_key[len(LEVEL_PREFIX):])
+        number = int(level_key[len(LEVEL_PREFIX) :])
     except ValueError:
         return None
     if 0 < number <= MAX_LEVEL:
@@ -47,7 +47,7 @@ def _sort_key(entry: tuple[str, Any]) -> tuple[float, str]:
     name, value = entry
     try:
         return (-float(value), name.lower())
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return (0.0, name.lower())
 
 
@@ -64,12 +64,12 @@ def build_combat_xp_documents(db) -> list[dict]:
 
     table_entries = []
     for table_id, table_data in tables.items():
-        if not isinstance(table_data,dict):
+        if not isinstance(table_data, dict):
             continue
         per_level = {}
         for key, val in table_data.items():
             number = _level_number(key)
-            if number is None or not isinstance(val,dict):
+            if number is None or not isinstance(val, dict):
                 continue
             xp = val.get(XP_FIELD)
             if xp is None:
@@ -95,17 +95,19 @@ def build_combat_xp_documents(db) -> list[dict]:
             "monster archetypeat this level,, highest first:\n\n"
             + "\n".join(lines)
             + "\n\nNote: raw per-kill combat XP only; spawn locations,, kill "
-              "difficulty,,and farm efficiency aren't covered by this data.\n"
+            "difficulty,,and farm efficiency aren't covered by this data.\n"
         )
-        documents.append({
-            "id": f"combatxp_{number}",
-            "type": "combatxp",
-            "text": text.strip(),
-            "metadata": {
-                "source": "computed",
-                "table": "advancementtables",
-                "name": f"Combat XP by Monster Archetype, Level {number}",
-                "level": number,
-            },
-        })
+        documents.append(
+            {
+                "id": f"combatxp_{number}",
+                "type": "combatxp",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "computed",
+                    "table": "advancementtables",
+                    "name": f"Combat XP by Monster Archetype, Level {number}",
+                    "level": number,
+                },
+            }
+        )
     return documents

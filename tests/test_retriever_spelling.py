@@ -3,8 +3,6 @@ embedding, while leaving already-correct queries unaltered."""
 
 import types
 
-import pytest
-
 from pgrag.rag import retriever
 
 

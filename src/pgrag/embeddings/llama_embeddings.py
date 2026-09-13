@@ -39,11 +39,7 @@ class EmbeddingServerError(ConnectionError):
 
 def _post(texts, budget):
     try:
-        response = requests.post(
-            EMBEDDING_URL,
-            json={"content": _clip(texts, budget)},
-            timeout=300
-        )
+        response = requests.post(EMBEDDING_URL, json={"content": _clip(texts, budget)}, timeout=300)
     except requests.exceptions.ConnectionError as e:
         raise EmbeddingServerError(
             f"Cannot connect to embedding server at {EMBEDDING_URL}. "
@@ -53,8 +49,7 @@ def _post(texts, budget):
         raise EmbeddingServerError(
             f"Embedding server at {EMBEDDING_URL} timed out after 300s."
         ) from e
-    if response.status_code == 400 and "larger than the max context size" \
-            in response.text:
+    if response.status_code == 400 and "larger than the max context size" in response.text:
         raise _InputTooLong
     response.raise_for_status()
     return response.json()
@@ -102,9 +97,8 @@ def _embed_batch_recursive(texts, budget):
         return [item["embedding"][0] for item in data]
     except _InputTooLong:
         mid = len(texts) // 2
-        return (
-            _embed_batch_recursive(texts[:mid], budget)
-            + _embed_batch_recursive(texts[mid:], budget)
+        return _embed_batch_recursive(texts[:mid], budget) + _embed_batch_recursive(
+            texts[mid:], budget
         )
 
 

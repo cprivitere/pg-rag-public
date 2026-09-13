@@ -18,56 +18,83 @@ def _load(tmp_path, monkeypatch, files, meta=None):
 
 
 def test_load_wiki_uses_real_title_from_meta(tmp_path, monkeypatch):
-    meta = '{"pages": {' \
-        '"Mycology": {"filename": "Mycology_91d06ad5.txt", "touched": "t"},' \
-        '"Wool": {"filename": "Wool_5f91efa4.txt", "touched": "t"},' \
+    meta = (
+        '{"pages": {'
+        '"Mycology": {"filename": "Mycology_91d06ad5.txt", "touched": "t"},'
+        '"Wool": {"filename": "Wool_5f91efa4.txt", "touched": "t"},'
         '"Wool!": {"filename": "Wool_9e28a3e0.txt", "touched": "t"}}}'
-    db = _load(tmp_path, monkeypatch, {
-        "Mycology_91d06ad5.txt": "x",
-        "Wool_5f91efa4.txt": "y",
-        "Wool_9e28a3e0.txt": "z",
-    }, meta=meta)
+    )
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Mycology_91d06ad5.txt": "x",
+            "Wool_5f91efa4.txt": "y",
+            "Wool_9e28a3e0.txt": "z",
+        },
+        meta=meta,
+    )
     assert set(db.wiki) == {"Mycology", "Wool", "Wool!"}
     assert set(db.wiki_mtimes) == set(db.wiki)
 
 
 def test_load_wiki_falls_back_to_stripped_stem(tmp_path, monkeypatch):
-    db = _load(tmp_path, monkeypatch, {
-        "Mycology_91d06ad5.txt": "x",
-        "Wool_5f91efa4.txt": "y",
-    })
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Mycology_91d06ad5.txt": "x",
+            "Wool_5f91efa4.txt": "y",
+        },
+    )
     assert set(db.wiki) == {"Mycology", "Wool"}
 
 
 def test_load_wiki_skips_legacy_unhashed(tmp_path, monkeypatch):
-    db = _load(tmp_path, monkeypatch, {
-        "Mycology_91d06ad5.txt": "x",
-        "Mycology.txt": "old duplicate",
-        "Plain.txt": "old duplicate 2",
-    })
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Mycology_91d06ad5.txt": "x",
+            "Mycology.txt": "old duplicate",
+            "Plain.txt": "old duplicate 2",
+        },
+    )
     assert set(db.wiki) == {"Mycology"}
 
 
 def test_load_wiki_defensive_collision_suffix(tmp_path, monkeypatch):
-    db = _load(tmp_path, monkeypatch, {
-        "Wool_5f91efa4.txt": "item",
-        "Wool_9e28a3e0.txt": "quest",
-    })
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Wool_5f91efa4.txt": "item",
+            "Wool_9e28a3e0.txt": "quest",
+        },
+    )
     assert set(db.wiki) == {"Wool", "Wool_2"}
 
 
 def test_load_wiki_preserves_hex_like_real_title(tmp_path, monkeypatch):
-    db = _load(tmp_path, monkeypatch, {
-        "Foo_12345678_abcdef12.txt": "x",
-    })
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Foo_12345678_abcdef12.txt": "x",
+        },
+    )
     assert set(db.wiki) == {"Foo_12345678"}
 
 
 def test_load_wiki_unreadable_meta_falls_back(tmp_path, monkeypatch):
     (tmp_path / ".meta.json").write_text("{broken", encoding="utf-8")
-    db = _load(tmp_path, monkeypatch, {
-        "Mycology_91d06ad5.txt": "x",
-    })
+    db = _load(
+        tmp_path,
+        monkeypatch,
+        {
+            "Mycology_91d06ad5.txt": "x",
+        },
+    )
     assert set(db.wiki) == {"Mycology"}
 
 

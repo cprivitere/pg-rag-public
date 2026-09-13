@@ -23,10 +23,10 @@ try:
 except ImportError:  # pragma: no cover - dependency absent
     Tokenizer = None  # type: ignore[assignment]
 
-_tokenizer: "Tokenizer | None | False" = None  # None = not loaded, False = unavailable
+_tokenizer: Tokenizer | False | None = None  # None = not loaded, False = unavailable
 
 
-def load_tokenizer() -> "Tokenizer | None":
+def load_tokenizer() -> Tokenizer | None:
     """Load the bge-small tokenizer from the vendored asset, or None if unavailable."""
     global _tokenizer
     if _tokenizer is not None:

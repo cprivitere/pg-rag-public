@@ -5,6 +5,7 @@ General queries retrieve only the top chunks of a wiki page; the answer often
 sits in a sibling chunk. `expand_parents` pulls sibling chunks via
 `parent_id` — bounded (2 pages, ~16k chars), id-deduped, non-wiki untouched.
 """
+
 from unittest.mock import patch
 
 from pgrag.rag import resolve
@@ -34,13 +35,20 @@ def _patch_index(monkeypatch, docs):
 
 
 def test_expansion_pulls_siblings(monkeypatch):
-    docs = _docs(["wiki_Mushroom Farming_Mechanics_chunk_0",
-                  "wiki_Mushroom Farming_Mechanics_chunk_1",
-                  "wiki_Mushroom Farming_Mechanics_chunk_3"])
+    docs = _docs(
+        [
+            "wiki_Mushroom Farming_Mechanics_chunk_0",
+            "wiki_Mushroom Farming_Mechanics_chunk_1",
+            "wiki_Mushroom Farming_Mechanics_chunk_3",
+        ]
+    )
     _patch_index(monkeypatch, docs)
     r = docs[0]
     ids, texts, metas, dists = resolve.expand_parents(
-        [r["id"]], [r["text"]], [r["metadata"]], [0.5],
+        [r["id"]],
+        [r["text"]],
+        [r["metadata"]],
+        [0.5],
     )
     assert len(ids) == 3
     assert "wiki_Mushroom Farming_Mechanics_chunk_1" in ids
@@ -67,13 +75,16 @@ def test_expansion_dedupes_retrieved_ids(monkeypatch):
 
 def test_expansion_bounded_to_two_pages(monkeypatch):
     retrieved = [
-        {"id": f"id_{i}", "type": "wiki", "text": "t",
-         "metadata": {"parent_id": f"wiki_Page_{i}"}}
+        {"id": f"id_{i}", "type": "wiki", "text": "t", "metadata": {"parent_id": f"wiki_Page_{i}"}}
         for i in range(4)
     ]
     siblings = [
-        {"id": f"id_{i}_sib", "type": "wiki", "text": f"s{i}",
-         "metadata": {"parent_id": f"wiki_Page_{i}"}}
+        {
+            "id": f"id_{i}_sib",
+            "type": "wiki",
+            "text": f"s{i}",
+            "metadata": {"parent_id": f"wiki_Page_{i}"},
+        }
         for i in range(4)
     ]
     _patch_index(monkeypatch, retrieved + siblings)
@@ -91,12 +102,18 @@ def test_expansion_bounded_to_two_pages(monkeypatch):
 
 
 def test_expansion_respects_char_cap(monkeypatch):
-    big = {"id": "wiki_Big_chunk", "type": "wiki", "text": "z" * 9000,
-           "metadata": {"parent_id": "wiki_Other"}}
+    big = {
+        "id": "wiki_Big_chunk",
+        "type": "wiki",
+        "text": "z" * 9000,
+        "metadata": {"parent_id": "wiki_Other"},
+    }
     _patch_index(monkeypatch, [big])
     ids, texts, _, _ = resolve.expand_parents(
-        ["wiki_Other"], ["other"],
-        [{"parent_id": "wiki_Other"}], [0.0],
+        ["wiki_Other"],
+        ["other"],
+        [{"parent_id": "wiki_Other"}],
+        [0.0],
         max_chars=100,
     )
     # 9000 > budget -> dropped
@@ -107,7 +124,9 @@ def test_expansion_respects_char_cap(monkeypatch):
 def test_expansion_non_wiki_untouched(monkeypatch):
     _patch_index(monkeypatch, [])
     ids, texts, metas, dists = resolve.expand_parents(
-        ["item_1"], ["item text"], [{"source": "cdn", "table": "items"}],
+        ["item_1"],
+        ["item text"],
+        [{"source": "cdn", "table": "items"}],
         [0.3],
     )
     assert ids == ["item_1"]
@@ -118,9 +137,7 @@ def test_expansion_non_wiki_untouched(monkeypatch):
 @patch("pgrag.rag.pipeline.expand_parents")
 @patch("pgrag.rag.pipeline.should_synthesize", return_value=False)
 @patch("pgrag.rag.pipeline.retrieve")
-def test_prepare_general_expands_wiki(
-    mock_retrieve, mock_synth, mock_expand
-):
+def test_prepare_general_expands_wiki(mock_retrieve, mock_synth, mock_expand):
     meta = [{"source": "wiki", "parent_id": "wiki_Mushroom Farming"}]
     mock_retrieve.return_value = {
         "ids": [["wiki_chunk_0"]],
@@ -145,9 +162,7 @@ def test_prepare_general_expands_wiki(
 @patch("pgrag.rag.pipeline.expand_parents")
 @patch("pgrag.rag.pipeline.should_synthesize", return_value=False)
 @patch("pgrag.rag.pipeline.retrieve")
-def test_prepare_lookup_uses_wide_retrieval(
-    mock_retrieve, mock_synth, mock_expand
-):
+def test_prepare_lookup_uses_wide_retrieval(mock_retrieve, mock_synth, mock_expand):
     """'Where can I find X?' classifies as lookup; it must get hybrid recall
     + wiki expansion like general, not a 3-doc dense-only window."""
     meta = [{"source": "wiki", "parent_id": "wiki_Field Mushroom"}]
@@ -159,7 +174,10 @@ def test_prepare_lookup_uses_wide_retrieval(
         "rerank_used": False,
     }
     mock_expand.return_value = (
-        ["wiki_chunk_0"], ["chunk text"], meta, [0.4],
+        ["wiki_chunk_0"],
+        ["chunk text"],
+        meta,
+        [0.4],
     )
 
     _prepare_general("Where can I find Field Mushrooms?", "lookup")
@@ -175,8 +193,10 @@ def test_prepare_lookup_uses_wide_retrieval(
 def test_expansion_skips_when_no_wiki_parent(monkeypatch):
     _patch_index(monkeypatch, [])
     ids, texts, metas, dists = resolve.expand_parents(
-        ["skill_Alchemy"], ["alchemy text"],
-        [{"source": "cdn", "table": "skills"}], [0.2],
+        ["skill_Alchemy"],
+        ["alchemy text"],
+        [{"source": "cdn", "table": "skills"}],
+        [0.2],
     )
     assert ids == ["skill_Alchemy"]
     assert texts == ["alchemy text"]

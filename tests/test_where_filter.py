@@ -8,10 +8,10 @@ That post-fusion pass must:
 - match delimited (`" | "`-joined) string fields by token membership
 - pass operator dicts through to Chroma untouched
 """
+
 from unittest.mock import MagicMock, patch
 
-from pgrag.rag.retriever import _where_matches, _scalar_eq, retrieve
-
+from pgrag.rag.retriever import _scalar_eq, _where_matches, retrieve
 
 # --- predicate unit tests ---
 
@@ -23,9 +23,7 @@ def test_where_eq_match():
 
 
 def test_where_missing_key_fails():
-    assert not _where_matches(
-        {"skill": "Alchemy"}, {"skill_level_req": 25}
-    )
+    assert not _where_matches({"skill": "Alchemy"}, {"skill_level_req": 25})
 
 
 def test_where_lte_gte():
@@ -59,9 +57,7 @@ def test_where_or_synonym_membership():
     """An $or of $eq token clauses lets a stored ingredient form match a
     query-side synonym name (e.g. recipe stores 'Animal Poop', query asks
     'Animal Feces'). The bare scalar clause alone must NOT match."""
-    clause = {"ingredients": {"$or": [
-        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
-    ]}}
+    clause = {"ingredients": {"$or": [{"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}]}}
     meta_synonym = {"type": "recipe", "ingredients": "Bottle of Water | Animal Poop"}
     assert _where_matches(meta_synonym, clause)
     scalar_clause = {"ingredients": "Animal Feces"}
@@ -71,9 +67,7 @@ def test_where_or_synonym_membership():
 def test_where_or_synonym_neither_branch_matches():
     """An $or synonym clause whose branches all fail keeps the doc filtered
     out (the any(...) short-circuits False inside the nested $or branch)."""
-    clause = {"ingredients": {"$or": [
-        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
-    ]}}
+    clause = {"ingredients": {"$or": [{"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}]}}
     meta_unrelated = {"type": "recipe", "ingredients": "Bottle of Water | Silk"}
     assert not _where_matches(meta_unrelated, clause)
 
@@ -81,9 +75,7 @@ def test_where_or_synonym_neither_branch_matches():
 def test_where_field_nested_and_membership():
     """Field-nested $and of $eq clauses on a delimited field: all branches
     must match the stored tokens (mirrors Chroma's server-side semantics)."""
-    clause = {"ingredients": {"$and": [
-        {"$eq": "Animal Poop"}, {"$eq": "Bottle of Water"}
-    ]}}
+    clause = {"ingredients": {"$and": [{"$eq": "Animal Poop"}, {"$eq": "Bottle of Water"}]}}
     meta_both = {"type": "recipe", "ingredients": "Bottle of Water | Animal Poop"}
     assert _where_matches(meta_both, clause)
     meta_one = {"type": "recipe", "ingredients": "Animal Poop"}
@@ -98,21 +90,22 @@ def test_scalar_eq_handles_numeric_strings():
 
 def test_where_compound_and_or():
     meta = {"skill": "Alchemy", "skill_level_req": 25}
-    assert _where_matches(meta, {
-        "$and": [
-            {"skill": "Alchemy"},
-            {"skill_level_req": {"$gte": 20}},
-        ]
-    })
-    assert not _where_matches(meta, {
-        "$and": [{"skill": "Alchemy"}, {"skill_level_req": {"$gte": 30}}]
-    })
-    assert _where_matches(meta, {
-        "$or": [{"skill": "Baking"}, {"skill_level_req": {"$gte": 20}}]
-    })
-    assert not _where_matches(meta, {
-        "$or": [{"skill": "Baking"}, {"skill_level_req": {"$gte": 30}}]
-    })
+    assert _where_matches(
+        meta,
+        {
+            "$and": [
+                {"skill": "Alchemy"},
+                {"skill_level_req": {"$gte": 20}},
+            ]
+        },
+    )
+    assert not _where_matches(
+        meta, {"$and": [{"skill": "Alchemy"}, {"skill_level_req": {"$gte": 30}}]}
+    )
+    assert _where_matches(meta, {"$or": [{"skill": "Baking"}, {"skill_level_req": {"$gte": 20}}]})
+    assert not _where_matches(
+        meta, {"$or": [{"skill": "Baking"}, {"skill_level_req": {"$gte": 30}}]}
+    )
 
 
 # --- retrieve() pass-through + fused re-filter ---
@@ -143,9 +136,7 @@ def test_retrieve_passes_operator_filter_to_chroma(mock_client, mock_embed):
 @patch("pgrag.rag.retriever.embed_text")
 @patch("pgrag.rag.retriever.chromadb.PersistentClient")
 @patch("pgrag.rag.bm25.load_bm25_index")
-def test_retrieve_token_filter_post_fusion_only(
-    mock_load, mock_client, mock_embed
-):
+def test_retrieve_token_filter_post_fusion_only(mock_load, mock_client, mock_embed):
     """A delimited-token filter (ingredient) cannot go to Chroma $contains;
     it only narrows the fused results, and Chroma where stays unset."""
     mock_embed.return_value = [0.1] * 384
@@ -154,18 +145,22 @@ def test_retrieve_token_filter_post_fusion_only(
     col.query.return_value = {
         "ids": [["dense_1", "dense_2"]],
         "documents": [["recipe A", "recipe B"]],
-        "metadatas": [[
-            {"type": "recipe", "ingredients": "Spider Silk | Mushroom"},
-            {"type": "recipe", "ingredients": "Flax Cloth"},
-        ]],
+        "metadatas": [
+            [
+                {"type": "recipe", "ingredients": "Spider Silk | Mushroom"},
+                {"type": "recipe", "ingredients": "Flax Cloth"},
+            ]
+        ],
         "distances": [[0.2, 0.3]],
     }
 
     bm25_docs = [
-        {"id": "dense_1", "text": "a",
-         "metadata": {"type": "recipe", "ingredients": "Spider Silk | Mushroom"}},
-        {"id": "dense_2", "text": "b",
-         "metadata": {"type": "recipe", "ingredients": "Flax Cloth"}},
+        {
+            "id": "dense_1",
+            "text": "a",
+            "metadata": {"type": "recipe", "ingredients": "Spider Silk | Mushroom"},
+        },
+        {"id": "dense_2", "text": "b", "metadata": {"type": "recipe", "ingredients": "Flax Cloth"}},
     ]
     fake_model = MagicMock()
     fake_model.search.return_value = ([1, 0], [0.9, 0.8])
@@ -188,9 +183,7 @@ def test_retrieve_token_filter_post_fusion_only(
 @patch("pgrag.rag.retriever.embed_text")
 @patch("pgrag.rag.retriever.chromadb.PersistentClient")
 @patch("pgrag.rag.bm25.load_bm25_index")
-def test_retrieve_native_and_token_filters_agree(
-    mock_load, mock_client, mock_embed
-):
+def test_retrieve_native_and_token_filters_agree(mock_load, mock_client, mock_embed):
     """native (scalar, Chroma where) + token (post-fusion) combine: a doc
     must satisfy both."""
     mock_embed.return_value = [0.1] * 384
@@ -199,18 +192,23 @@ def test_retrieve_native_and_token_filters_agree(
     col.query.return_value = {
         "ids": [["dense_1", "dense_2"]],
         "documents": [["a", "b"]],
-        "metadatas": [[
-            {"type": "recipe", "skill": "Alchemy",
-             "ingredients": "Mushroom"},
-            {"type": "recipe", "skill": "Cooking",
-             "ingredients": "Mushroom"},
-        ]],
+        "metadatas": [
+            [
+                {"type": "recipe", "skill": "Alchemy", "ingredients": "Mushroom"},
+                {"type": "recipe", "skill": "Cooking", "ingredients": "Mushroom"},
+            ]
+        ],
         "distances": [[0.2, 0.3]],
     }
-    bm25_docs = [{"id": d, "text": t, "metadata": m} for d, t, m in
-                 zip(col.query.return_value["ids"][0],
-                     col.query.return_value["documents"][0],
-                     col.query.return_value["metadatas"][0])]
+    bm25_docs = [
+        {"id": d, "text": t, "metadata": m}
+        for d, t, m in zip(
+            col.query.return_value["ids"][0],
+            col.query.return_value["documents"][0],
+            col.query.return_value["metadatas"][0],
+            strict=False,
+        )
+    ]
     fake_model = MagicMock()
     fake_model.search.return_value = ([1, 0], [0.9, 0.8])
     mock_load.return_value = (fake_model, bm25_docs)
@@ -223,21 +221,18 @@ def test_retrieve_native_and_token_filters_agree(
         hybrid=True,
     )
     assert col.query.call_args.kwargs["where"] == {
-        "type": "recipe", "skill": "Alchemy",
+        "type": "recipe",
+        "skill": "Alchemy",
     }
     kept = results["metadatas"][0]
-    assert kept == [{"type": "recipe", "skill": "Alchemy",
-                     "ingredients": "Mushroom"}]
-    assert {"type": "recipe", "skill": "Cooking", "ingredients": "Mushroom"} \
-        not in kept
+    assert kept == [{"type": "recipe", "skill": "Alchemy", "ingredients": "Mushroom"}]
+    assert {"type": "recipe", "skill": "Cooking", "ingredients": "Mushroom"} not in kept
 
 
 @patch("pgrag.rag.retriever.embed_text")
 @patch("pgrag.rag.retriever.chromadb.PersistentClient")
 @patch("pgrag.rag.bm25.load_bm25_index")
-def test_retrieve_hybrid_filters_fused_docs_by_operator(
-    mock_load, mock_client, mock_embed
-):
+def test_retrieve_hybrid_filters_fused_docs_by_operator(mock_load, mock_client, mock_embed):
     """BM25-only hits dodge Chroma's where; the post-fusion pass must apply
     the operator clause so `$lte` doesn't silently drop them via `==`."""
     mock_embed.return_value = [0.1] * 384
@@ -251,10 +246,8 @@ def test_retrieve_hybrid_filters_fused_docs_by_operator(
     }
 
     bm25_docs = [
-        {"id": "bm25_1", "text": "low-level recipe",
-         "metadata": {"skill_level_req": 10}},
-        {"id": "bm25_2", "text": "high-level recipe",
-         "metadata": {"skill_level_req": 50}},
+        {"id": "bm25_1", "text": "low-level recipe", "metadata": {"skill_level_req": 10}},
+        {"id": "bm25_2", "text": "high-level recipe", "metadata": {"skill_level_req": 50}},
     ]
     fake_model = MagicMock()
     fake_model.search.return_value = ([1, 0], [0.9, 0.8])  # bm25 hits both
@@ -271,12 +264,11 @@ def test_retrieve_hybrid_filters_fused_docs_by_operator(
     assert {"skill_level_req": 40} not in kept  # dense 40 -> dropped
     assert {"skill_level_req": 50} not in kept  # bm25 50 -> dropped
 
+
 @patch("pgrag.rag.retriever.embed_text")
 @patch("pgrag.rag.retriever.chromadb.PersistentClient")
 @patch("pgrag.rag.bm25.load_bm25_index")
-def test_token_filter_fallback_on_empty(
-    mock_load, mock_client, mock_embed
-):
+def test_token_filter_fallback_on_empty(mock_load, mock_client, mock_embed):
     """When token_filter alone would drop all results, fall back to
     metadata_filter only so the query isn't emptied by an over-narrowing
     ingredient name mismatch (e.g. "Animal Feces" vs "Animal Poop")."""
@@ -288,18 +280,22 @@ def test_token_filter_fallback_on_empty(
     col.query.return_value = {
         "ids": [["dense_1", "dense_2"]],
         "documents": [["recipe with Animal Poop", "not a recipe"]],
-        "metadatas": [[
-            {"type": "recipe", "ingredients": "Animal Poop"},
-            {"type": "other", "ingredients": "Spider Silk"},
-        ]],
+        "metadatas": [
+            [
+                {"type": "recipe", "ingredients": "Animal Poop"},
+                {"type": "other", "ingredients": "Spider Silk"},
+            ]
+        ],
         "distances": [[0.2, 0.3]],
     }
 
     bm25_docs = [
-        {"id": "dense_1", "text": "a",
-         "metadata": {"type": "recipe", "ingredients": "Animal Poop"}},
-        {"id": "dense_2", "text": "b",
-         "metadata": {"type": "other", "ingredients": "Spider Silk"}},
+        {
+            "id": "dense_1",
+            "text": "a",
+            "metadata": {"type": "recipe", "ingredients": "Animal Poop"},
+        },
+        {"id": "dense_2", "text": "b", "metadata": {"type": "other", "ingredients": "Spider Silk"}},
     ]
     fake_model = MagicMock()
     fake_model.search.return_value = ([1, 0], [0.9, 0.8])
@@ -318,13 +314,17 @@ def test_token_filter_fallback_on_empty(
     # token filter alone would empty the pool (neither doc has "Animal Feces"
     # in its delimited ingredients field), so fallback fires using metadata_filter only.
     # Only dense_1 (type="recipe") should survive; dense_2 (type="other") should be dropped.
-    assert len(results["ids"][0]) == 1, f"Expected 1 result after fallback, got {len(results['ids'][0])}"
-    assert results["metadatas"][0][0].get("ingredients") == "Animal Poop", \
+    assert len(results["ids"][0]) == 1, (
+        f"Expected 1 result after fallback, got {len(results['ids'][0])}"
+    )
+    assert results["metadatas"][0][0].get("ingredients") == "Animal Poop", (
         f"Expected 'Animal Poop' in metadatas, got {results['metadatas'][0]}"
+    )
 
     # trace should record the fallback fired
     rec = trace["retrieval_calls"][0]
-    assert rec.get("token_filter_fallback") is True, \
+    assert rec.get("token_filter_fallback") is True, (
         f"token_filter_fallback not recorded: {rec.get('token_filter_fallback')}"
+    )
     # fallback survivors land in post_filter_ids, never an emptied token-only set
     assert rec.get("post_filter_ids") == ["dense_1"], rec.get("post_filter_ids")

@@ -5,7 +5,7 @@ LoreBook/Ability template names while other wikicode is stripped, and
 build_wiki_documents emitting row, coverage, and narrative records.
 """
 
-from pgrag.documents.wiki_builder import build_wiki_documents, _preserve_template_names
+from pgrag.documents.wiki_builder import _preserve_template_names, build_wiki_documents
 
 
 class FakeDB:
@@ -202,8 +202,11 @@ def test_wiki_table_truncated_to_950():
 |}}
 """
     db = FakeDB({"Tabby": raw})
-    docs = [d for d in build_wiki_documents(db)
-            if d.get("type") == "wiki" and d["metadata"].get("table_record")]
+    docs = [
+        d
+        for d in build_wiki_documents(db)
+        if d.get("type") == "wiki" and d["metadata"].get("table_record")
+    ]
     assert docs
     for d in docs:
         assert len(d["text"]) <= 950
@@ -220,8 +223,7 @@ def test_unclosed_table_falls_back_to_narrative():
 """
     db = FakeDB({"Mushroom Farming": raw})
     docs = build_wiki_documents(db)
-    table_recs = [d for d in docs
-                  if d.get("type") == "wiki" and d["metadata"].get("table_record")]
+    table_recs = [d for d in docs if d.get("type") == "wiki" and d["metadata"].get("table_record")]
     assert table_recs == []
     all_text = " ".join(d["text"] for d in docs)
     assert "Parasol Mushroom" in all_text

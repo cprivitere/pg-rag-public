@@ -10,16 +10,15 @@ def main():
     print("\nAnswer:")
     print(result["answer"])
 
-    print("\nRerank: %s" % ("cross-encoder (:8082)" if result.get("rerank_used") else "lexical fallback"))
+    print(
+        "\nRerank: %s"
+        % ("cross-encoder (:8082)" if result.get("rerank_used") else "lexical fallback")
+    )
 
     print("\nSources:")
 
     for source in result["sources"]:
-        print(
-            source["id"],
-            source["metadata"],
-            source["distance"]
-        )
+        print(source["id"], source["metadata"], source["distance"])
 
     print("\nRetrieved documents:")
 

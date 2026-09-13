@@ -34,17 +34,19 @@ def build_summary_documents(documents):
             lines.append(f"{rank}. {name} ({level})")
 
         summary_id = f"summary_{skill.lower().replace(' ', '_')}"
-        summaries.append({
-            "id": summary_id,
-            "type": "summary",
-            "text": "\n".join(lines),
-            "metadata": {
-                "source": "computed",
-                "table": "summaries",
-                "name": f"{skill} Summary",
+        summaries.append(
+            {
+                "id": summary_id,
                 "type": "summary",
+                "text": "\n".join(lines),
+                "metadata": {
+                    "source": "computed",
+                    "table": "summaries",
+                    "name": f"{skill} Summary",
+                    "type": "summary",
+                },
             }
-        })
+        )
 
     return summaries
 
@@ -128,17 +130,19 @@ def build_gathering_summaries(items, recipes):
             lines.append(f"{rank}. {name} ({level})")
 
         summary_id = f"summary_gathering_{skill.lower().replace(' ', '_')}"
-        summaries.append({
-            "id": summary_id,
-            "type": "summary",
-            "text": "\n".join(lines),
-            "metadata": {
-                "source": "computed",
-                "table": "summaries",
-                "name": f"{skill} Gathering Summary",
+        summaries.append(
+            {
+                "id": summary_id,
                 "type": "summary",
+                "text": "\n".join(lines),
+                "metadata": {
+                    "source": "computed",
+                    "table": "summaries",
+                    "name": f"{skill} Gathering Summary",
+                    "type": "summary",
+                },
             }
-        })
+        )
 
     return summaries
 
@@ -157,9 +161,7 @@ _WIKI_SKILL_MAP = {
 }
 
 # Regex to extract rows from wiki tables: {{Item|Name}} || Level || ...
-_WIKI_ROW_RE = re.compile(
-    r"\{\{Item\|([^}|]+)\}\}\s*\|\|\s*(\d+)\??"
-)
+_WIKI_ROW_RE = re.compile(r"\{\{Item\|([^}|]+)\}\}\s*\|\|\s*(\d+)\??")
 
 
 def _parse_wiki_harvest_rows(wiki):
@@ -230,17 +232,19 @@ def build_wiki_gathering_summaries(wiki):
             lines.append(f"{rank}. {name} ({level})")
 
         summary_id = f"summary_wiki_{skill.lower().replace(' ', '_')}"
-        summaries.append({
-            "id": summary_id,
-            "type": "summary",
-            "text": "\n".join(lines),
-            "metadata": {
-                "source": "wiki",
-                "table": "summaries",
-                "name": f"{skill} Wiki Gathering Summary",
+        summaries.append(
+            {
+                "id": summary_id,
                 "type": "summary",
+                "text": "\n".join(lines),
+                "metadata": {
+                    "source": "wiki",
+                    "table": "summaries",
+                    "name": f"{skill} Wiki Gathering Summary",
+                    "type": "summary",
+                },
             }
-        })
+        )
 
     return summaries
 
@@ -253,8 +257,16 @@ _CAMEL_SPLIT_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z]+|[a-z]+")
 
 # CDN Keywords too generic to sharpen gift-question matching.
 _GIFT_KEYWORD_SKIP = {
-    "Loot", "Equipment", "Consumable", "Document", "Book", "MacGuffin",
-    "QuestItem", "NotForSale", "Unusual", "Undeletable",
+    "Loot",
+    "Equipment",
+    "Consumable",
+    "Document",
+    "Book",
+    "MacGuffin",
+    "QuestItem",
+    "NotForSale",
+    "Unusual",
+    "Undeletable",
 }
 
 
@@ -282,13 +294,11 @@ def build_gift_summaries(db_tables):
     items = db_tables.get("items", {})
     npcs = db_tables.get("npcs", {})
 
-    item_name = {
-        iid: it.get("Name", "")
-        for iid, it in items.items() if isinstance(it, dict)
-    }
+    item_name = {iid: it.get("Name", "") for iid, it in items.items() if isinstance(it, dict)}
     item_keywords = {
         iid: it.get("Keywords") if isinstance(it.get("Keywords"), list) else []
-        for iid, it in items.items() if isinstance(it, dict)
+        for iid, it in items.items()
+        if isinstance(it, dict)
     }
 
     npcs_gifts: dict[str, set[str]] = {}
@@ -324,20 +334,21 @@ def build_gift_summaries(db_tables):
                 labels.update(
                     _keyword_label(kw)
                     for kw in item_keywords.get(iid, [])
-                    if not kw.startswith("Lint_") and "=" not in kw
-                    and kw not in _GIFT_KEYWORD_SKIP
+                    if not kw.startswith("Lint_") and "=" not in kw and kw not in _GIFT_KEYWORD_SKIP
                 )
             lines.extend(f"  (type: {label})" for label in sorted(labels))
         summary_id = f"summary_gifts_{npc.lower().replace(' ', '_').replace(chr(39), '')}"
-        summaries.append({
-            "id": summary_id,
-            "type": "summary",
-            "text": "\n".join(lines),
-            "metadata": {
-                "source": "computed",
-                "table": "summaries",
-                "name": f"{npc} Gift Preferences",
+        summaries.append(
+            {
+                "id": summary_id,
                 "type": "summary",
+                "text": "\n".join(lines),
+                "metadata": {
+                    "source": "computed",
+                    "table": "summaries",
+                    "name": f"{npc} Gift Preferences",
+                    "type": "summary",
+                },
             }
-        })
+        )
     return summaries

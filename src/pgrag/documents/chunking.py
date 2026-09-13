@@ -26,9 +26,13 @@ import logging
 import re
 
 from pgrag.documents.tokenizer import token_count
-from pgrag.embeddings.llama_embeddings import MAX_EMBED_CHARS
+
+# Explicit re-export: tests (test_chunking, test_leveling) assert budgets against
+# this bindings' import path; ruff shouldn't strip it as unused (F401).
+from pgrag.embeddings.llama_embeddings import MAX_EMBED_CHARS as MAX_EMBED_CHARS
 
 _logger = logging.getLogger(__name__)
+
 
 DEFAULT_MAX_CHARS = 1024
 OVERLAP_CHARS = 100
@@ -94,7 +98,7 @@ def _split_paragraphs(text):
 
 
 def _split_lines(text):
-    return [l.strip() for l in text.split("\n") if l.strip()]
+    return [line.strip() for line in text.split("\n") if line.strip()]
 
 
 def _split_sentences(text):
@@ -312,7 +316,7 @@ def _apply_overlap(chunks):
         overlap_text = prev[-OVERLAP_CHARS:]
         space_idx = overlap_text.find(" ")
         if space_idx > 0:
-            overlap_text = overlap_text[space_idx + 1:]
+            overlap_text = overlap_text[space_idx + 1 :]
         overlapped.append(overlap_text + " " + chunks[i])
 
     return overlapped

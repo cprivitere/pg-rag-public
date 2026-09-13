@@ -140,8 +140,6 @@ def test_rerank_magic_mock_requests_are_ignored(mock_post):
     """Ensure the requests.post mock path doesn't short-circuit parsing."""
     mock_post.return_value = MagicMock()
     mock_post.return_value.raise_for_status.return_value = None
-    mock_post.return_value.json.return_value = {
-        "results": [{"index": 0, "relevance_score": 1.0}]
-    }
+    mock_post.return_value.json.return_value = {"results": [{"index": 0, "relevance_score": 1.0}]}
     indices = reranker_client.rerank_documents("q", ["a"], 1)
     assert indices == [0]

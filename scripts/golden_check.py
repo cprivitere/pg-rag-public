@@ -5,7 +5,7 @@ import re
 import sys
 from pathlib import Path
 
-from pgrag.rag.pipeline import ask, _fit_context
+from pgrag.rag.pipeline import _fit_context, ask
 
 GOLDEN_DIR = Path("data/golden")
 TRACE_DIR = Path("data/retrieval_traces")
@@ -45,8 +45,8 @@ def main():
         "--diagnose",
         action="store_true",
         help="for each FAIL, report whether the missing fact is present in the "
-             "retrieved context (GEN-side extraction gap) or absent (RET-side "
-             "retrieval gap), using the exact context the LLM received.",
+        "retrieved context (GEN-side extraction gap) or absent (RET-side "
+        "retrieval gap), using the exact context the LLM received.",
     )
     args = parser.parse_args()
 
@@ -69,37 +69,32 @@ def main():
                 print(f"    (trace write failed: {exc})")
         if golden.get("xfail"):
             if misses:
-                print("[KNOWN-GAP] %s (%s, %s)" % (golden["id"], golden["type"], result["query_type"]))
+                print(f"[KNOWN-GAP] {golden['id']} ({golden['type']}, {result['query_type']})")
                 continue
-            print("[XPASS] %s — gap closed; remove the 'xfail' flag" % golden["id"])
+            print(f"[XPASS] {golden['id']} — gap closed; remove the 'xfail' flag")
             total_xpass += 1
             continue
         status = "PASS" if not misses else "FAIL"
-        print("[%s] %s (%s, %s)" % (
-            status,
-            golden["id"],
-            golden["type"],
-            result["query_type"],
-        ))
+        print(f"[{status}] {golden['id']} ({golden['type']}, {result['query_type']})")
         for variants, first in misses:
             if args.diagnose:
                 in_ctx = any(normalize(v) in context for v in variants)
                 tag = (
                     "GEN-SIDE (fact in context but not extracted)"
-                    if in_ctx else
-                    "RET-SIDE (fact not in retrieved context)"
+                    if in_ctx
+                    else "RET-SIDE (fact not in retrieved context)"
                 )
-                print("    MISSING: %s  [%s]" % (first, tag))
+                print(f"    MISSING: {first}  [{tag}]")
             else:
-                print("    MISSING: %s" % first)
+                print(f"    MISSING: {first}")
         total_miss += len(misses)
 
     print()
     if total_miss or total_xpass:
         if total_miss:
-            print("FAIL: %d fact(s) missing" % total_miss)
+            print(f"FAIL: {total_miss} fact(s) missing")
         if total_xpass:
-            print("FAIL: %d known-gap probe(s) now pass — remove 'xfail' flag(s)" % total_xpass)
+            print(f"FAIL: {total_xpass} known-gap probe(s) now pass — remove 'xfail' flag(s)")
         sys.exit(1)
     print("OK: all golden facts present")
 

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from pgrag.rag.retrieval_eval import (
     build_doc_name_map,
@@ -31,7 +33,6 @@ from pgrag.rag.retrieval_eval import (
     resolve_relevant_ids,
     run_benchmark,
 )
-import pytest
 
 FIXTURE = Path(__file__).parent / "fixtures" / "retrieval_cases.json"
 BENCHMARK_DATASET = Path("evaluation/queries.jsonl")
@@ -56,9 +57,7 @@ def test_exact_metric_values():
     assert mrr(queries) == pytest.approx(7 / 9)
 
     # NDCG@2, q2: DCG = 1/log2(2)=1.0 (d2); IDCG = 1 + 1/log2(3)
-    assert ndcg_at_k(ranked[1], relevant[1], 2) == pytest.approx(
-        1.0 / (1.0 + 1.0 / math.log2(3))
-    )
+    assert ndcg_at_k(ranked[1], relevant[1], 2) == pytest.approx(1.0 / (1.0 + 1.0 / math.log2(3)))
     # perfect ranking -> NDCG 1
     assert ndcg_at_k(["d2", "d4", "d5"], ["d2", "d4"], 2) == 1.0
 
@@ -118,7 +117,7 @@ def test_compute_stage_metrics_collapses_row_cluster():
     """A wiki table's rows count once: ranking one row hits the whole cluster."""
     rows = [f"wiki_Spider_Silk_table_0_row_{i}" for i in range(25)]
     # ranked surfaces a single row; relevant is the full 25-row cluster
-    metrics = compute_stage_metrics([rows[0]] + ["unrelated"] * 10, [rows[0]] + rows[1:])
+    metrics = compute_stage_metrics([rows[0], *["unrelated"] * 10], [rows[0], *rows[1:]])
     assert metrics["hit@1"] == 1.0
     assert metrics["recall@1"] == 1.0
     # Without canonicalization this would be recall@1 == 0.0 (24/25 missed)
@@ -265,18 +264,14 @@ def test_resolve_relevant_ids_collapses_wiki_row_coverage_fans():
     docs_by_id = {
         # One wiki page table -> coverage + many rows
         "wiki_Field_Mushroom_table_0_coverage": {"name": "Field Mushroom"},
-        **{
-            f"wiki_Field_Mushroom_table_0_row_{i}": {"name": "Field Mushroom"}
-            for i in range(12)
-        },
+        **{f"wiki_Field_Mushroom_table_0_row_{i}": {"name": "Field Mushroom"} for i in range(12)},
         # Distinct legitimate targets must survive canonicalization
         "item_11004": {"name": "Field Mushroom"},
         "wiki_Field Mushroom_Uses": {"name": "Field Mushroom"},
         "skill_Mycology": {"name": "Mycology"},
     }
     sample_docs = [
-        {"id": did, "metadata": meta, "text": "content"}
-        for did, meta in docs_by_id.items()
+        {"id": did, "metadata": meta, "text": "content"} for did, meta in docs_by_id.items()
     ]
     name_map, chunk_map = build_doc_name_map(sample_docs)
 
@@ -308,20 +303,38 @@ def test_evaluate_query_passes_query_type_to_retrieve(monkeypatch):
     """evaluate_query forwards classify_query's label to retrieve (production parity)."""
     captured: dict[str, Any] = {}
 
-    def fake_retrieve(question, count=3, metadata_filter=None, token_filter=None,
-                      rerank=True, hybrid=False, query_type="general", trace=None):
+    def fake_retrieve(
+        question,
+        count=3,
+        metadata_filter=None,
+        token_filter=None,
+        rerank=True,
+        hybrid=False,
+        query_type="general",
+        trace=None,
+    ):
         captured["query_type"] = query_type
         captured["count"] = count
-        return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]],
-                "rerank_used": False}
+        return {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+            "rerank_used": False,
+        }
 
     monkeypatch.setattr("pgrag.rag.retriever.retrieve", fake_retrieve)
     monkeypatch.setattr("pgrag.rag.retrieval_eval.classify_query", lambda q: "comparison")
-    monkeypatch.setattr("pgrag.rag.retrieval_eval.find_entities", lambda q: [
-        ("Fireball", "ability_ability_3502", "ability"),
-        ("Fire Breath", "ability_ability_3607", "ability"),
-    ])
-    monkeypatch.setattr("pgrag.rag.retrieval_eval.find_entity", lambda q: ("ability_ability_3607", None))
+    monkeypatch.setattr(
+        "pgrag.rag.retrieval_eval.find_entities",
+        lambda q: [
+            ("Fireball", "ability_ability_3502", "ability"),
+            ("Fire Breath", "ability_ability_3607", "ability"),
+        ],
+    )
+    monkeypatch.setattr(
+        "pgrag.rag.retrieval_eval.find_entity", lambda q: ("ability_ability_3607", None)
+    )
 
     case = {
         "id": "fireball-vs-firebreath",
@@ -340,10 +353,23 @@ def test_comparison_routes_multientity_dossier_both_subjects(monkeypatch):
     """Comparison queries are scored on the multi-entity dossier (both subjects)."""
     captured: dict[str, Any] = {}
 
-    def fake_retrieve(question, count=3, metadata_filter=None, token_filter=None,
-                      rerank=True, hybrid=False, query_type="general", trace=None):
-        return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]],
-                "rerank_used": False}
+    def fake_retrieve(
+        question,
+        count=3,
+        metadata_filter=None,
+        token_filter=None,
+        rerank=True,
+        hybrid=False,
+        query_type="general",
+        trace=None,
+    ):
+        return {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]],
+            "rerank_used": False,
+        }
 
     # The multi-entity dossier production feeds the LLM: both subjects present
     def fake_multi(question, entities, trace=None):
@@ -358,11 +384,16 @@ def test_comparison_routes_multientity_dossier_both_subjects(monkeypatch):
 
     monkeypatch.setattr("pgrag.rag.retriever.retrieve", fake_retrieve)
     monkeypatch.setattr("pgrag.rag.retrieval_eval.classify_query", lambda q: "comparison")
-    monkeypatch.setattr("pgrag.rag.retrieval_eval.find_entities", lambda q: [
-        ("Fireball", "ability_ability_3502", "ability"),
-        ("Fire Breath", "ability_ability_3607", "ability"),
-    ])
-    monkeypatch.setattr("pgrag.rag.retrieval_eval.find_entity", lambda q: ("ability_ability_3607", None))
+    monkeypatch.setattr(
+        "pgrag.rag.retrieval_eval.find_entities",
+        lambda q: [
+            ("Fireball", "ability_ability_3502", "ability"),
+            ("Fire Breath", "ability_ability_3607", "ability"),
+        ],
+    )
+    monkeypatch.setattr(
+        "pgrag.rag.retrieval_eval.find_entity", lambda q: ("ability_ability_3607", None)
+    )
     monkeypatch.setattr("pgrag.rag.entity_retrieval.build_multi_entity_context", fake_multi)
 
     case = {
@@ -530,8 +561,16 @@ def test_run_benchmark_offline_synthetic():
     ]
 
     mock_doc_store = [
-        {"id": "ability_punch_1", "metadata": {"name": "Punch", "type": "ability"}, "text": "Punch info"},
-        {"id": "ability_fireball_1", "metadata": {"name": "Fireball", "type": "ability"}, "text": "Fireball info"},
+        {
+            "id": "ability_punch_1",
+            "metadata": {"name": "Punch", "type": "ability"},
+            "text": "Punch info",
+        },
+        {
+            "id": "ability_fireball_1",
+            "metadata": {"name": "Fireball", "type": "ability"},
+            "text": "Fireball info",
+        },
     ]
 
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
@@ -612,18 +651,24 @@ def test_fixture_case_well_formed(case_id: str):
 def test_cli_main_compare_different_baseline(monkeypatch, capsys):
     """Verify scripts.retrieval_eval.main() correctly prints delta diff when comparing against baseline."""
     import sys
+
     from scripts.retrieval_eval import main as cli_main
 
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f_dataset:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".jsonl", delete=False, encoding="utf-8"
+    ) as f_dataset:
         f_dataset.write(
-            json.dumps({
-                "id": "test-q1",
-                "query": "what is punch",
-                "expected_classifier": "entity",
-                "target_entities": ["Punch"],
-                "relevant_ids": ["ability_punch_1"],
-                "category": "abilities",
-            }) + "\n"
+            json.dumps(
+                {
+                    "id": "test-q1",
+                    "query": "what is punch",
+                    "expected_classifier": "entity",
+                    "target_entities": ["Punch"],
+                    "relevant_ids": ["ability_punch_1"],
+                    "category": "abilities",
+                }
+            )
+            + "\n"
         )
         dataset_path = Path(f_dataset.name)
 
@@ -669,11 +714,15 @@ def test_cli_main_compare_different_baseline(monkeypatch, capsys):
     try:
         test_argv = [
             "retrieval_eval.py",
-            "--dataset", str(dataset_path),
-            "--stages", "entity",
+            "--dataset",
+            str(dataset_path),
+            "--stages",
+            "entity",
             "--offline",
-            "--compare", str(baseline_path),
-            "--out", str(out_path),
+            "--compare",
+            str(baseline_path),
+            "--out",
+            str(out_path),
         ]
         monkeypatch.setattr(sys, "argv", test_argv)
 
@@ -694,22 +743,30 @@ def test_cli_main_compare_different_baseline(monkeypatch, capsys):
 def test_cli_main_compare_same_out_path_preserves_comparison(monkeypatch, capsys):
     """Verify comparison baseline is loaded before --out overwrites it when both point to the same path."""
     import sys
+
     from scripts.retrieval_eval import main as cli_main
 
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f_dataset:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".jsonl", delete=False, encoding="utf-8"
+    ) as f_dataset:
         f_dataset.write(
-            json.dumps({
-                "id": "test-q1",
-                "query": "what is punch",
-                "expected_classifier": "entity",
-                "target_entities": ["Punch"],
-                "relevant_ids": ["ability_punch_1"],
-                "category": "abilities",
-            }) + "\n"
+            json.dumps(
+                {
+                    "id": "test-q1",
+                    "query": "what is punch",
+                    "expected_classifier": "entity",
+                    "target_entities": ["Punch"],
+                    "relevant_ids": ["ability_punch_1"],
+                    "category": "abilities",
+                }
+            )
+            + "\n"
         )
         dataset_path = Path(f_dataset.name)
 
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f_shared:
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".json", delete=False, encoding="utf-8"
+    ) as f_shared:
         initial_baseline = {
             "total_cases": 1,
             "summary": {
@@ -747,11 +804,15 @@ def test_cli_main_compare_same_out_path_preserves_comparison(monkeypatch, capsys
     try:
         test_argv = [
             "retrieval_eval.py",
-            "--dataset", str(dataset_path),
-            "--stages", "entity",
+            "--dataset",
+            str(dataset_path),
+            "--stages",
+            "entity",
             "--offline",
-            "--compare", str(shared_path),
-            "--out", str(shared_path),
+            "--compare",
+            str(shared_path),
+            "--out",
+            str(shared_path),
         ]
         monkeypatch.setattr(sys, "argv", test_argv)
 
@@ -772,11 +833,13 @@ def test_cli_main_compare_same_out_path_preserves_comparison(monkeypatch, capsys
 def test_cli_main_compare_missing_file_fails_fast(monkeypatch, capsys):
     """Verify scripts.retrieval_eval.main() exits 1 if comparison baseline does not exist."""
     import sys
+
     from scripts.retrieval_eval import main as cli_main
 
     test_argv = [
         "retrieval_eval.py",
-        "--compare", "non_existent_baseline_file_12345.json",
+        "--compare",
+        "non_existent_baseline_file_12345.json",
     ]
     monkeypatch.setattr(sys, "argv", test_argv)
 

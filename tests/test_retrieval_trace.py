@@ -9,13 +9,15 @@ class _FakeCollection:
         return {
             "ids": [["d1", "d2", "d3", "d4", "d5"]],
             "documents": [["a", "b", "c", "d", "e"]],
-            "metadatas": [[
-                {"type": "recipe", "name": "a"},
-                {"type": "recipe", "name": "b"},
-                {"type": "recipe", "name": "c"},
-                {"type": "recipe", "name": "d"},
-                {"type": "recipe", "name": "e"},
-            ]],
+            "metadatas": [
+                [
+                    {"type": "recipe", "name": "a"},
+                    {"type": "recipe", "name": "b"},
+                    {"type": "recipe", "name": "c"},
+                    {"type": "recipe", "name": "d"},
+                    {"type": "recipe", "name": "e"},
+                ]
+            ],
             "distances": [[0.1, 0.2, 0.3, 0.4, 0.5]],
         }
 
@@ -40,14 +42,18 @@ def _install_retrieve_harness(monkeypatch):
         class _Model:
             def search(self, q, k):
                 return [0, 1, 2, 3, 4], None
-        all_docs = [{"id": f"d{i+1}"} for i in range(5)]
+
+        all_docs = [{"id": f"d{i + 1}"} for i in range(5)]
         return _Model(), all_docs
+
     # retrieve() imports load_bm25_index locally from pgrag.rag.bm25
     from pgrag.rag import bm25
+
     monkeypatch.setattr(bm25, "load_bm25_index", _load_bm25)
 
     def _rerank(q, ids, docs, metas, dists, count, name_query=None):
         return ids, docs, metas, dists, True
+
     monkeypatch.setattr(retriever, "_rerank_or_cross_encoder", _rerank)
 
 
@@ -66,10 +72,16 @@ def test_retrieve_trace_captures_every_stage(monkeypatch):
     assert len(trace["retrieval_calls"]) == 1
     rec = trace["retrieval_calls"][0]
     for key in (
-        "query", "hybrid", "metadata_filter",
-        "dense_ids", "dense_dists",
-        "bm25_ids", "rrf_ids",
-        "post_filter_ids", "reranked_ids", "rerank_used",
+        "query",
+        "hybrid",
+        "metadata_filter",
+        "dense_ids",
+        "dense_dists",
+        "bm25_ids",
+        "rrf_ids",
+        "post_filter_ids",
+        "reranked_ids",
+        "rerank_used",
     ):
         assert key in rec, f"missing trace key: {key}"
     assert rec["query"] == "silk recipe"
@@ -92,6 +104,7 @@ def test_ask_trace_does_not_change_payload(monkeypatch):
             "distances": [[0.3]],
             "rerank_used": False,
         }
+
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", _fake_retrieve)
     monkeypatch.setattr("pgrag.rag.pipeline.generate", lambda prompt: "answer")
 

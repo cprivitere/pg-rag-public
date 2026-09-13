@@ -45,16 +45,14 @@ def _build_entity_index(db):
             name = record.get("Name")
             if not name:
                 continue
-            if table in ("items", "recipes"):
-                entity_id = key
-            else:
-                entity_id = f"{etype}_{key}"
+            entity_id = key if table in ("items", "recipes") else f"{etype}_{key}"
             for variant in {
                 _norm_name(name),
                 _norm_name(name.replace(" ", "_")),
             }:
                 index.setdefault(variant, (entity_id, etype))
     return index
+
 
 # Templates whose first argument is a meaningful name that gets
 # destroyed by strip_code().  We rewrite them to plain text first.
@@ -92,8 +90,7 @@ def _parse_table(tab, idx, display, safe, base_meta):
     """
     data_rows = []
     for tr in tab.contents.nodes:
-        if (getattr(tr, "__class__", None).__name__ != "Tag"
-                or tr.tag != "tr"):
+        if getattr(tr, "__class__", None).__name__ != "Tag" or tr.tag != "tr":
             continue
         cells = []
         th_only = True
@@ -124,37 +121,45 @@ def _parse_table(tab, idx, display, safe, base_meta):
     cov = f"{display} table covers: " + ", ".join(first_cells)
     if len(cov) > 950:
         cov = cov[:950]
-    records.append({
-        "id": f"{table_id}_coverage",
-        "type": "wiki",
-        "text": cov,
-        "metadata": dict(
-            base_meta, table_id=table_id, table_record="coverage",
-            section=section,
-        ),
-    })
+    records.append(
+        {
+            "id": f"{table_id}_coverage",
+            "type": "wiki",
+            "text": cov,
+            "metadata": dict(
+                base_meta,
+                table_id=table_id,
+                table_record="coverage",
+                section=section,
+            ),
+        }
+    )
 
     for r, cells in enumerate(data_rows):
         row_key = cells[0]
         text = f"{display} table row: " + " | ".join(cells)
         if len(text) > 950:
             text = text[:950]
-        records.append({
-            "id": f"{table_id}_row_{r}",
-            "type": "wiki",
-            "text": text,
-            "metadata": dict(
-                base_meta, table_id=table_id, table_record="row",
-                row_key=row_key, section=section,
-            ),
-        })
+        records.append(
+            {
+                "id": f"{table_id}_row_{r}",
+                "type": "wiki",
+                "text": text,
+                "metadata": dict(
+                    base_meta,
+                    table_id=table_id,
+                    table_record="row",
+                    row_key=row_key,
+                    section=section,
+                ),
+            }
+        )
 
     return records
 
 
 def _is_table_node(node):
-    return (getattr(node, "__class__", None).__name__ == "Tag"
-            and node.tag == "table")
+    return getattr(node, "__class__", None).__name__ == "Tag" and node.tag == "table"
 
 
 def _parse_page(page_name, raw_text, entity_info=None):
@@ -172,38 +177,30 @@ def _parse_page(page_name, raw_text, entity_info=None):
         metadata["entity_id"], metadata["entity_type"] = entity_info
 
     wikicode = mwparserfromhell.parse(raw_text)
-    sections = wikicode.get_sections(
-        levels=[2], include_lead=True
-    )
+    sections = wikicode.get_sections(levels=[2], include_lead=True)
 
     table_offset = 0
     display = page_name.replace("_", " ")
-    safe = "wiki_" + "".join(
-        c if c.isalnum() else "_" for c in page_name
-    )
+    safe = "wiki_" + "".join(c if c.isalnum() else "_" for c in page_name)
     for section in sections:
         heading = ""
         for h in section.filter_headings():
-            h_clean = mwparserfromhell.parse(
-                str(h.title)
-            ).strip_code(
-                normalize=False, collapse=True
-            ).strip()
+            h_clean = (
+                mwparserfromhell.parse(str(h.title))
+                .strip_code(normalize=False, collapse=True)
+                .strip()
+            )
             heading = h_clean
             break
 
         # Pull this section's top-level tables out before the narrative path.
         # A table that yields no records (e.g. an all-template layout wrapper)
         # is left in place so its infobox content survives as before.
-        tables = [
-            node for node in section.nodes if _is_table_node(node)
-        ]
+        tables = [node for node in section.nodes if _is_table_node(node)]
         table_records = []
         removed = 0
         for tab in tables:
-            recs = _parse_table(
-                tab, table_offset + removed, display, safe, metadata
-            )
+            recs = _parse_table(tab, table_offset + removed, display, safe, metadata)
             if not recs:
                 continue
             table_records.extend(recs)
@@ -219,9 +216,7 @@ def _parse_page(page_name, raw_text, entity_info=None):
             documents.append(rec)
 
         text = _preserve_template_names(str(section))
-        text = mwparserfromhell.parse(text).strip_code(
-            normalize=False, collapse=True
-        ).strip()
+        text = mwparserfromhell.parse(text).strip_code(normalize=False, collapse=True).strip()
 
         # mwparserfromhell glitch: unclosed ''' before a == heading leaves
         # preceding template shells intact (B16); a half-stripped/nested
@@ -241,12 +236,7 @@ def _parse_page(page_name, raw_text, entity_info=None):
 
         doc_id = f"wiki_{page_name}"
         if heading:
-            safe_heading = (
-                heading
-                .replace(" ", "_")
-                .replace("/", "_")
-                .replace("&", "and")[:80]
-            )
+            safe_heading = heading.replace(" ", "_").replace("/", "_").replace("&", "and")[:80]
             doc_id = f"wiki_{page_name}_{safe_heading}"
 
         if doc_id in seen_ids:
@@ -256,12 +246,14 @@ def _parse_page(page_name, raw_text, entity_info=None):
             doc_id = f"{doc_id}_{counter}"
         seen_ids.add(doc_id)
 
-        documents.append({
-            "id": doc_id,
-            "type": "wiki",
-            "text": text,
-            "metadata": dict(metadata, section=heading if heading else None),
-        })
+        documents.append(
+            {
+                "id": doc_id,
+                "type": "wiki",
+                "text": text,
+                "metadata": dict(metadata, section=heading if heading else None),
+            }
+        )
 
     return documents
 
@@ -270,7 +262,7 @@ def _load_cache():
     if CACHE_FILE.exists():
         try:
             cache = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
+        except ValueError, OSError:
             return {}
         if cache.get("__version") != CACHE_VERSION:
             return {}

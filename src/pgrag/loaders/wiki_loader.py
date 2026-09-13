@@ -16,11 +16,9 @@ def _load_title_map():
         meta = json.loads((WIKI_DIR / ".meta.json").read_text(encoding="utf-8"))
         pages = meta.get("pages", {})
         return {
-            info.get("filename"): title
-            for title, info in pages.items()
-            if info.get("filename")
+            info.get("filename"): title for title, info in pages.items() if info.get("filename")
         }
-    except (OSError, ValueError, AttributeError):
+    except OSError, ValueError, AttributeError:
         return {}
 
 

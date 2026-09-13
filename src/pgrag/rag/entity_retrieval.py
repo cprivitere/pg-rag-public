@@ -111,6 +111,7 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
         return None
     if budget is None:
         from pgrag.config import CONTEXT_BUDGET
+
         budget = CONTEXT_BUDGET
 
     hub_chunks = _hub_chunks(hub_id, docs)
@@ -118,11 +119,6 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
         return None
 
     dtype = _entity_type(hub_id)
-    entity_name = _entity_name_from_hub(hub_id)
-    if hub_chunks:
-        hub_name = (hub_chunks[0].get("metadata") or {}).get("name")
-        if hub_name:
-            entity_name = hub_name
 
     ids = [d["id"] for d in hub_chunks]
     texts = [d["text"] for d in hub_chunks]
@@ -135,9 +131,9 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
     _leveling_included = False
     if dtype == "skill" and hub_id.startswith(("skill_", "skillprofile_")):
         hub_suffix = (
-            hub_id[len("skillprofile_"):]
+            hub_id[len("skillprofile_") :]
             if hub_id.startswith("skillprofile_")
-            else hub_id[len("skill_"):]
+            else hub_id[len("skill_") :]
         )
         _leveling_id = "leveling_" + hub_suffix
         for _d in _family_chunks(_leveling_id, docs):
@@ -149,10 +145,7 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
             _leveling_included = True
 
     # Wiki pages linked to this entity (same logic as build_entity_context)
-    hub_suffix = (
-        hub_id[len("skillprofile_"):]
-        if hub_id.startswith("skillprofile_") else None
-    )
+    hub_suffix = hub_id[len("skillprofile_") :] if hub_id.startswith("skillprofile_") else None
     wiki_links = []
     for doc in docs:
         doc_meta = doc.get("metadata", {})
@@ -199,11 +192,12 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
 
     if dtype == "skill":
         hub_count = len(hub_chunks) + (1 if _leveling_included else 0)
-        heads = list(zip(ids, texts, metas, dists))[:hub_count]
-        tails = list(zip(ids, texts, metas, dists))[hub_count:]
+        heads = list(zip(ids, texts, metas, dists, strict=False))[:hub_count]
+        tails = list(zip(ids, texts, metas, dists, strict=False))[hub_count:]
 
         def _req_level(item):
             import re
+
             m = re.search(r"Required Skill Level:\s*\n(\d+)", item[1])
             return int(m.group(1)) if m else 10**9
 
@@ -214,9 +208,7 @@ def build_entity_context_offline(hub_id, docs=None, budget=None):
         others = [t for t in tails if t[2].get("type") != "recipe"]
         ordered = heads + recipes + others
         if ordered:
-            ids, texts, metas, dists = (
-                list(x) for x in zip(*ordered)
-            )
+            ids, texts, metas, dists = (list(x) for x in zip(*ordered, strict=False))
 
     total = 0
     cut = len(texts)
@@ -253,16 +245,24 @@ def _entity_type(hub_id):
 
 def _entity_name_from_hub(hub_id):
     """Extract human-readable entity name from hub_id."""
-    for prefix in ("skillprofile_", "item_", "ability_", "quest_",
-                    "recipe_", "effect_", "area_", "npc_"):
+    for prefix in (
+        "skillprofile_",
+        "item_",
+        "ability_",
+        "quest_",
+        "recipe_",
+        "effect_",
+        "area_",
+        "npc_",
+    ):
         if hub_id.startswith(prefix):
-            return hub_id[len(prefix):]
+            return hub_id[len(prefix) :]
     return hub_id
 
 
-def build_entity_context(question, hub_id, budget=None,
-                         other_hub_ids=frozenset(), trace=None,
-                         include_leveling=False):
+def build_entity_context(
+    question, hub_id, budget=None, other_hub_ids=frozenset(), trace=None, include_leveling=False
+):
     docs = _load_docs()
     if not docs:
         return None
@@ -330,7 +330,7 @@ def build_entity_context(question, hub_id, budget=None,
             # high-ability skills (Archery ~257, FireMagic ~198) can't flood
             # the dossier; ascending level keeps the commonly-used abilities
             # survival-biased under the budget cut.
-            skill_code = hub_id[len("skillprofile_"):].split("_chunk_")[0]
+            skill_code = hub_id[len("skillprofile_") :].split("_chunk_")[0]
             _own = []
             for _ability_doc in docs:
                 _am = _ability_doc.get("metadata")
@@ -343,9 +343,7 @@ def build_entity_context(question, hub_id, budget=None,
                 if _ability_doc["id"] in seen:
                     continue
                 _own.append(_ability_doc)
-            _own.sort(
-                key=lambda d: (d["metadata"].get("level", 10**9), d["id"])
-            )
+            _own.sort(key=lambda d: (d["metadata"].get("level", 10**9), d["id"]))
             for _ability_doc in _own[:_MAX_SKILL_ABILITIES]:
                 _am = _ability_doc["metadata"]
                 seen.add(_ability_doc["id"])
@@ -365,9 +363,7 @@ def build_entity_context(question, hub_id, budget=None,
                 trace=trace,
             )
         except Exception as exc:
-            logger.warning(
-                "facet %r failed for hub %r: %s", facet_q, hub_id, exc
-            )
+            logger.warning("facet %r failed for hub %r: %s", facet_q, hub_id, exc)
             continue
         rerank_used = rerank_used or res.get("rerank_used", False)
         for i in range(len(res["ids"][0])):
@@ -384,10 +380,7 @@ def build_entity_context(question, hub_id, budget=None,
     # entity_id/entity_type metadata (see documents/wiki_builder.py), so a
     # skill's mechanics table or an item's How-to-Obtain page joins the
     # dossier. skillprofile hubs link to the CDN skill doc id.
-    hub_suffix = (
-        hub_id[len("skillprofile_"):]
-        if hub_id.startswith("skillprofile_") else None
-    )
+    hub_suffix = hub_id[len("skillprofile_") :] if hub_id.startswith("skillprofile_") else None
     wiki_links = []
     for doc in docs:
         doc_meta = doc.get("metadata", {})
@@ -442,8 +435,8 @@ def build_entity_context(question, hub_id, budget=None,
         # The leveling doc (if added) sits at index len(hub_chunks); keep it
         # in the non-truncated heads head so it always reaches the LLM.
         hub_count = len(hub_chunks) + (1 if _leveling_included else 0)
-        heads = list(zip(ids, texts, metas, dists))[:hub_count]
-        tails = list(zip(ids, texts, metas, dists))[hub_count:]
+        heads = list(zip(ids, texts, metas, dists, strict=False))[:hub_count]
+        tails = list(zip(ids, texts, metas, dists, strict=False))[hub_count:]
 
         def _req_level(item):
             m = re.search(r"Required Skill Level:\s*\n(\d+)", item[1])
@@ -456,9 +449,7 @@ def build_entity_context(question, hub_id, budget=None,
         others = [t for t in tails if t[2].get("type") != "recipe"]
         ordered = heads + recipes + others
         if ordered:
-            ids, texts, metas, dists = (
-                list(x) for x in zip(*ordered)
-            )
+            ids, texts, metas, dists = (list(x) for x in zip(*ordered, strict=False))
 
     total = 0
     cut = len(texts)
@@ -517,7 +508,7 @@ def build_multi_entity_context(question, entities, trace=None):
                 trace.setdefault("unresolved", []).append(name)
             continue
         blocks.append(f"=== {name} ({dtype}) ===")
-        for did, text in zip(ctx["ids"][0], ctx["documents"][0]):
+        for did, text in zip(ctx["ids"][0], ctx["documents"][0], strict=False):
             if did in seen:
                 continue
             seen.add(did)

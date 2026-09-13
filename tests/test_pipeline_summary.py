@@ -135,6 +135,11 @@ def test_find_matching_summary_empty(mock_client, mock_embed):
     mock_embed.return_value = [0.1] * 128
     mock_col = MagicMock()
     mock_client.return_value.get_collection.return_value = mock_col
-    mock_col.query.return_value = {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+    mock_col.query.return_value = {
+        "ids": [[]],
+        "documents": [[]],
+        "metadatas": [[]],
+        "distances": [[]],
+    }
 
     assert _find_matching_summary("nothing here") is None

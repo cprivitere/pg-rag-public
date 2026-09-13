@@ -11,6 +11,8 @@ Locks the suite invariants from the plan:
 4. Metadata-only build-index pass routes through `collection.update`, never
    `upsert` (no re-embedding of ~135k docs).
 """
+
+import contextlib
 import tempfile
 
 from pgrag.documents.builder import (
@@ -21,14 +23,23 @@ from pgrag.documents.builder import (
     build_skill_documents,
 )
 from pgrag.documents.wiki_builder import build_wiki_documents
-from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 from pgrag.vectorstore.build_index import build_index
+from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 
 
 class FakeDB:
-    def __init__(self, items=None, recipes=None, skills=None, quests=None,
-                 abilities=None, npcs=None, areas=None, effects=None,
-                 wiki=None):
+    def __init__(
+        self,
+        items=None,
+        recipes=None,
+        skills=None,
+        quests=None,
+        abilities=None,
+        npcs=None,
+        areas=None,
+        effects=None,
+        wiki=None,
+    ):
         self.tables = {
             "items": items or {},
             "recipes": recipes or {},
@@ -79,13 +90,15 @@ def test_recipe_metadata_enriched():
 
 
 def test_recipe_metadata_defaults_when_fields_missing():
-    db = FakeDB(recipes={
-        "recipe_2": {
-            "Name": "Minimal",
-            "Ingredients": [],
-            "ResultItems": [],
-        },
-    })
+    db = FakeDB(
+        recipes={
+            "recipe_2": {
+                "Name": "Minimal",
+                "Ingredients": [],
+                "ResultItems": [],
+            },
+        }
+    )
     meta = build_recipe_documents(db)[0]["metadata"]
     assert meta["skill"] == ""
     assert meta["skill_level_req"] == 0
@@ -95,27 +108,29 @@ def test_recipe_metadata_defaults_when_fields_missing():
 
 
 def test_recipe_metadata_handles_keyless_ingredients():
-    db = FakeDB(recipes={
-        "recipe_3": {
-            "Name": "Fertilizer",
-            "Ingredients": [
-                {"ItemKeys": ["animal_feces"], "Desc": "Animal Feces",
-                 "StackSize": 3},
-                {"Desc": "Mystery goo"},
-            ],
-            "ResultItems": [],
-        },
-    })
+    db = FakeDB(
+        recipes={
+            "recipe_3": {
+                "Name": "Fertilizer",
+                "Ingredients": [
+                    {"ItemKeys": ["animal_feces"], "Desc": "Animal Feces", "StackSize": 3},
+                    {"Desc": "Mystery goo"},
+                ],
+                "ResultItems": [],
+            },
+        }
+    )
     meta = build_recipe_documents(db)[0]["metadata"]
     assert "Animal Feces" in meta["ingredients"]
     assert "Mystery goo" in meta["ingredients"]
 
 
 def test_recipe_metadata_reward_skill_falls_back_to_skill():
-    db = FakeDB(recipes={
-        "recipe_4": {"Name": "B", "Skill": "Alchemy", "Ingredients": [],
-                     "ResultItems": []},
-    })
+    db = FakeDB(
+        recipes={
+            "recipe_4": {"Name": "B", "Skill": "Alchemy", "Ingredients": [], "ResultItems": []},
+        }
+    )
     meta = build_recipe_documents(db)[0]["metadata"]
     assert meta["reward_skill"] == "Alchemy"
 
@@ -124,16 +139,18 @@ def test_recipe_metadata_reward_skill_falls_back_to_skill():
 
 
 def _item_db():
-    return FakeDB(items={
-        "item_1": {
-            "Name": "Bunny Juice",
-            "Keywords": ["Beverage", "Cooking"],
-            "EquipSlot": "MainHand",
-            "SkillReqs": {"Mycology": 15, "Garden": 5},
-            "Value": 26,
-            "MaxStackSize": 9,
-        },
-    })
+    return FakeDB(
+        items={
+            "item_1": {
+                "Name": "Bunny Juice",
+                "Keywords": ["Beverage", "Cooking"],
+                "EquipSlot": "MainHand",
+                "SkillReqs": {"Mycology": 15, "Garden": 5},
+                "Value": 26,
+                "MaxStackSize": 9,
+            },
+        }
+    )
 
 
 def test_item_metadata_enriched():
@@ -159,15 +176,17 @@ def test_item_metadata_defaults_when_fields_missing():
 
 
 def _ability_db():
-    return FakeDB(abilities={
-        "ability_1001": {
-            "Name": "Fireball",
-            "Skill": "Fire Magic",
-            "Keywords": ["Damage", "Ranged"],
-            "Level": 20,
-            "DamageType": "Fire",
-        },
-    })
+    return FakeDB(
+        abilities={
+            "ability_1001": {
+                "Name": "Fireball",
+                "Skill": "Fire Magic",
+                "Keywords": ["Damage", "Ranged"],
+                "Level": 20,
+                "DamageType": "Fire",
+            },
+        }
+    )
 
 
 def test_ability_metadata_enriched():
@@ -182,17 +201,19 @@ def test_ability_metadata_enriched():
 
 
 def _quest_db():
-    return FakeDB(quests={
-        "quest_1": {
-            "Name": "Mushroom Roundup",
-            "DisplayedLocation": "Serbule",
-            "Rewards": [
-                {"T": "SkillXp", "Xp": 50, "Skill": "Mycology"},
-                {"T": "SkillXp", "Xp": 50, "Skill": "Mycology"},
-                {"T": "Recipe", "Recipe": "recipe_1"},
-            ],
-        },
-    })
+    return FakeDB(
+        quests={
+            "quest_1": {
+                "Name": "Mushroom Roundup",
+                "DisplayedLocation": "Serbule",
+                "Rewards": [
+                    {"T": "SkillXp", "Xp": 50, "Skill": "Mycology"},
+                    {"T": "SkillXp", "Xp": 50, "Skill": "Mycology"},
+                    {"T": "Recipe", "Recipe": "recipe_1"},
+                ],
+            },
+        }
+    )
 
 
 def test_quest_metadata_enriched():
@@ -244,7 +265,7 @@ def test_wiki_page_matching_entity_gets_entity_metadata():
 
 def test_wiki_page_without_entity_match_omits_entity_metadata():
     docs = build_wiki_documents(_wiki_db())
-    serbule = [d for d in docs if d["metadata"]["name"] == "Serbule Quests"][0]
+    serbule = next(d for d in docs if d["metadata"]["name"] == "Serbule Quests")
     assert "entity_id" not in serbule["metadata"]
     assert "entity_type" not in serbule["metadata"]
 
@@ -255,30 +276,45 @@ def test_wiki_page_without_entity_match_omits_entity_metadata():
 def test_all_builders_emit_scalar_metadata_only():
     db = FakeDB(
         items={
-            "item_1": {"Name": "Bunny", "Keywords": ["A", "B"],
-                       "SkillReqs": {"Mycology": 15}, "Value": 9},
+            "item_1": {
+                "Name": "Bunny",
+                "Keywords": ["A", "B"],
+                "SkillReqs": {"Mycology": 15},
+                "Value": 9,
+            },
             "item_2": {"Name": "Juice"},
         },
         recipes={
-            "recipe_1": {"Name": "Potion", "Skill": "Alchemy",
-                         "SkillLevelReq": 3,
-                         "Ingredients": [{"ItemCode": 1, "StackSize": 2}],
-                         "ResultItems": [{"ItemCode": 2, "StackSize": 1}]},
+            "recipe_1": {
+                "Name": "Potion",
+                "Skill": "Alchemy",
+                "SkillLevelReq": 3,
+                "Ingredients": [{"ItemCode": 1, "StackSize": 2}],
+                "ResultItems": [{"ItemCode": 2, "StackSize": 1}],
+            },
         },
         skills={"Alchemy": {"Name": "Alchemy"}},
-        quests={"quest_1": {"Name": "Q", "DisplayedLocation": "Serbule",
-                            "Rewards": [{"T": "SkillXp", "Xp": 5,
-                                         "Skill": "Alchemy"}]}},
-        abilities={"ability_1": {"Name": "Punch", "Keywords": ["Melee"],
-                                 "Level": 1, "DamageType": "Crush"}},
+        quests={
+            "quest_1": {
+                "Name": "Q",
+                "DisplayedLocation": "Serbule",
+                "Rewards": [{"T": "SkillXp", "Xp": 5, "Skill": "Alchemy"}],
+            }
+        },
+        abilities={
+            "ability_1": {"Name": "Punch", "Keywords": ["Melee"], "Level": 1, "DamageType": "Crush"}
+        },
         npcs={"npc_1": {"Name": "Trainer"}},
         areas={"AreaCave1": {"Name": "Dungeon"}},
         effects={"effect_1": {"Name": "Poison", "Desc": "Hurts"}},
         wiki={"Serbule": ("== A ==\n" + "x" * 80 + ".")},
     )
     builders = [
-        build_item_documents, build_recipe_documents, build_skill_documents,
-        build_quest_documents, build_ability_documents,
+        build_item_documents,
+        build_recipe_documents,
+        build_skill_documents,
+        build_quest_documents,
+        build_ability_documents,
     ]
     docs = [d for b in builders for d in b(db)]
     docs += build_wiki_documents(db)
@@ -294,34 +330,42 @@ def test_all_builders_emit_scalar_metadata_only():
 def test_embedding_hash_independent_of_metadata():
     base = {"id": "x", "text": "hello"}
     lean = dict(base, metadata={"source": "cdn"})
-    rich = dict(base, metadata={
-        "source": "cdn", "skill": "Alchemy", "skill_level_req": 25,
-        "ingredients": "Spider Silk | Toadstool Cap",
-    })
+    rich = dict(
+        base,
+        metadata={
+            "source": "cdn",
+            "skill": "Alchemy",
+            "skill_level_req": 25,
+            "ingredients": "Spider Silk | Toadstool Cap",
+        },
+    )
     assert embedding_hash(lean) == embedding_hash(rich)
     assert metadata_hash(lean) != metadata_hash(rich)
 
 
 def test_metadata_only_change_routes_to_update_not_upsert(monkeypatch):
-    import chromadb
     from unittest.mock import MagicMock
 
     old_meta = {"source": "cdn", "table": "recipes"}
     new_meta = dict(old_meta, skill="Alchemy", skill_level_req=25)
-    old = {"id": "recipe_1", "type": "recipe", "text": "text",
-           "metadata": old_meta}
-    new = {"id": "recipe_1", "type": "recipe", "text": "text",
-           "metadata": new_meta}
+    old = {"id": "recipe_1", "type": "recipe", "text": "text", "metadata": old_meta}
+    new = {"id": "recipe_1", "type": "recipe", "text": "text", "metadata": new_meta}
 
     collection = MagicMock()
     # _get_existing_dim → one row with embedding; then hash scan batch.
     collection.get.side_effect = [
         {"ids": ["recipe_1"], "embeddings": [[0.1] * 384]},
-        {"ids": ["recipe_1"], "metadatas": [dict(
-            old_meta, type="recipe",
-            embedding_hash=embedding_hash(old),
-            metadata_hash=metadata_hash(old),
-        )]},
+        {
+            "ids": ["recipe_1"],
+            "metadatas": [
+                dict(
+                    old_meta,
+                    type="recipe",
+                    embedding_hash=embedding_hash(old),
+                    metadata_hash=metadata_hash(old),
+                )
+            ],
+        },
     ]
     collection.count.return_value = 1
 
@@ -376,10 +420,8 @@ def test_chroma_update_merges_metadata_add_only():
         assert meta["source"] == "cdn", "update() must merge: stale keys persist"
     finally:
         # Windows: chroma holds mmaps on the data dir; release before rmtree.
-        try:
+        with contextlib.suppress(Exception):
             client._system.stop()
-        except Exception:
-            pass
         del client
         gc.collect()
         shutil.rmtree(tmp, ignore_errors=True)

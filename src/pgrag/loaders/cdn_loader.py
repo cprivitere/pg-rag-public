@@ -1,4 +1,5 @@
 import json
+
 from pgrag.config import CDN_DIR
 
 
@@ -8,10 +9,7 @@ def load_database(db):
 
         print(f"Loading {table_name}...")
 
-        with open(file, "r", encoding="utf-8") as f:
-            db.add_table(
-                table_name,
-                json.load(f)
-            )
+        with open(file, encoding="utf-8") as f:
+            db.add_table(table_name, json.load(f))
 
     print(f"Loaded {len(db.tables)} tables.")

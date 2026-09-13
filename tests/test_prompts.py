@@ -7,7 +7,9 @@ from pgrag.rag.prompts import build_prompt
 
 
 def test_comparison_prompt_includes_instructions():
-    prompt = build_prompt("what is the highest level cheese?", "context here", query_type="comparison")
+    prompt = build_prompt(
+        "what is the highest level cheese?", "context here", query_type="comparison"
+    )
     assert "COMPARISON QUESTION DETECTED" in prompt
     assert "compare values" in prompt.lower() or "Compare" in prompt
 
@@ -18,7 +20,9 @@ def test_general_prompt_no_comparison_section():
 
 
 def test_lookup_prompt_no_comparison_section():
-    prompt = build_prompt("what level is statehelm sewer cheese?", "context here", query_type="lookup")
+    prompt = build_prompt(
+        "what level is statehelm sewer cheese?", "context here", query_type="lookup"
+    )
     assert "COMPARISON QUESTION DETECTED" not in prompt
 
 
@@ -70,6 +74,7 @@ def test_prompt_allows_reasoning_but_blocks_fabrication():
     assert "do not invent facts" in prompt
     assert "Arithmetic directly derived from stated context values" in prompt
 
+
 def test_old_overrestrictive_wording_removed():
     """'Do NOT guess, infer' conflated interpretation with fabrication and
     made the model refuse to synthesize. It must not come back."""
@@ -83,6 +88,8 @@ def test_entity_prompt_lists_all_named_characters():
 
 
 def test_comparison_prompt_quotes_descriptions_and_concludes_firmly():
-    prompt = build_prompt("Which is more damaging, Sword or Unarmed?", "ctx", query_type="comparison")
+    prompt = build_prompt(
+        "Which is more damaging, Sword or Unarmed?", "ctx", query_type="comparison"
+    )
     assert "Quote each compared item's own description verbatim" in prompt
     assert "Conclude firmly" in prompt

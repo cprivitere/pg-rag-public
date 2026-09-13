@@ -32,17 +32,14 @@ def _check_hash_integrity(collection, issues, source_docs=None):
     if not ids:
         return
 
-    if source_docs:
-        source_by_id = {d["id"]: d for d in source_docs}
-    else:
-        source_by_id = {}
+    source_by_id = {d["id"]: d for d in source_docs} if source_docs else {}
 
     bad_embed = 0
     bad_meta = 0
     sample_embed = []
     sample_meta = []
 
-    for doc_id, meta in zip(ids, metadatas):
+    for doc_id, meta in zip(ids, metadatas, strict=False):
         stored_embed = meta.get("embedding_hash")
         stored_metahash = meta.get("metadata_hash")
 
@@ -65,19 +62,16 @@ def _check_hash_integrity(collection, issues, source_docs=None):
             bad_meta += 1
 
     if bad_embed:
-        issues.append(
-            f"Embedding hash mismatch: {bad_embed} doc(s) — sample: {sample_embed}"
-        )
+        issues.append(f"Embedding hash mismatch: {bad_embed} doc(s) — sample: {sample_embed}")
     if bad_meta:
-        issues.append(
-            f"Metadata hash mismatch: {bad_meta} doc(s) — sample: {sample_meta}"
-        )
+        issues.append(f"Metadata hash mismatch: {bad_meta} doc(s) — sample: {sample_meta}")
     if not bad_embed and not bad_meta:
         print(f"Hash integrity: OK ({len(ids)} docs)")
 
 
-def health_check(chroma_path=CHROMA_PATH, collection_name=COLLECTION_NAME,
-                 documents_path=DOCUMENTS_PATH):
+def health_check(
+    chroma_path=CHROMA_PATH, collection_name=COLLECTION_NAME, documents_path=DOCUMENTS_PATH
+):
     issues = []
 
     try:
@@ -98,8 +92,7 @@ def health_check(chroma_path=CHROMA_PATH, collection_name=COLLECTION_NAME,
             print(f"Embedding dimension: {dim}")
             if dim != EMBEDDING_DIM:
                 issues.append(
-                    f"Embedding dimension mismatch: collection={dim}, "
-                    f"EMBEDDING_DIM={EMBEDDING_DIM}"
+                    f"Embedding dimension mismatch: collection={dim}, EMBEDDING_DIM={EMBEDDING_DIM}"
                 )
         else:
             issues.append("No embedding data in collection")
@@ -108,7 +101,7 @@ def health_check(chroma_path=CHROMA_PATH, collection_name=COLLECTION_NAME,
 
     docs = None
     try:
-        with open(documents_path, "r", encoding="utf-8") as f:
+        with open(documents_path, encoding="utf-8") as f:
             docs = json.load(f)
         expected_count = len(docs)
         print(f"Expected document count (from {documents_path}): {expected_count}")

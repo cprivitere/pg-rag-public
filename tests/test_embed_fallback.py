@@ -1,6 +1,7 @@
 """Tests the embed_batch overflow fallback: on _InputTooLong the batch is
 bisected, isolating only the genuinely over-window texts instead of
 re-embedding the whole batch one-at-a-time (the O(n) regression in REVIEW.md)."""
+
 import pgrag.embeddings.llama_embeddings as emb
 
 
@@ -26,8 +27,8 @@ def test_embed_batch_bisects_on_too_long_isolating_offender(monkeypatch):
     monkeypatch.setattr(emb, "validate_embeddings", lambda v: v)
 
     out = emb.embed_batch(["a", "b", "c", "d"])
-    assert out == ["va", "vb", "vc", "vd"]          # order preserved
-    assert calls["count"] == 3                     # 1 full + 2 halves, NOT 4
+    assert out == ["va", "vb", "vc", "vd"]  # order preserved
+    assert calls["count"] == 3  # 1 full + 2 halves, NOT 4
     assert all(b == emb.MAX_EMBED_CHARS for b in calls["budgets"])  # no shrink
 
 
@@ -45,6 +46,6 @@ def test_embed_batch_leaf_falls_through_to_embed_one(monkeypatch):
     monkeypatch.setattr(emb, "validate_embeddings", lambda v: v)
 
     out = emb.embed_batch(["toolong"])
-    assert out == [f"v{emb._TRUNC_STEPS[1]}"]   # shrunk to next budget
+    assert out == [f"v{emb._TRUNC_STEPS[1]}"]  # shrunk to next budget
     assert emb.MAX_EMBED_CHARS in calls["budgets"]
     assert emb._TRUNC_STEPS[1] in calls["budgets"]

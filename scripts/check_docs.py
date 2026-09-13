@@ -16,6 +16,7 @@ Exit 0 = clean; 1 = one or more drifts (printed). Run via `mise drift`
 (uv run python scripts/check_docs.py). Only stable facts are asserted — a
 check that breaks on innocuous churn gets ignored, which is how guardrails rot.
 """
+
 from __future__ import annotations
 
 import json
@@ -79,7 +80,7 @@ def main() -> int:
 
     # --- 3. Contract constants agree across the docs that quote them --------
     try:
-        from pgrag.config import DOCUMENTS_VERSION, EMBEDDING_DIM  # noqa: PLC0415
+        from pgrag.config import DOCUMENTS_VERSION, EMBEDDING_DIM
     except Exception as exc:  # pragma: no cover - environment
         _drift("cannot import pgrag.config", str(exc))
         DOCUMENTS_VERSION = EMBEDDING_DIM = None
@@ -121,11 +122,10 @@ def main() -> int:
     if eval_skill.exists() and golden_dir.is_dir():
         golden_files = sorted(golden_dir.glob("*.json"))
         types = Counter(
-            (json.loads(f.read_text(encoding="utf-8")) or {}).get("type", "?")
-            for f in golden_files
+            (json.loads(f.read_text(encoding="utf-8")) or {}).get("type", "?") for f in golden_files
         )
         text = eval_skill.read_text(encoding="utf-8")
-        expected = {"entity": 20, "general":  14, "recipe":  3, "comparison":  5}
+        expected = {"entity": 20, "general": 14, "recipe": 3, "comparison": 5}
         mismatches = []
         if f"{len(golden_files)} files exist today" not in text:
             mismatches.append(f"count ({len(golden_files)})")
@@ -162,8 +162,14 @@ def main() -> int:
         _drift("cannot parse mise.toml [env]", str(exc))
         mise_env = {}
 
-    model_keys = ["LLM_MODEL", "LLM_FLAGS", "EMBED_MODEL", "EMBED_FLAGS",
-                  "RERANK_MODEL", "RERANK_FLAGS"]
+    model_keys = [
+        "LLM_MODEL",
+        "LLM_FLAGS",
+        "EMBED_MODEL",
+        "EMBED_FLAGS",
+        "RERANK_MODEL",
+        "RERANK_FLAGS",
+    ]
     if all(k in mise_env for k in model_keys):
         # Files where a literal model ref/flag WOULD be a leftover. vram_sweep
         # carries deliberate equal fallbacks (reads env first) — excluded.
@@ -190,12 +196,23 @@ def main() -> int:
             else:
                 leaked = [k for k in model_keys if mise_env[k] in text]
                 if leaked:
-                    _drift(f"{label} hardcodes model literal",
-                           ", ".join(f"{k}={mise_env[k]}" for k in leaked))
+                    _drift(
+                        f"{label} hardcodes model literal",
+                        ", ".join(f"{k}={mise_env[k]}" for k in leaked),
+                    )
                 else:
-                    varref = [v for v in ("LLM_MODEL", "EMBED_MODEL", "RERANK_MODEL",
-                                          "LLM_FLAGS", "EMBED_FLAGS", "RERANK_FLAGS")
-                              if v in text]
+                    varref = [
+                        v
+                        for v in (
+                            "LLM_MODEL",
+                            "EMBED_MODEL",
+                            "RERANK_MODEL",
+                            "LLM_FLAGS",
+                            "EMBED_FLAGS",
+                            "RERANK_FLAGS",
+                        )
+                        if v in text
+                    ]
                     _report("OK", f"{label} references env vars: {', '.join(varref) or 'none'}")
 
         # embed_eval.py's production bake-off candidate must read EMBED_MODEL
@@ -205,7 +222,8 @@ def main() -> int:
         # would false-positive on the comparison models).
         ee = (ROOT / "scripts" / "embed_eval.py").read_text(encoding="utf-8")
         if "EMBED_MODEL" in ee and not re.search(
-                r'tomllib\.loads.*EMBED_MODEL|get\("EMBED_MODEL"\)', ee, re.S):
+            r'tomllib\.loads.*EMBED_MODEL|get\("EMBED_MODEL"\)', ee, re.S
+        ):
             _drift("embed_eval.py references EMBED_MODEL but not from mise.toml [env]")
         elif "EMBED_MODEL" not in ee:
             _drift("embed_eval.py no longer references EMBED_MODEL (production bake-off unfixed)")
@@ -214,12 +232,16 @@ def main() -> int:
 
     else:
         # A missing key silently skips all model checks — fail loudly instead.
-        _drift("missing model env keys in mise.toml [env]",
-               ", ".join(k for k in model_keys if k not in mise_env))
+        _drift(
+            "missing model env keys in mise.toml [env]",
+            ", ".join(k for k in model_keys if k not in mise_env),
+        )
 
     # --- Report -------------------------------------------------------------
-    print(f"drift check: {sum(1 for t, *_ in _lines if t == 'OK')} OK, "
-          f"{sum(1 for t, *_ in _lines if t == 'DRIFT')} drift")
+    print(
+        f"drift check: {sum(1 for t, *_ in _lines if t == 'OK')} OK, "
+        f"{sum(1 for t, *_ in _lines if t == 'DRIFT')} drift"
+    )
     for tag, label, detail in _lines:
         line = f"[{tag}] {label}"
         if detail:

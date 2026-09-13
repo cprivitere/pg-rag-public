@@ -1,5 +1,4 @@
 import re
-from pathlib import Path
 
 import mwparserfromhell
 
@@ -14,8 +13,8 @@ from pgrag.documents.skill_profiles import (
     build_skill_profile_documents,
 )
 from pgrag.documents.summaries import (
-    build_gift_summaries,
     build_gathering_summaries,
+    build_gift_summaries,
     build_summary_documents,
     build_wiki_gathering_summaries,
     build_wiki_harvest_map,
@@ -38,10 +37,10 @@ def _int_or(value, default=0):
         return default
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return default
 
 
@@ -49,29 +48,31 @@ def build_curated_documents():
     """Load curated documents from the derived curated directory."""
     documents = []
     curated_dir = CURATED_DIR
-    
+
     if not curated_dir.exists():
         return documents
-    
+
     for txt_file in curated_dir.glob("*_curated.txt"):
         try:
             content = txt_file.read_text(encoding="utf-8")
-            
+
             doc_id = f"curated_{txt_file.stem}"
-            
-            documents.append({
-                "id": doc_id,
-                "type": "curated",
-                "text": content,
-                "metadata": {
-                    "source": "curated",
-                    "table": "curated",
-                    "name": txt_file.stem.replace("_curated", "").replace("_", " ").title()
+
+            documents.append(
+                {
+                    "id": doc_id,
+                    "type": "curated",
+                    "text": content,
+                    "metadata": {
+                        "source": "curated",
+                        "table": "curated",
+                        "name": txt_file.stem.replace("_curated", "").replace("_", " ").title(),
+                    },
                 }
-            })
+            )
         except Exception as e:
             print(f"Warning: Failed to load curated doc {txt_file}: {e}")
-    
+
     return documents
 
 
@@ -94,25 +95,25 @@ def build_item_documents(db):
             continue
 
         text = f"""
-Item: {item.get('Name', item_id)}
+Item: {item.get("Name", item_id)}
 
 Internal Name:
-{item.get('InternalName', '')}
+{item.get("InternalName", "")}
 
 Keywords:
-{', '.join(item.get('Keywords', []))}
+{", ".join(item.get("Keywords", []))}
 
 Usage:
-{item.get('Description', '')}
+{item.get("Description", "")}
 
 Description:
-{item.get('Description', '')}
+{item.get("Description", "")}
 
 Stack Size:
-{item.get('MaxStackSize', '')}
+{item.get("MaxStackSize", "")}
 
 Value:
-{item.get('Value', '')}
+{item.get("Value", "")}
 """
 
         section = []
@@ -153,7 +154,7 @@ Value:
                         label = attr["Label"]
                     try:
                         numeric = float(value)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         section.append(f"Stat: {label} {value}")
                         continue
                     sign = "+" if numeric >= 0 else ""
@@ -162,10 +163,7 @@ Value:
                     section.append(entry)
 
         bestow_recipes = item.get("BestowRecipes")
-        if (
-            isinstance(bestow_recipes, list)
-            and isinstance(db.tables.get("recipes"), dict)
-        ):
+        if isinstance(bestow_recipes, list) and isinstance(db.tables.get("recipes"), dict):
             for recipe_code in bestow_recipes:
                 section.append(f"Bestows Recipe: {resolver.recipe_name(recipe_code)}")
 
@@ -187,22 +185,24 @@ Value:
             for skill, req_level in sorted(skill_reqs.items()):
                 skill_req_parts.append(f"{skill} {req_level}")
 
-        documents.append({
-            "id": item_id,
-            "type": "item",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "items",
-                "name": item.get("Name", item_id),
-                # Chroma-filterable scalars (multi-value via " | ")
-                "keywords": " | ".join(keywords),
-                "equip_slot": _str_or(item.get("EquipSlot")),
-                "skill_reqs": " | ".join(skill_req_parts),
-                "value": _int_or(item.get("Value")),
-                "stack_size": _int_or(item.get("MaxStackSize")),
+        documents.append(
+            {
+                "id": item_id,
+                "type": "item",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "items",
+                    "name": item.get("Name", item_id),
+                    # Chroma-filterable scalars (multi-value via " | ")
+                    "keywords": " | ".join(keywords),
+                    "equip_slot": _str_or(item.get("EquipSlot")),
+                    "skill_reqs": " | ".join(skill_req_parts),
+                    "value": _int_or(item.get("Value")),
+                    "stack_size": _int_or(item.get("MaxStackSize")),
+                },
             }
-        })
+        )
 
     return documents
 
@@ -216,72 +216,54 @@ def build_recipe_documents(db):
     recipes = db.tables.get("recipes", {})
 
     for recipe_id, recipe in recipes.items():
-
         ingredients = []
         ingredient_names = []
 
         for ingredient in recipe.get("Ingredients", []):
-
             if "ItemCode" in ingredient:
-                name = resolver.item_name(
-                    ingredient["ItemCode"]
-                )
+                name = resolver.item_name(ingredient["ItemCode"])
                 ingredient_names.append(name)
 
-                ingredients.append(
-                    f"- {name} x{ingredient.get('StackSize', 1)}"
-                )
+                ingredients.append(f"- {name} x{ingredient.get('StackSize', 1)}")
 
             elif "ItemKeys" in ingredient:
                 desc = ingredient.get("Desc")
                 keys = ", ".join(ingredient["ItemKeys"])
-                ingredient_names.append(
-                    desc or ", ".join(ingredient["ItemKeys"])
-                )
+                ingredient_names.append(desc or ", ".join(ingredient["ItemKeys"]))
                 if desc:
                     ingredients.append(
-                        f"- {desc} "
-                        f"(category: {keys}) "
-                        f"x{ingredient.get('StackSize', 1)}"
+                        f"- {desc} (category: {keys}) x{ingredient.get('StackSize', 1)}"
                     )
                 else:
                     ingredients.append(
-                        f"- Any item matching: {keys} "
-                        f"x{ingredient.get('StackSize', 1)}"
+                        f"- Any item matching: {keys} x{ingredient.get('StackSize', 1)}"
                     )
 
             else:
                 desc = ingredient.get("Desc", "Unknown ingredient")
                 ingredient_names.append(desc)
-                ingredients.append(
-                    f"- {desc}"
-                )
+                ingredients.append(f"- {desc}")
 
         results = []
         result_names = []
 
         for result in recipe.get("ResultItems", []):
-
-            name = resolver.item_name(
-                result["ItemCode"]
-            )
+            name = resolver.item_name(result["ItemCode"])
             result_names.append(name)
 
-            results.append(
-                f"- {name} x{result['StackSize']}"
-            )
+            results.append(f"- {name} x{result['StackSize']}")
 
         text = f"""
-Recipe: {recipe.get('Name', recipe_id)}
+Recipe: {recipe.get("Name", recipe_id)}
 
 Skill:
-{recipe.get('Skill', '')}
+{recipe.get("Skill", "")}
 
 Required Skill Level:
-{recipe.get('SkillLevelReq', 0)}
+{recipe.get("SkillLevelReq", 0)}
 
 Description:
-{recipe.get('Description', '')}
+{recipe.get("Description", "")}
 
 Ingredients:
 {chr(10).join(ingredients)}
@@ -290,24 +272,24 @@ Produces:
 {chr(10).join(results)}
 """
 
-        reward_skill = recipe.get('RewardSkill', '') or recipe.get('Skill', '')
+        reward_skill = recipe.get("RewardSkill", "") or recipe.get("Skill", "")
         reward_sections = []
 
-        xp = recipe.get('RewardSkillXp')
-        first_time = recipe.get('RewardSkillXpFirstTime')
+        xp = recipe.get("RewardSkillXp")
+        first_time = recipe.get("RewardSkillXpFirstTime")
         if xp is not None or first_time is not None:
             xp_part = f"+{xp}" if xp is not None else ""
             first_part = f"first-time +{first_time}" if first_time is not None else ""
             joined = ", ".join(p for p in [xp_part, first_part] if p)
             reward_sections.append(f"Awards {reward_skill} XP: {joined}")
 
-        if recipe.get('RewardSkill') and recipe['RewardSkill'] != recipe.get('Skill', ''):
+        if recipe.get("RewardSkill") and recipe["RewardSkill"] != recipe.get("Skill", ""):
             reward_sections.append(f"Reward Skill: {recipe['RewardSkill']}")
 
         drop_parts = []
-        pct = recipe.get('RewardSkillXpDropOffPct')
-        level = recipe.get('RewardSkillXpDropOffLevel')
-        rate = recipe.get('RewardSkillXpDropOffRate')
+        pct = recipe.get("RewardSkillXpDropOffPct")
+        level = recipe.get("RewardSkillXpDropOffLevel")
+        rate = recipe.get("RewardSkillXpDropOffRate")
         if pct is not None:
             drop_parts.append(f"-{pct * 100:g}%")
         if level is not None:
@@ -317,34 +299,34 @@ Produces:
         if drop_parts:
             reward_sections.append("XP Drop-off: " + ", ".join(drop_parts))
 
-        reset = recipe.get('ResetTimeInSeconds')
+        reset = recipe.get("ResetTimeInSeconds")
         if reset is not None:
             reward_sections.append(f"Reset Time: {reset}s")
 
-        max_uses = recipe.get('MaxUses')
+        max_uses = recipe.get("MaxUses")
         if max_uses is not None:
             reward_sections.append(f"Max Uses: {max_uses}")
 
         if reward_sections:
             text += "\n\nRewards:\n" + "\n".join(reward_sections)
 
-        documents.append({
-            "id": recipe_id,
-            "type": "recipe",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "recipes",
-                # Chroma-filterable scalars (multi-value via " | ")
-                "skill": _str_or(recipe.get("Skill")),
-                "skill_level_req": _int_or(recipe.get("SkillLevelReq")),
-                "reward_skill": _str_or(
-                    recipe.get("RewardSkill") or recipe.get("Skill")
-                ),
-                "ingredients": " | ".join(dict.fromkeys(ingredient_names)),
-                "result_items": " | ".join(dict.fromkeys(result_names)),
+        documents.append(
+            {
+                "id": recipe_id,
+                "type": "recipe",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "recipes",
+                    # Chroma-filterable scalars (multi-value via " | ")
+                    "skill": _str_or(recipe.get("Skill")),
+                    "skill_level_req": _int_or(recipe.get("SkillLevelReq")),
+                    "reward_skill": _str_or(recipe.get("RewardSkill") or recipe.get("Skill")),
+                    "ingredients": " | ".join(dict.fromkeys(ingredient_names)),
+                    "result_items": " | ".join(dict.fromkeys(result_names)),
+                },
             }
-        })
+        )
 
     return documents
 
@@ -372,7 +354,9 @@ def build_skill_documents(db):
             hints = {}
 
         reward_lines = []
-        for level in sorted(rewards.keys(), key=lambda x: int(x.split("_")[0]) if x.split("_")[0].isdigit() else 0):
+        for level in sorted(
+            rewards.keys(), key=lambda x: int(x.split("_")[0]) if x.split("_")[0].isdigit() else 0
+        ):
             r = rewards[level]
             if isinstance(r, dict):
                 display_level = level
@@ -396,10 +380,10 @@ Description:
 {desc}
 
 Rewards:
-{chr(10).join(reward_lines) if reward_lines else 'No rewards listed'}
+{chr(10).join(reward_lines) if reward_lines else "No rewards listed"}
 
 Advancement Hints:
-{chr(10).join(hint_lines) if hint_lines else 'No advancement hints listed'}"""
+{chr(10).join(hint_lines) if hint_lines else "No advancement hints listed"}"""
         if parents:
             clean_parents = [p for p in parents if p is not None]
             if clean_parents:
@@ -416,16 +400,18 @@ Advancement Hints:
         if max_bonus is not None:
             text += f"\nMax Bonus Levels: {max_bonus}"
 
-        documents.append({
-            "id": f"skill_{skill_id}",
-            "type": "skill",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "skills",
-                "name": name,
+        documents.append(
+            {
+                "id": f"skill_{skill_id}",
+                "type": "skill",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "skills",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -466,19 +452,25 @@ def build_quest_documents(db):
                     if isinstance(sub, dict):
                         req_t = sub.get("T", "")
                         if req_t == "MinSkillLevel":
-                            requirements.append(f"Skill {sub.get('Skill','')} >= {sub.get('Level',0)}")
+                            requirements.append(
+                                f"Skill {sub.get('Skill', '')} >= {sub.get('Level', 0)}"
+                            )
                         elif req_t == "MinFavorLevel":
-                            requirements.append(f"Favor with {sub.get('Npc','')} >= {sub.get('Level','')}")
+                            requirements.append(
+                                f"Favor with {sub.get('Npc', '')} >= {sub.get('Level', '')}"
+                            )
                         elif req_t == "QuestCompleted":
-                            requirements.append(f"Completed quest: {sub.get('Quest','')}")
+                            requirements.append(f"Completed quest: {sub.get('Quest', '')}")
             elif isinstance(req, dict):
                 req_t = req.get("T", "")
                 if req_t == "MinSkillLevel":
-                    requirements.append(f"Skill {req.get('Skill','')} >= {req.get('Level',0)}")
+                    requirements.append(f"Skill {req.get('Skill', '')} >= {req.get('Level', 0)}")
                 elif req_t == "MinFavorLevel":
-                    requirements.append(f"Favor with {req.get('Npc','')} >= {req.get('Level','')}")
+                    requirements.append(
+                        f"Favor with {req.get('Npc', '')} >= {req.get('Level', '')}"
+                    )
                 elif req_t == "QuestCompleted":
-                    requirements.append(f"Completed quest: {req.get('Quest','')}")
+                    requirements.append(f"Completed quest: {req.get('Quest', '')}")
 
         rewards_text = []
         reward_skills = []
@@ -486,15 +478,15 @@ def build_quest_documents(db):
             if isinstance(r, dict):
                 r_t = r.get("T", "")
                 if r_t == "SkillXp":
-                    rewards_text.append(f"+{r.get('Xp',0)} {r.get('Skill','')} XP")
+                    rewards_text.append(f"+{r.get('Xp', 0)} {r.get('Skill', '')} XP")
                     skill_name = r.get("Skill")
                     if skill_name:
                         reward_skills.append(skill_name)
                 elif r_t == "Recipe":
-                    rewards_text.append(f"Recipe: {r.get('Recipe','')}")
+                    rewards_text.append(f"Recipe: {r.get('Recipe', '')}")
 
         for ri in quest.get("Rewards_Items", []):
-            rewards_text.append(f"Item: {ri.get('Item','')} x{ri.get('StackSize',1)}")
+            rewards_text.append(f"Item: {ri.get('Item', '')} x{ri.get('StackSize', 1)}")
 
         text = f"""Quest: {name}
 
@@ -510,23 +502,25 @@ Description:
         if objectives:
             text += f"\n\nObjectives:\n{chr(10).join(objectives)}"
         if requirements:
-            text += f"\n\nRequirements:\n" + "\n".join(f"- {r}" for r in requirements)
+            text += "\n\nRequirements:\n" + "\n".join(f"- {r}" for r in requirements)
         if rewards_text:
-            text += f"\n\nRewards:\n" + "\n".join(f"- {r}" for r in rewards_text)
+            text += "\n\nRewards:\n" + "\n".join(f"- {r}" for r in rewards_text)
 
-        documents.append({
-            "id": f"quest_{quest_id}",
-            "type": "quest",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "quests",
-                "name": name,
-                # Chroma-filterable scalars (multi-value via " | ")
-                "reward_skills": " | ".join(dict.fromkeys(reward_skills)),
-                "location": _str_or(quest.get("DisplayedLocation")),
+        documents.append(
+            {
+                "id": f"quest_{quest_id}",
+                "type": "quest",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "quests",
+                    "name": name,
+                    # Chroma-filterable scalars (multi-value via " | ")
+                    "reward_skills": " | ".join(dict.fromkeys(reward_skills)),
+                    "location": _str_or(quest.get("DisplayedLocation")),
+                },
             }
-        })
+        )
 
     return documents
 
@@ -577,21 +571,23 @@ Reset Time: {reset_time}s"""
         if not isinstance(keywords, list):
             keywords = []
 
-        documents.append({
-            "id": f"ability_{ability_id}",
-            "type": "ability",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "abilities",
-                "name": name,
-                # Chroma-filterable scalars (multi-value via " | ")
-                "skill": _str_or(ability.get("Skill")),
-                "keywords": " | ".join(keywords),
-                "level": _int_or(ability.get("Level")),
-                "damage_type": _str_or(ability.get("DamageType")),
+        documents.append(
+            {
+                "id": f"ability_{ability_id}",
+                "type": "ability",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "abilities",
+                    "name": name,
+                    # Chroma-filterable scalars (multi-value via " | ")
+                    "skill": _str_or(ability.get("Skill")),
+                    "keywords": " | ".join(keywords),
+                    "level": _int_or(ability.get("Level")),
+                    "damage_type": _str_or(ability.get("DamageType")),
+                },
             }
-        })
+        )
 
     return documents
 
@@ -631,16 +627,18 @@ Location: {area}"""
                 service_lines.append(line)
             text += "\n\nServices:\n" + "\n".join(service_lines)
 
-        documents.append({
-            "id": f"npc_{npc_id}",
-            "type": "npc",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "npcs",
-                "name": name,
+        documents.append(
+            {
+                "id": f"npc_{npc_id}",
+                "type": "npc",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "npcs",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -669,16 +667,18 @@ Description:
         if keywords:
             text += f"\n\nKeywords: {', '.join(keywords)}"
 
-        documents.append({
-            "id": f"effect_{effect_id}",
-            "type": "effect",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "effects",
-                "name": name,
+        documents.append(
+            {
+                "id": f"effect_{effect_id}",
+                "type": "effect",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "effects",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -701,9 +701,9 @@ def build_lorebook_documents(db):
         if not text_content:
             continue
 
-        clean_text = mwparserfromhell.parse(text_content).strip_code(
-            normalize=False, collapse=True
-        ).strip()
+        clean_text = (
+            mwparserfromhell.parse(text_content).strip_code(normalize=False, collapse=True).strip()
+        )
 
         doc_text = f"""Lore Book: {title}
 
@@ -716,16 +716,18 @@ Content:
         if keywords:
             doc_text += f"\n\nKeywords: {', '.join(keywords)}"
 
-        documents.append({
-            "id": f"lorebook_{book_id}",
-            "type": "lorebook",
-            "text": doc_text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "lorebooks",
-                "name": title,
+        documents.append(
+            {
+                "id": f"lorebook_{book_id}",
+                "type": "lorebook",
+                "text": doc_text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "lorebooks",
+                    "name": title,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -759,16 +761,18 @@ Zone: {zone}"""
         if small_hint:
             text += f"\n\nSmall Hint: {small_hint}"
 
-        documents.append({
-            "id": f"goal_{goal.get('Id', label)}",
-            "type": "directedgoal",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "directedgoals",
-                "name": label,
+        documents.append(
+            {
+                "id": f"goal_{goal.get('Id', label)}",
+                "type": "directedgoal",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "directedgoals",
+                    "name": label,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -790,16 +794,18 @@ def build_area_documents(db):
 Short Name: {short}
 Internal ID: {area_id}"""
 
-        documents.append({
-            "id": f"area_{area_id}",
-            "type": "area",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "areas",
-                "name": name,
+        documents.append(
+            {
+                "id": f"area_{area_id}",
+                "type": "area",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "areas",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -827,18 +833,20 @@ def build_itemuse_documents(db):
         text = f"""Item Usage: {name}
 
 Used in {len(recipes)} recipes:
-Recipe IDs: {', '.join(str(r) for r in recipes)}"""
+Recipe IDs: {", ".join(str(r) for r in recipes)}"""
 
-        documents.append({
-            "id": f"itemuse_{item_id}",
-            "type": "itemuse",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "itemuses",
-                "name": name,
+        documents.append(
+            {
+                "id": f"itemuse_{item_id}",
+                "type": "itemuse",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "itemuses",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -870,16 +878,18 @@ Location: {loc}
 Description:
 {desc}"""
 
-            documents.append({
-                "id": f"landmark_{area_id}_{name}_{i}",
-                "type": "landmark",
-                "text": text.strip(),
-                "metadata": {
-                    "source": "cdn",
-                    "table": "landmarks",
-                    "name": name,
+            documents.append(
+                {
+                    "id": f"landmark_{area_id}_{name}_{i}",
+                    "type": "landmark",
+                    "text": text.strip(),
+                    "metadata": {
+                        "source": "cdn",
+                        "table": "landmarks",
+                        "name": name,
+                    },
                 }
-            })
+            )
 
     return documents
 
@@ -895,16 +905,18 @@ def build_title_documents(db):
 
         title_text = title_data.get("Title", "")
 
-        documents.append({
-            "id": f"title_{title_id}",
-            "type": "title",
-            "text": f"Player Title: {title_text}",
-            "metadata": {
-                "source": "cdn",
-                "table": "playertitles",
-                "name": title_text,
+        documents.append(
+            {
+                "id": f"title_{title_id}",
+                "type": "title",
+                "text": f"Player Title: {title_text}",
+                "metadata": {
+                    "source": "cdn",
+                    "table": "playertitles",
+                    "name": title_text,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -929,16 +941,18 @@ Area: {area}
 Slots: {slots}
 Has Associated NPC: {has_npc}"""
 
-        documents.append({
-            "id": f"vault_{vault_id}",
-            "type": "vault",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "storagevaults",
-                "name": name,
+        documents.append(
+            {
+                "id": f"vault_{vault_id}",
+                "type": "vault",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "storagevaults",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -969,16 +983,18 @@ def build_advancementtable_documents(db):
 
 {chr(10).join(stat_lines)}"""
 
-        documents.append({
-            "id": f"advtable_{table_id}",
-            "type": "advancementtable",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "advancementtables",
-                "name": name,
+        documents.append(
+            {
+                "id": f"advtable_{table_id}",
+                "type": "advancementtable",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "advancementtables",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -1014,18 +1030,20 @@ Mobility: {mobility}
 Uncontrolled Pet: {is_pet}
 
 Abilities:
-{chr(10).join(ability_lines) if ability_lines else 'No abilities listed'}"""
+{chr(10).join(ability_lines) if ability_lines else "No abilities listed"}"""
 
-        documents.append({
-            "id": f"ai_{ai_id}",
-            "type": "ai",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "ai",
-                "name": ai_id,
+        documents.append(
+            {
+                "id": f"ai_{ai_id}",
+                "type": "ai",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "ai",
+                    "name": ai_id,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -1051,18 +1069,21 @@ Default Value: {default}
 Display Rule: {display_rule}
 Display Type: {display_type}"""
 
-        documents.append({
-            "id": f"attr_{attr_id}",
-            "type": "attribute",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "attributes",
-                "name": label,
+        documents.append(
+            {
+                "id": f"attr_{attr_id}",
+                "type": "attribute",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "attributes",
+                    "name": label,
+                },
             }
-        })
+        )
 
     return documents
+
 
 def build_source_documents(db):
     """Build source documents from the `sources_abilities`/`sources_items`/`sources_recipes` CDN tables (table per source)."""
@@ -1115,16 +1136,18 @@ def build_source_documents(db):
 Found in {table_name}:
 {chr(10).join(entry_lines)}"""
 
-            documents.append({
-                "id": f"source_{source_type}_{item_id}",
-                "type": "source",
-                "text": text.strip(),
-                "metadata": {
-                    "source": "cdn",
-                    "table": table_name,
-                    "name": f"{display_name} Sources",
+            documents.append(
+                {
+                    "id": f"source_{source_type}_{item_id}",
+                    "type": "source",
+                    "text": text.strip(),
+                    "metadata": {
+                        "source": "cdn",
+                        "table": table_name,
+                        "name": f"{display_name} Sources",
+                    },
                 }
-            })
+            )
 
     return documents
 
@@ -1163,21 +1186,23 @@ def build_tsys_documents(db):
 
 Skill: {skill}
 Suffix: {suffix}
-Slots: {', '.join(s for s in slots if s and s != "None") if slots else 'Any'}
+Slots: {", ".join(s for s in slots if s and s != "None") if slots else "Any"}
 
 Tiers:
-{chr(10).join(tier_lines) if tier_lines else 'No tiers listed'}"""
+{chr(10).join(tier_lines) if tier_lines else "No tiers listed"}"""
 
-        documents.append({
-            "id": f"tsys_{item_id}",
-            "type": "tsys",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "tsysclientinfo",
-                "name": name,
+        documents.append(
+            {
+                "id": f"tsys_{item_id}",
+                "type": "tsys",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "tsysclientinfo",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -1210,16 +1235,18 @@ def build_xptable_documents(db):
 XP required per level:
 {chr(10).join(level_lines)}"""
 
-        documents.append({
-            "id": f"xptable_{table_id}",
-            "type": "xptable",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "xptables",
-                "name": name,
+        documents.append(
+            {
+                "id": f"xptable_{table_id}",
+                "type": "xptable",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "xptables",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
@@ -1263,16 +1290,18 @@ def build_abilitykeyword_documents(db):
             text_lines.append(f"Crit Damage Attrs: {', '.join(crit_dmg)}")
         text = "\n".join(text_lines)
 
-        documents.append({
-            "id": doc_id,
-            "type": "abilitykeyword",
-            "text": text.strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "abilitykeywords",
-                "name": f"Keyword Combo: {stable_key}",
+        documents.append(
+            {
+                "id": doc_id,
+                "type": "abilitykeyword",
+                "text": text.strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "abilitykeywords",
+                    "name": f"Keyword Combo: {stable_key}",
+                },
             }
-        })
+        )
 
     return documents
 
@@ -1385,7 +1414,8 @@ def _assemble_documents(db):
         if s["id"].startswith("summary_wiki_")
     }
     gathering = [
-        g for g in gathering
+        g
+        for g in gathering
         if not g["id"].startswith("summary_gathering_")
         or g["id"].split("summary_gathering_", 1)[-1] not in wiki_skills
     ]

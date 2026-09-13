@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+
 import requests
-import sys
+
 
 def check_service(name, url, timeout=2):
     try:
@@ -12,22 +13,23 @@ def check_service(name, url, timeout=2):
     except requests.exceptions.RequestException:
         return "Stopped"
 
+
 def main():
     print("Service Status:")
     print()
-    
+
     services = [
         ("Embedding Server (:8081)", "http://localhost:8081/health"),
         ("LLM Server (:8080)", "http://localhost:8080/health"),
         ("Reranker Server (:8082)", "http://localhost:8082/health"),
         ("Chat (Gradio) (:7860)", "http://localhost:7860"),
     ]
-    
+
     for name, url in services:
         status = check_service(name, url)
         status_symbol = "[OK]" if status == "Running" else "[DOWN]"
         print(f"{status_symbol} {name}: {status}")
-    
+
     print()
     print("Commands:")
     print("  mise start      - Start all services")
@@ -37,6 +39,7 @@ def main():
     print("  mise sr        - Start reranker server only")
     print("  mise sc        - Start Chat (Gradio) only")
     print("  mise xc        - Stop Chat (Gradio) only")
+
 
 if __name__ == "__main__":
     main()

@@ -19,6 +19,7 @@ Usage:
 Restores the original mise.toml LLM_MODEL/LLM_FLAGS at the end (best effort,
 also on Ctrl-C). Does NOT touch embed/rerank/chat.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -122,8 +123,12 @@ def set_mise(model: str, flags: str) -> None:
 
 def stop_llm() -> None:
     subprocess.run(
-        ["mise", "llm-stop"], cwd=ROOT, check=False,
-        capture_output=True, text=True, timeout=60,
+        ["mise", "llm-stop"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     # Make sure the port is actually free (taskkill /T /F can leave a linger).
     _wait_port_free(LLM_PORT, timeout=30)
@@ -131,13 +136,18 @@ def stop_llm() -> None:
 
 def start_llm() -> None:
     subprocess.run(
-        ["mise", "llm-start"], cwd=ROOT, check=False,
-        capture_output=True, text=True, timeout=60,
+        ["mise", "llm-start"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
 
 
 def _wait_port_free(port: int, timeout: float) -> None:
     import socket
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -155,6 +165,7 @@ def _wait_port_free(port: int, timeout: float) -> None:
 
 def wait_health(url: str, timeout: float = 240) -> bool:
     import urllib.request
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -175,7 +186,9 @@ def run_golden() -> tuple[int, str, bool]:
     """
     proc = subprocess.Popen(
         ["uv", "run", "python", str(GOLDEN), "--diagnose"],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
     )
     try:
@@ -206,12 +219,16 @@ def parse_missing(output: str) -> tuple[int, list[str]]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="LLM golden bakeoff across backends.")
     ap.add_argument(
-        "--models", default=",".join(CANDIDATES),
+        "--models",
+        default=",".join(CANDIDATES),
         help="comma list of candidate keys (default: all)",
     )
     ap.add_argument("--dry-run", action="store_true", help="print plan, run nothing")
-    ap.add_argument("--skip-restore", action="store_true",
-                    help="leave the last model set (don't restore mise.toml)")
+    ap.add_argument(
+        "--skip-restore",
+        action="store_true",
+        help="leave the last model set (don't restore mise.toml)",
+    )
     args = ap.parse_args()
 
     keys = [k.strip() for k in args.models.split(",") if k.strip()]
@@ -223,8 +240,7 @@ def main() -> int:
 
     # require embed + rerank up (golden needs embed; rerank improves retrieval
     # constancy — both stay up for the whole sweep).
-    print("Pre-flight: embed (:8081) + reranker (:8082) must be up for the sweep.",
-          flush=True)
+    print("Pre-flight: embed (:8081) + reranker (:8082) must be up for the sweep.", flush=True)
     for url in ("http://localhost:8081/health", "http://localhost:8082/health"):
         if not wait_health(url, timeout=5):
             print(f"  ! {url} not up — start with `mise se && mise sr` first")
@@ -232,8 +248,7 @@ def main() -> int:
     print("  embed + rerank OK", flush=True)
 
     original_model_line, original_flags_line = snapshot_mise()
-    print(f"Snapshot mise.toml: {original_model_line} / {original_flags_line}",
-          flush=True)
+    print(f"Snapshot mise.toml: {original_model_line} / {original_flags_line}", flush=True)
 
     if args.dry_run:
         print("\nDRY RUN — plan:")
@@ -269,8 +284,11 @@ def main() -> int:
             if not wait_health(HEALTH_URL, timeout=300):
                 print("  !! LLM did not become healthy — skipping", flush=True)
                 results[k] = {
-                    "model": c["model"], "flags": c["flags"],
-                    "status": "unhealthy", "missing": None, "fails": [],
+                    "model": c["model"],
+                    "flags": c["flags"],
+                    "status": "unhealthy",
+                    "missing": None,
+                    "fails": [],
                     "output": "",
                 }
                 continue
@@ -283,12 +301,18 @@ def main() -> int:
             elapsed = time.time() - t0
             miss, fails = parse_missing(out)
             status = "timeout" if timed_out else ("PASS" if rc == 0 else "FAIL")
-            print(f"  -> {status}: {miss} missing, {len(fails)} FAIL cases, "
-                  f"{elapsed:.0f}s", flush=True)
+            print(
+                f"  -> {status}: {miss} missing, {len(fails)} FAIL cases, {elapsed:.0f}s",
+                flush=True,
+            )
             results[k] = {
-                "model": c["model"], "flags": c["flags"],
-                "status": status, "missing": miss, "fails": fails,
-                "elapsed": round(elapsed, 1), "output": out,
+                "model": c["model"],
+                "flags": c["flags"],
+                "status": status,
+                "missing": miss,
+                "fails": fails,
+                "elapsed": round(elapsed, 1),
+                "output": out,
             }
     except KeyboardInterrupt:
         print("\n!! interrupted — restoring mise.toml", flush=True)
@@ -312,18 +336,14 @@ def main() -> int:
         "golden_cases": sum(1 for _ in (ROOT / "data" / "golden").glob("*.json")),
         "restored": restored,
         "results": {
-            k: {kk: vv for kk, vv in v.items() if kk != "output"}
-            for k, v in results.items()
+            k: {kk: vv for kk, vv in v.items() if kk != "output"} for k, v in results.items()
         },
     }
-    stamp.write_text(
-        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    stamp.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     # full output dump
     full = RESULTS_DIR / f"llm_bakeoff_{ts}_full.json"
     full.write_text(
-        json.dumps({"timestamp": ts, "results": results}, indent=2,
-                   ensure_ascii=False),
+        json.dumps({"timestamp": ts, "results": results}, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 

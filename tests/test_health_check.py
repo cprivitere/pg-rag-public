@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import chromadb
-import pytest
 
 from pgrag.config import EMBEDDING_DIM
 from pgrag.vectorstore.build_index import build_index

@@ -1,18 +1,18 @@
+import contextlib
 import json
 import os
 import sys
 import time
 
 from pgrag.config import DOCUMENTS_VERSION, DOCUMENTS_VERSION_FILE
-from pgrag.loaders.database import GameDatabase
-from pgrag.loaders.cdn_loader import load_database
-from pgrag.loaders.wiki_loader import load_wiki
 from pgrag.documents.builder import build_documents
+from pgrag.loaders.cdn_loader import load_database
+from pgrag.loaders.database import GameDatabase
+from pgrag.loaders.wiki_loader import load_wiki
 
-try:
+with contextlib.suppress(AttributeError, ValueError):
+    # not a real stream (e.g. captured by pytest)
     sys.stdout.reconfigure(line_buffering=True)
-except (AttributeError, ValueError):
-    pass  # not a real stream (e.g. captured by pytest)
 
 
 def generate_documents() -> None:
@@ -39,10 +39,12 @@ def generate_documents() -> None:
 
     DOCUMENTS_VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
     DOCUMENTS_VERSION_FILE.write_text(
-        json.dumps({
-            "version": DOCUMENTS_VERSION,
-            "updated": int(time.time()),
-        }),
+        json.dumps(
+            {
+                "version": DOCUMENTS_VERSION,
+                "updated": int(time.time()),
+            }
+        ),
         encoding="utf-8",
     )
 

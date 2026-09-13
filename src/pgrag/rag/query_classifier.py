@@ -159,9 +159,7 @@ _ENTITY_ALIASES: dict[str, list[tuple[str, str, str]]] = {
         ("The Chalice Saga, Vol 2", "lorebook_Book_104", "lorebook"),
         ("The Chalice Saga, Vol 3", "lorebook_Book_105", "lorebook"),
     ],
-    "Ranalon Den": [
-        (f"quest {i}", f"quest_quest_{i}", "quest") for i in range(25401, 25416)
-    ],
+    "Ranalon Den": [(f"quest {i}", f"quest_quest_{i}", "quest") for i in range(25401, 25416)],
     "Animal Feces": [
         ("Meager Animal Poop", "item_1501", "item"),
         ("Cow Poop", "item_1493", "item"),
@@ -231,7 +229,7 @@ def _load_entity_index():
 
 def _hub_id(doc_id, dtype):
     if dtype == "skill":
-        key = doc_id[len("skill_"):]
+        key = doc_id[len("skill_") :]
         return f"skillprofile_{key}"
     return doc_id
 

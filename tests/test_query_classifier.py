@@ -72,7 +72,10 @@ def test_case_insensitive():
 def test_leveling_intent_wins_over_comparison_phrasing():
     """'most efficient way to level X' is a how-to on a named skill, not an
     item comparison — it must route to the entity dossier."""
-    assert classify_query("What is the most efficient way to level Cheesemaking to level 25?") == "entity"
+    assert (
+        classify_query("What is the most efficient way to level Cheesemaking to level 25?")
+        == "entity"
+    )
 
 
 def test_leveling_how_to_routes_to_entity():
@@ -127,15 +130,17 @@ def test_aggregation_recipes_use_stays_general():
     item dossier. Paired inverse: 'make Orcish Flour' IS the entity target."""
     assert classify_query("What recipes use Animal Feces?") == "general"
 
+
 def test_location_listing_of_animals_stays_general():
     """'List the locations with deer, sheep, goats, cows, or oxen' enumerates
     spawn zones (creature docs), NOT a comparison of the 'Deer'/'Cow' skills.
     The multi-animal list must route to the wide general path, not the
     multi-entity skill dossiers (which would answer with skill-trainer
     locations and 0 sources)."""
-    assert classify_query(
-        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
-    ) == "general"
+    assert (
+        classify_query("List all the locations with deer, sheep, goats, cows, or oxen in the game.")
+        == "general"
+    )
     assert classify_query("What recipes can I make with Spider Silk at Tailoring 4?") == "general"
     assert classify_query("What skill and level do I need to make Orcish Flour?") == "entity"
 
@@ -161,6 +166,7 @@ def test_which_abilities_deal_stays_general():
     assert classify_query("Which Sword abilities deal Slashing damage?") == "general"
     assert classify_query("Which abilities deal damage, Punch or Front Kick?") == "comparison"
 
+
 def test_gift_recipient_listing_routes_general():
     """'Who can I gift a hammer to?' enumerates NPC gift recipients; the named
     item is the filter, not the answer. A single-entity route opens the HAMMER
@@ -175,11 +181,12 @@ def test_exclusion_phrasing_does_not_break_real_comparisons():
     comparisons and genuine entity questions keep their routing (the guard
     must not widen its blast radius)."""
     assert classify_query("Which ability deals more damage, Punch or Front Kick?") == "comparison"
-    assert classify_query("What is the difference between Fireball and Fire Breath?") == "comparison"
+    assert (
+        classify_query("What is the difference between Fireball and Fire Breath?") == "comparison"
+    )
     assert classify_query("What is the best armor?") == "comparison"
     assert classify_query("Tell me about Foretold Hammer") == "entity"
     assert classify_query("what can improve my Hammer skill?") == "entity"
-
 
 
 def test_lorebook_series_stays_general():
@@ -214,10 +221,13 @@ def npc_guard_index(monkeypatch):
     )
 
 
-@pytest.mark.parametrize("npc,hub", [
-    ("Way", "npc_NPC_Way"),
-    ("Altar", "npc_NPC_Altar"),
-])
+@pytest.mark.parametrize(
+    "npc,hub",
+    [
+        ("Way", "npc_NPC_Way"),
+        ("Altar", "npc_NPC_Altar"),
+    ],
+)
 def test_npc_proper_noun_requires_capitalized_query(npc_guard_index, npc, hub):
     """A capitalized single-token NPC name ('Way', 'Altar') is a proper noun:
     the bare lowercase word in prose must not resolve the NPC. Only a

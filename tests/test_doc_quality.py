@@ -14,14 +14,38 @@ from pgrag.documents.chunking import chunk_all_documents
 CDN_DIR = Path("data/cdn")
 
 KNOWN_TYPES = {
-    "item", "recipe", "skill", "quest", "ability", "npc", "effect",
-    "lorebook", "directedgoal", "area", "itemuse", "landmark", "title",
-    "vault", "advancementtable", "ai", "attribute", "source", "tsys",
-    "xptable", "abilitykeyword", "wiki", "summary", "curated", "skillprofile",
+    "item",
+    "recipe",
+    "skill",
+    "quest",
+    "ability",
+    "npc",
+    "effect",
+    "lorebook",
+    "directedgoal",
+    "area",
+    "itemuse",
+    "landmark",
+    "title",
+    "vault",
+    "advancementtable",
+    "ai",
+    "attribute",
+    "source",
+    "tsys",
+    "xptable",
+    "abilitykeyword",
+    "wiki",
+    "summary",
+    "curated",
+    "skillprofile",
     # computed leveling dossier (skill_profiles.build_leveling_documents);
     # the chunker TOKEN_BUDGETED_TYPES treats it as a token-budgeted family.
     "leveling",
-    "enum", "schema", "mechanic", "combatxp",
+    "enum",
+    "schema",
+    "mechanic",
+    "combatxp",
 }
 KNOWN_SOURCES = {"cdn", "wiki", "computed", "curated", "il2cpp"}
 
@@ -33,6 +57,7 @@ _RAW_ITEM_ID = re.compile(r"item_\d+")
 
 def _assemble(db):
     from pgrag.documents.builder import _assemble_documents
+
     return _assemble_documents(db)
 
 
@@ -44,11 +69,12 @@ def real_docs(tmp_path_factory):
     # The build writes a .parsed cache; route it to a tmp dir so the real
     # source tree's derived cache is never mutated by this fixture.
     from pgrag.documents import wiki_builder
+
     _orig_cache = wiki_builder.CACHE_FILE
     wiki_builder.CACHE_FILE = tmp_path_factory.mktemp("derived") / "wiki_parsed.json"
     try:
-        from pgrag.loaders.database import GameDatabase
         from pgrag.loaders.cdn_loader import load_database
+        from pgrag.loaders.database import GameDatabase
         from pgrag.loaders.wiki_loader import load_wiki
 
         db = GameDatabase()
@@ -64,6 +90,7 @@ def _violations(docs, check):
 
 
 # ---------- T52: shape contract (V27) ----------
+
 
 @pytest.mark.slow
 def test_real_shape_contract(real_docs):
@@ -93,8 +120,13 @@ def test_shape_contract_all_builders():
         "items": {"item_1": {"Name": "Mushroom", "Description": "A mushroom."}},
         "recipes": {"recipe_1": {"Name": "Butter", "Description": "Churn it."}},
         "skills": {"Alchemy": {"Name": "Alchemy", "Description": "Combine."}},
-        "quests": {"q1": {"Name": "Fetch", "Description": "Fetch a thing.",
-                          "Objectives": [{"Description": "Get thing"}]}},
+        "quests": {
+            "q1": {
+                "Name": "Fetch",
+                "Description": "Fetch a thing.",
+                "Objectives": [{"Description": "Get thing"}],
+            }
+        },
         "abilities": {"ability_1": {"Name": "Punch", "Description": "Punch it."}},
         "npcs": {"npc_1": {"Name": "Guard", "Description": "Guards."}},
         "effects": {"effect_1": {"Name": "Burn", "Description": "Hurt."}},
@@ -128,6 +160,7 @@ def test_shape_contract_all_builders():
 
 # ---------- T52: text hygiene (V28) ----------
 
+
 @pytest.mark.slow
 def test_real_hygiene_cdn(real_docs):
     bad = []
@@ -159,6 +192,7 @@ def test_real_hygiene_wiki(real_docs):
 
 # ---------- T70/T71: item/recipe flat translations (V58) ----------
 
+
 @pytest.mark.slow
 def test_real_item_recipe_no_brace_residue(real_docs):
     bad = []
@@ -180,10 +214,11 @@ def test_real_recipe_xp_line_present(real_docs):
 
 # ---------- T53: determinism + dedup (V29) ----------
 
+
 @pytest.mark.slow
 def test_real_determinism(real_docs):
-    from pgrag.loaders.database import GameDatabase
     from pgrag.loaders.cdn_loader import load_database
+    from pgrag.loaders.database import GameDatabase
     from pgrag.loaders.wiki_loader import load_wiki
 
     db = GameDatabase()
@@ -204,6 +239,7 @@ def test_real_ids_unique(real_docs):
 
 # ---------- T54: chunk↔doc integration (V30) ----------
 
+
 def _norm(s):
     return re.sub(r"\s+", " ", s).strip()
 
@@ -216,7 +252,7 @@ def _covers(parent, chunk):
     m = re.search(r"\S+$", c)
     if not m:
         return False
-    base = c[:m.start()].rstrip()
+    base = c[: m.start()].rstrip()
     return base in p and re.search(r"(?<=\s)" + re.escape(m.group(0)), p)
 
 
@@ -255,11 +291,13 @@ def test_real_chunk_metadata(real_docs):
 
 # ---------- T55: cross-source consistency (V31) ----------
 
+
 @pytest.mark.slow
 def test_real_itemuse_keys_in_items_table(real_docs):
     import json
-    itemuses = json.load(open(CDN_DIR / "itemuses.json", encoding="utf-8"))
-    items = json.load(open(CDN_DIR / "items.json", encoding="utf-8"))
+
+    itemuses = json.loads((CDN_DIR / "itemuses.json").read_text(encoding="utf-8"))
+    items = json.loads((CDN_DIR / "items.json").read_text(encoding="utf-8"))
     missing = [k for k in itemuses if k not in items]
     assert not missing, f"itemuse keys missing from items: {missing[:10]}"
 
@@ -267,15 +305,15 @@ def test_real_itemuse_keys_in_items_table(real_docs):
 @pytest.mark.slow
 def test_real_itemuse_count_matches(real_docs):
     import json
-    itemuses = json.load(open(CDN_DIR / "itemuses.json", encoding="utf-8"))
+
+    itemuses = json.loads((CDN_DIR / "itemuses.json").read_text(encoding="utf-8"))
     for doc in real_docs:
         if doc["type"] != "itemuse":
             continue
         item_id = doc["id"].removeprefix("itemuse_")
         data = itemuses.get(item_id, {})
         expected = len(data.get("RecipesThatUseItem", []))
-        assert f"Used in {expected} recipes" in doc["text"], (
-            f"{doc['id']}: count mismatch")
+        assert f"Used in {expected} recipes" in doc["text"], f"{doc['id']}: count mismatch"
 
 
 @pytest.mark.slow
@@ -300,17 +338,24 @@ def test_real_npc_gift_sources_named_and_gifted_to(real_docs):
     from npcs.json are allowed to fall through to the raw key.)
     """
     import json
-    npc_keys = set(json.load(open(CDN_DIR / "npcs.json", encoding="utf-8")))
+
+    npc_keys = set(json.loads((CDN_DIR / "npcs.json").read_text(encoding="utf-8")))
     bad_key_exposed = []
     for doc in real_docs:
-        if doc["metadata"].get("table") not in ("sources_items", "sources_abilities", "sources_recipes"):
+        if doc["metadata"].get("table") not in (
+            "sources_items",
+            "sources_abilities",
+            "sources_recipes",
+        ):
             continue
         for m in re.finditer(r"\b(NPC_[A-Za-z0-9_]+)", doc["text"]):
             raw = m.group(0)
             if raw in npc_keys:
                 bad_key_exposed.append(doc["id"])
                 break
-    assert not bad_key_exposed, f"resolvable NPC keys leaked into source docs ({len(bad_key_exposed)}): {bad_key_exposed[:10]}"
+    assert not bad_key_exposed, (
+        f"resolvable NPC keys leaked into source docs ({len(bad_key_exposed)}): {bad_key_exposed[:10]}"
+    )
 
 
 @pytest.mark.slow
@@ -319,10 +364,14 @@ def test_real_peening_hammer_gifted_to_amutasa(real_docs):
     Hammer's source doc must read 'Gifted to Amutasa' (display name), which
     is what lets retrieval answer 'who can I gift hammers to?'."""
     peening = next(
-        (d for d in real_docs
-         if d["metadata"].get("table") == "sources_items"
-         and d["metadata"].get("name", "").startswith("Peening Hammer Sources")),
-        None)
+        (
+            d
+            for d in real_docs
+            if d["metadata"].get("table") == "sources_items"
+            and d["metadata"].get("name", "").startswith("Peening Hammer Sources")
+        ),
+        None,
+    )
     assert peening is not None, "Peening Hammer source doc missing"
     assert "Gifted to Amutasa" in peening["text"], peening["text"]
 
@@ -330,8 +379,8 @@ def test_real_peening_hammer_gifted_to_amutasa(real_docs):
 @pytest.mark.slow
 def test_real_skill_rewards_spotcheck(real_docs):
     alchemy = next(
-        (d for d in real_docs if d["type"] == "skill" and d["id"] == "skill_Alchemy"),
-        None)
+        (d for d in real_docs if d["type"] == "skill" and d["id"] == "skill_Alchemy"), None
+    )
     assert alchemy is not None, "skill_Alchemy missing"
     assert "Level 10:" in alchemy["text"], "Alchemy level 10 rewards missing"
     assert "None" not in alchemy["text"], "Alchemy rewards show None"

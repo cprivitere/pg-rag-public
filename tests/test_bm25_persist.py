@@ -6,6 +6,7 @@ Locks:
 - cache is NOT rebuilt when documents.json is unchanged
 - cache survives stale/corrupt pickles by rebuilding
 """
+
 import json
 import os
 
@@ -77,8 +78,11 @@ def test_cache_ignores_stale_corrupt_pickle(tmp_path):
 
 def test_cache_roundtrip_preserves_metadata(tmp_path):
     docs = [
-        {"id": "recipe_1", "text": "spider silk hat", "metadata": {
-            "source": "cdn", "skill": "Nature Appreciation"}},
+        {
+            "id": "recipe_1",
+            "text": "spider silk hat",
+            "metadata": {"source": "cdn", "skill": "Nature Appreciation"},
+        },
     ]
     src = tmp_path / "documents.json"
     pkl = tmp_path / "bm25_index.pkl"

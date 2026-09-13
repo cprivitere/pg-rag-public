@@ -2,7 +2,6 @@ import json
 
 import requests
 
-
 LLM_URL = "http://localhost:8080/v1/chat/completions"
 
 
@@ -30,13 +29,10 @@ def _post(prompt, stream, temperature=0.2, seed=None):
 def _server_error(exc):
     if isinstance(exc, requests.exceptions.ConnectionError):
         return LLMServerError(
-            f"Cannot connect to LLM server at {LLM_URL}. "
-            "Ensure llama.cpp is running on port 8080."
+            f"Cannot connect to LLM server at {LLM_URL}. Ensure llama.cpp is running on port 8080."
         )
     if isinstance(exc, requests.exceptions.Timeout):
-        return LLMServerError(
-            f"LLM server at {LLM_URL} timed out after 300s."
-        )
+        return LLMServerError(f"LLM server at {LLM_URL} timed out after 300s.")
     return exc
 
 
@@ -66,12 +62,12 @@ def stream_generate(prompt, temperature=0.2, seed=None):
     for line in response.iter_lines(decode_unicode=True):
         if not line or not line.startswith("data:"):
             continue
-        data = line[len("data:"):].strip()
+        data = line[len("data:") :].strip()
         if data == "[DONE]":
             break
         try:
             delta = json.loads(data)["choices"][0]["delta"].get("content")
-        except (ValueError, KeyError, IndexError, TypeError):
+        except ValueError, KeyError, IndexError, TypeError:
             continue
         if delta:
             yield delta

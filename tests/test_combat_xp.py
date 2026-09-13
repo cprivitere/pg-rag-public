@@ -1,4 +1,5 @@
 """Whitebox suite for the per-level combat-XP comparison docs (computed family)."""
+
 import re
 
 from pgrag.documents.combat_xp import build_combat_xp_documents
@@ -33,15 +34,20 @@ def test_combat_xp_doc_sweeps_all_archetypes_sorted_desc():
     assert doc["metadata"]["level"] == 40
     lines = [line for line in doc["text"].splitlines() if line.startswith("- ")]
     assert [line.split(":", 1)[0] for line in lines] == [
-        
-        "- 811_EpicBoss4", "- 810_EpicBoss3", "- 962_ExtraXp3", "- 989_Evasion4",
+        "- 811_EpicBoss4",
+        "- 810_EpicBoss3",
+        "- 962_ExtraXp3",
+        "- 989_Evasion4",
     ]
     assert "Level 39" not in doc["text"]
 
 
 def test_skips_levels_with_single_contributor():
     tables = {
-        "a": {"Level_1": {"MONSTER_COMBAT_XP_VALUE": 5}, "Level_2": {"MONSTER_COMBAT_XP_VALUE": 10}},
+        "a": {
+            "Level_1": {"MONSTER_COMBAT_XP_VALUE": 5},
+            "Level_2": {"MONSTER_COMBAT_XP_VALUE": 10},
+        },
         "b": {"Level_1": {"MONSTER_COMBAT_XP_VALUE": 7}},
         "c": {"Level_2": {"MONSTER_COMBAT_XP_VALUE": 8}},
     }

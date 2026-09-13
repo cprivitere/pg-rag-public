@@ -9,26 +9,23 @@ import json
 
 import pytest
 
-from scripts.golden_check import check_golden, GOLDEN_DIR
+from scripts.golden_check import GOLDEN_DIR, check_golden
 
 _ALL_FILES = sorted(GOLDEN_DIR.glob("*.json"))
 
 _SHORT_FILES = [
-    GOLDEN_DIR / "bacon-for-joeh.json",               # entity: simplest, 3 facts
-    GOLDEN_DIR / "fireball-ability.json",              # entity: variant normalization
-    GOLDEN_DIR / "moonstone-item.json",                # entity: 2 facts, quick
+    GOLDEN_DIR / "bacon-for-joeh.json",  # entity: simplest, 3 facts
+    GOLDEN_DIR / "fireball-ability.json",  # entity: variant normalization
+    GOLDEN_DIR / "moonstone-item.json",  # entity: 2 facts, quick
     GOLDEN_DIR / "blacksmithing-leveling-25-30.json",  # entity: XP ranges
-    GOLDEN_DIR / "fireball-vs-fire-breath-damage.json",# comparison: damage numbers
-    GOLDEN_DIR / "healing-potion-omega.json",          # recipe: crafting/effects
-    GOLDEN_DIR / "cheesemaking-leveling.json",         # entity: arithmetic, 8 facts, hardest
+    GOLDEN_DIR / "fireball-vs-fire-breath-damage.json",  # comparison: damage numbers
+    GOLDEN_DIR / "healing-potion-omega.json",  # recipe: crafting/effects
+    GOLDEN_DIR / "cheesemaking-leveling.json",  # entity: arithmetic, 8 facts, hardest
     GOLDEN_DIR / "il2cpp-mechanic-curse-remedy.json",  # general: xfail gate
-    GOLDEN_DIR / "grow-field-mushrooms.json",          # general: 5 facts, medium
+    GOLDEN_DIR / "grow-field-mushrooms.json",  # general: 5 facts, medium
 ]
 
-_LONG_FILES = [
-    f for f in sorted(GOLDEN_DIR.glob("*.json"))
-    if f not in _SHORT_FILES
-]
+_LONG_FILES = [f for f in sorted(GOLDEN_DIR.glob("*.json")) if f not in _SHORT_FILES]
 
 
 def _servers_up():

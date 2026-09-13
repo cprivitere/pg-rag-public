@@ -2,9 +2,8 @@
 server failures fall back to lexical score order and are recorded in stats,
 while the cross-encoder path reorders results by reranker scores."""
 
-from pgrag.rag.retriever import _rerank_or_cross_encoder, _term_overlap
 from pgrag.rag import reranker_client
-
+from pgrag.rag.retriever import _rerank_or_cross_encoder
 
 IDS = ["a", "b", "c"]
 DOCS = ["cheese wheel", "aged cheddar cheese", "stale bread"]
@@ -42,9 +41,7 @@ def test_fallback_records_even_if_stats_write_fails(monkeypatch, tmp_path):
         "rerank_documents",
         lambda *a, **k: (_ for _ in ()).throw(reranker_client.RerankError("x")),
     )
-    ids, docs, metas, dists, used = _rerank_or_cross_encoder(
-        "cheese", IDS, DOCS, METAS, DISTS, 2
-    )
+    ids, docs, metas, dists, used = _rerank_or_cross_encoder("cheese", IDS, DOCS, METAS, DISTS, 2)
     assert used is False
     assert ids == ["a", "b"]  # lexical order preserved, trimmed to count
 
@@ -57,9 +54,7 @@ def test_cross_encoder_path_uses_overlap(monkeypatch, tmp_path):
 
     monkeypatch.setattr(reranker_client, "rerank_documents", fake_rerank)
 
-    ids, docs, metas, dists, used = _rerank_or_cross_encoder(
-        "cheese", IDS, DOCS, METAS, DISTS, 2
-    )
+    ids, docs, metas, dists, used = _rerank_or_cross_encoder("cheese", IDS, DOCS, METAS, DISTS, 2)
 
     assert used is True
     assert ids[0] == "b"

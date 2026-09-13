@@ -3,7 +3,8 @@ pass through, and EmbeddingValidationError is raised for empty input,
 non-list vectors, empty/non-numeric entries, and dimension mismatches."""
 
 import pytest
-from pgrag.embeddings.llama_embeddings import validate_embeddings, EmbeddingValidationError
+
+from pgrag.embeddings.llama_embeddings import EmbeddingValidationError, validate_embeddings
 
 
 def test_valid_vectors_pass():
@@ -32,7 +33,7 @@ def test_non_numeric_element_raises():
 
 
 def test_dimension_mismatch_raises():
-    with pytest.raises(EmbeddingValidationError, match="length.*!=.*expected"):
+    with pytest.raises(EmbeddingValidationError, match=r"length.*!=.*expected"):
         validate_embeddings([[0.1, 0.2]], expected_dim=3)
 
 
@@ -42,5 +43,5 @@ def test_dimension_match_passes():
 
 
 def test_mixed_dimension_raises():
-    with pytest.raises(EmbeddingValidationError, match="length.*!=.*expected"):
+    with pytest.raises(EmbeddingValidationError, match=r"length.*!=.*expected"):
         validate_embeddings([[0.1, 0.2], [0.3]], expected_dim=2)

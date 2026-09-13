@@ -2,10 +2,10 @@
 composite where clauses and result counts) and pgrag.rag.pipeline.ask metadata-
 filter passthrough and source citation formatting."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from pgrag.rag.retriever import retrieve
 from pgrag.rag.pipeline import ask
+from pgrag.rag.retriever import retrieve
 
 
 @patch("pgrag.rag.retriever.embed_text")
@@ -69,7 +69,7 @@ def test_ask_passes_metadata_filter(mock_generate, mock_retrieve):
         "documents": [[]],
         "ids": [[]],
         "distances": [[]],
-        "metadatas": [[]]
+        "metadatas": [[]],
     }
 
     ask("test", metadata_filter={"source": "cdn"})
@@ -87,7 +87,7 @@ def test_source_citation_format_with_name(mock_generate, mock_retrieve):
         "documents": [["doc text"]],
         "ids": [["item_96"]],
         "distances": [[0.42]],
-        "metadatas": [[{"name": "Bunny Juice", "table": "items", "source": "cdn"}]]
+        "metadatas": [[{"name": "Bunny Juice", "table": "items", "source": "cdn"}]],
     }
 
     result = ask("test")
@@ -107,7 +107,7 @@ def test_source_citation_fallback_to_id(mock_generate, mock_retrieve):
         "documents": [["doc text"]],
         "ids": [["item_96"]],
         "distances": [[0.42]],
-        "metadatas": [[{"table": "items", "source": "cdn"}]]
+        "metadatas": [[{"table": "items", "source": "cdn"}]],
     }
 
     result = ask("test")
@@ -123,7 +123,7 @@ def test_source_citation_unknown_table(mock_generate, mock_retrieve):
         "documents": [["doc text"]],
         "ids": [["item_96"]],
         "distances": [[0.42]],
-        "metadatas": [[{"name": "Bunny Juice"}]]
+        "metadatas": [[{"name": "Bunny Juice"}]],
     }
 
     result = ask("test")

@@ -2,19 +2,21 @@
 routing, and the HYBRID_MULTIPLIER/RRF_K constants and result-count choices in
 pgrag.rag.retriever.retrieve."""
 
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import MagicMock, patch
 
 from pgrag.rag.bm25 import BM25
-from pgrag.rag.retriever import _hybrid_fuse, retrieve, HYBRID_MULTIPLIER, RRF_K
+from pgrag.rag.retriever import HYBRID_MULTIPLIER, _hybrid_fuse, retrieve
 
 
 def test_bm25_rank_known_doc_highest():
     model = BM25()
-    model.index([
-        "potion recipe for healing wounds",
-        "sword sharpening with whetstone",
-        "potion brewing tips for beginners",
-    ])
+    model.index(
+        [
+            "potion recipe for healing wounds",
+            "sword sharpening with whetstone",
+            "potion brewing tips for beginners",
+        ]
+    )
     indices, scores = model.search("potion", k=3)
     assert indices[0] == 0 or indices[0] == 2
 
@@ -42,13 +44,15 @@ def test_bm25_case_insensitive():
 
 def test_bm25_k_respected():
     model = BM25()
-    model.index([
-        "doc a content here",
-        "doc b content here",
-        "doc c content here",
-        "doc d content here",
-        "doc e content here",
-    ])
+    model.index(
+        [
+            "doc a content here",
+            "doc b content here",
+            "doc c content here",
+            "doc d content here",
+            "doc e content here",
+        ]
+    )
     indices, scores = model.search("content", k=3)
     assert len(indices) == 3
 
@@ -67,8 +71,13 @@ def test_hybrid_fuse_intersection():
     ]
 
     ids, texts, metas, dists = _hybrid_fuse(
-        dense_ids, dense_texts, dense_metas, dense_dists,
-        bm25_ids, all_docs, 2,
+        dense_ids,
+        dense_texts,
+        dense_metas,
+        dense_dists,
+        bm25_ids,
+        all_docs,
+        2,
     )
 
     assert len(ids) == 2
@@ -87,8 +96,13 @@ def test_hybrid_fuse_bm25_only_doc():
     ]
 
     ids, texts, metas, dists = _hybrid_fuse(
-        dense_ids, dense_texts, dense_metas, dense_dists,
-        bm25_ids, all_docs, 3,
+        dense_ids,
+        dense_texts,
+        dense_metas,
+        dense_dists,
+        bm25_ids,
+        all_docs,
+        3,
     )
 
     assert "c" in ids
@@ -102,8 +116,10 @@ def test_hybrid_multiplier_constant():
 
 
 def test_hybrid_default_disabled():
-    from pgrag.rag.retriever import retrieve
     import inspect
+
+    from pgrag.rag.retriever import retrieve
+
     src = inspect.signature(retrieve)
     assert "hybrid" in src.parameters
     assert src.parameters["hybrid"].default is False
@@ -152,7 +168,7 @@ def test_retrieve_comparison_uses_higher_count(mock_client, mock_embed):
         "distances": [[0.1] * 20],
     }
 
-    results = retrieve("highest level cheese", count=3, query_type="comparison", rerank=False)
+    retrieve("highest level cheese", count=3, query_type="comparison", rerank=False)
 
     call_kwargs = mock_col.query.call_args[1]
     assert call_kwargs["n_results"] == 20
@@ -171,7 +187,7 @@ def test_retrieve_general_uses_default_count(mock_client, mock_embed):
         "distances": [[0.1, 0.2, 0.3]],
     }
 
-    results = retrieve("tell me about cheese", count=3, query_type="general", rerank=False)
+    retrieve("tell me about cheese", count=3, query_type="general", rerank=False)
 
     call_kwargs = mock_col.query.call_args[1]
     assert call_kwargs["n_results"] == 3

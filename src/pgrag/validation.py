@@ -31,9 +31,9 @@ from pathlib import Path
 
 from pgrag.config import (
     CDN_DIR,
-    WIKI_DIR,
     DOCUMENTS_VERSION,
     DOCUMENTS_VERSION_FILE,
+    WIKI_DIR,
 )
 from pgrag.vectorstore.health_check import (
     CHROMA_PATH,
@@ -58,27 +58,21 @@ def _check_sources(cdn_dir, wiki_dir, warnings):
             try:
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 warnings.append(
                     f"CDN {path.name} is unreadable/invalid JSON — run `pgrag download-cdn`"
                 )
                 continue
             if not data:
-                warnings.append(
-                    f"CDN {path.name} is empty — run `pgrag download-cdn`"
-                )
+                warnings.append(f"CDN {path.name} is empty — run `pgrag download-cdn`")
 
     wiki_txt = sorted(Path(wiki_dir).glob("*.txt"))
     if not wiki_txt:
-        warnings.append(
-            "No wiki page dumps found in data/wiki/ — run `pgrag download-wiki`"
-        )
+        warnings.append("No wiki page dumps found in data/wiki/ — run `pgrag download-wiki`")
     else:
         empty = [p.name for p in wiki_txt if p.stat().st_size == 0]
         if empty:
-            warnings.append(
-                f"Empty wiki page dumps: {empty[:5]} — run `pgrag download-wiki`"
-            )
+            warnings.append(f"Empty wiki page dumps: {empty[:5]} — run `pgrag download-wiki`")
 
 
 def _check_documents(documents_path, version_file, warnings, issues):
@@ -107,7 +101,7 @@ def _check_documents(documents_path, version_file, warnings, issues):
     try:
         meta = json.loads(Path(version_file).read_text(encoding="utf-8"))
         stored = meta.get("version")
-    except (OSError, ValueError):
+    except OSError, ValueError:
         stored = None
     if stored != DOCUMENTS_VERSION:
         # Legit mid-cycle: docs regenerated, not yet indexed. Warn, don't gate —
@@ -151,9 +145,7 @@ def _check_wiki_meta(wiki_dir, warnings):
     try:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        warnings.append(
-            ".meta.json not found in data/wiki/ — run `pgrag download-wiki`"
-        )
+        warnings.append(".meta.json not found in data/wiki/ — run `pgrag download-wiki`")
         return
     except (OSError, ValueError) as e:
         warnings.append(f".meta.json is unreadable/invalid JSON: {e}")
@@ -166,9 +158,7 @@ def _check_wiki_meta(wiki_dir, warnings):
         if isinstance(info, dict) and info.get("filename")
     }
     if not tracked:
-        warnings.append(
-            ".meta.json tracks no wiki page filenames — run `pgrag download-wiki`"
-        )
+        warnings.append(".meta.json tracks no wiki page filenames — run `pgrag download-wiki`")
 
     missing = sorted(f for f in tracked if not (Path(wiki_dir) / f).exists())
     if missing:

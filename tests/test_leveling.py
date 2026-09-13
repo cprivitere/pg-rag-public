@@ -32,9 +32,31 @@ def _cheese_xp_table():
         "Table_24": {
             "InternalName": "TypicalNoncombatSkill",
             "XpAmounts": [
-                10, 50, 50, 50, 50, 210, 210, 210, 210, 210,
-                420, 420, 420, 420, 420, 680, 680, 680, 680, 680,
-                990, 990, 990, 990, 990,
+                10,
+                50,
+                50,
+                50,
+                50,
+                210,
+                210,
+                210,
+                210,
+                210,
+                420,
+                420,
+                420,
+                420,
+                420,
+                680,
+                680,
+                680,
+                680,
+                680,
+                990,
+                990,
+                990,
+                990,
+                990,
             ],
         }
     }
@@ -92,6 +114,7 @@ def test_leveling_document_shape():
     assert "Level 17: 680 XP (cumulative 4720)" in doc["text"]
     assert "Range XP = Level B cumulative XP - Level A cumulative XP" in doc["text"]
 
+
 def test_leveling_recipe_ladder_all_within_cap():
     # Under the cap the ladder is complete (no truncation below LEVELING_RECIPE_CAP).
     recipes = _mulching_recipes(30)
@@ -119,14 +142,20 @@ def test_leveling_capped_ladder_reports_remainder():
     assert len(docs) == 1
     text = docs[0]["text"]
     assert "more recipes" in text
-    assert "+200 - 60" in text or str("from level 61") in text or "from level" in text
+    assert "+200 - 60" in text or "from level 61" in text or "from level" in text
 
 
 def test_leveling_xp_curve_join_arithmetic():
     db = make_db(
         skills={"Cheesemaking": {"Name": "Cheesemaking", "XpTable": "TinyTable"}},
-        recipes={"recipe_1": {"Name": "Butter", "Skill": "Cheesemaking",
-                              "SkillLevelReq": 3, "RewardSkillXp": 10}},
+        recipes={
+            "recipe_1": {
+                "Name": "Butter",
+                "Skill": "Cheesemaking",
+                "SkillLevelReq": 3,
+                "RewardSkillXp": 10,
+            }
+        },
         xptables={
             "T1": {"InternalName": "TinyTable", "XpAmounts": [100, 200, 50]},
         },

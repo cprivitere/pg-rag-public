@@ -34,6 +34,7 @@ to 1 and MRR/NDCG/Recall degenerate. Instead:
 Run: uv run python scripts/bakeoff_corpus.py
 Writes: data/bakeoff_corpus.json
 """
+
 import hashlib
 import json
 import random
@@ -46,12 +47,12 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 DOCS_PATH = DATA / "documents.json"
 OUT_PATH = DATA / "bakeoff_corpus.json"
 
-TARGET = 500            # corpus docs (golds are by-construction present)
-N_QUERIES = 40          # evaluation queries (needle + fill + 20 paraphrase; fill adapts so total == 40)
-HARD_N = 9              # cap on the single-gold "needle" tier (8 templates exist)
+TARGET = 500  # corpus docs (golds are by-construction present)
+N_QUERIES = 40  # evaluation queries (needle + fill + 20 paraphrase; fill adapts so total == 40)
+HARD_N = 9  # cap on the single-gold "needle" tier (8 templates exist)
 SEED = 42
-CAP_SHARE = 0.35        # no single table's docs >35% of the corpus sample
-AMBIG_CAP = 30          # name with more entity-table matches: too generic to group
+CAP_SHARE = 0.35  # no single table's docs >35% of the corpus sample
+AMBIG_CAP = 30  # name with more entity-table matches: too generic to group
 INTERESTING = ("recipe", "item", "wiki", "ability", "quest", "skillprofile", "effect")
 # Needle queries: (type, metadata field, question). The gold is the ONE doc of
 # that type whose text contains the field value, chosen for max same-name
@@ -71,25 +72,37 @@ HARD_TEMPLATES = [
 # golds (the whole cluster, capped like fill). A model that scores both is
 # semantic; one that drops a->b is lexical.
 PARAPHRASE_TEMPLATES = {
-    "recipe": ["What materials are needed to craft {name}?",
-               "What ingredients do I need to make {name}?"],
-    "item": ["What does the item {name} do?",
-             "What is {name} used for?"],
-    "ability": ["What does the ability {name} do?",
-                "Describe the {name} ability"],
-    "skillprofile": ["Tell me everything about the {name} skill",
-                     "What are the details of the {name} skill profile?"],
-    "wiki": ["What does the wiki say about {title}?",
-             "What information is available about {title}?"],
-    "effect": ["What effect does {name} have?",
-               "What does the {name} effect do?"],
-    "quest": ["How do I start the quest {name}?",
-              "How do I complete the quest {name}?"],
+    "recipe": [
+        "What materials are needed to craft {name}?",
+        "What ingredients do I need to make {name}?",
+    ],
+    "item": ["What does the item {name} do?", "What is {name} used for?"],
+    "ability": ["What does the ability {name} do?", "Describe the {name} ability"],
+    "skillprofile": [
+        "Tell me everything about the {name} skill",
+        "What are the details of the {name} skill profile?",
+    ],
+    "wiki": [
+        "What does the wiki say about {title}?",
+        "What information is available about {title}?",
+    ],
+    "effect": ["What effect does {name} have?", "What does the {name} effect do?"],
+    "quest": ["How do I start the quest {name}?", "How do I complete the quest {name}?"],
 }
 # Tables whose same-name records are plausibly the same entity (cross-source link).
 CROSS_TABLES = {
-    "item", "recipe", "quest", "ability", "effect", "skill",
-    "skillprofile", "leveling", "npc", "wiki", "itemuse", "abilitykeyword",
+    "item",
+    "recipe",
+    "quest",
+    "ability",
+    "effect",
+    "skill",
+    "skillprofile",
+    "leveling",
+    "npc",
+    "wiki",
+    "itemuse",
+    "abilitykeyword",
 }
 
 CHUNK_SUFFIX = re.compile(r"_chunk_\d+$")
@@ -162,21 +175,23 @@ def pick_clusters(clusters, by_id, target, cap_share=CAP_SHARE):
     rng = random.Random(SEED)
     order = list(range(len(clusters)))
     rng.shuffle(order)
-    order.sort(key=lambda c: -len(clusters[c]))      # richest first (seeded)
+    order.sort(key=lambda c: -len(clusters[c]))  # richest first (seeded)
 
     total_types = Counter()
     for ids in clusters:
         total_types.update(by_id[i]["type"] for i in ids)
     tt = sum(total_types.values()) or 1
-    cap = {t: max(1, int(target * min(total_types[t] / tt, cap_share)))
-           for t in total_types}
+    cap = {t: max(1, int(target * min(total_types[t] / tt, cap_share))) for t in total_types}
 
     def has_type(ids, t):
         return any(by_id[i]["type"] == t for i in ids)
 
-    forced = [c for t in INTERESTING
-              for c in (next((x for x in order if has_type(clusters[x], t)), None),)
-              if c is not None]
+    forced = [
+        c
+        for t in INTERESTING
+        for c in (next((x for x in order if has_type(clusters[x], t)), None),)
+        if c is not None
+    ]
     ordered_forced = []
     seen = set()
     for c in forced:
@@ -236,7 +251,7 @@ def build_queries(docs, clusters, chosen_cids, n=N_QUERIES):
         if t == "wiki":
             title = base_key(doc["id"])
             if title.startswith("wiki_"):
-                title = title[len("wiki_"):]
+                title = title[len("wiki_") :]
             return tmpl.format(title=title.replace("_", " "))
         return tmpl.format(name=doc_name(doc))
 
@@ -268,9 +283,13 @@ def build_queries(docs, clusters, chosen_cids, n=N_QUERIES):
                     best, best_score, best_len = i, score, vlen
         if best == -1:
             continue
-        queries.append({"id": f"q_hard_{hard_ids}",
-                        "text": tmpl.format(name=doc_name(by_id[best])),
-                        "expected_doc_ids": [best]})
+        queries.append(
+            {
+                "id": f"q_hard_{hard_ids}",
+                "text": tmpl.format(name=doc_name(by_id[best])),
+                "expected_doc_ids": [best],
+            }
+        )
         used.add(best)
         hard_ids += 1
 
@@ -304,9 +323,13 @@ def build_queries(docs, clusters, chosen_cids, n=N_QUERIES):
             covered = [t for t in INTERESTING if any(by_id[i]["type"] == t for i in ids)]
             if bool(covered) != prefer_interesting:
                 continue
-            queries.append({"id": f"q_fill_{fills}",
-                            "text": fill_text(ids, covered),
-                            "expected_doc_ids": list(ids)[:10]})
+            queries.append(
+                {
+                    "id": f"q_fill_{fills}",
+                    "text": fill_text(ids, covered),
+                    "expected_doc_ids": list(ids)[:10],
+                }
+            )
             used.update(ids)
             fills += 1
 
@@ -329,10 +352,14 @@ def build_queries(docs, clusters, chosen_cids, n=N_QUERIES):
             if pass_ == 0 and t in seen_types:
                 continue
             doc = anchor_of_type(ids, t)
-            for s, tmpl in zip(("a", "b"), PARAPHRASE_TEMPLATES[t]):
-                queries.append({"id": f"q_para_{pair_no}_{s}",
-                                "text": fmt(t, doc, tmpl),
-                                "expected_doc_ids": list(ids)[:10]})
+            for s, tmpl in zip(("a", "b"), PARAPHRASE_TEMPLATES[t], strict=False):
+                queries.append(
+                    {
+                        "id": f"q_para_{pair_no}_{s}",
+                        "text": fmt(t, doc, tmpl),
+                        "expected_doc_ids": list(ids)[:10],
+                    }
+                )
             used.update(ids)
             seen_types.add(t)
             pair_no += 1
@@ -366,21 +393,31 @@ def main():
     by_id = {d["id"]: d for d in docs}
 
     clusters, _owner = build_clusters(docs, by_id)
-    sys.stderr.write(f"{len(clusters)} entity clusters "
-                     f"(mean {sum(len(c) for c in clusters) / len(clusters):.2f} docs/cluster)\n")
+    sys.stderr.write(
+        f"{len(clusters)} entity clusters "
+        f"(mean {sum(len(c) for c in clusters) / len(clusters):.2f} docs/cluster)\n"
+    )
 
     chosen_cids = pick_clusters(clusters, by_id, TARGET)
     chosen_ids = [i for c in chosen_cids for i in clusters[c]]
     n_types = len({by_id[i]["type"] for i in chosen_ids})
-    sys.stderr.write(f"selected {len(chosen_cids)} clusters / {len(chosen_ids)} docs "
-                     f"({n_types} tables)\n")
+    sys.stderr.write(
+        f"selected {len(chosen_cids)} clusters / {len(chosen_ids)} docs ({n_types} tables)\n"
+    )
 
     queries = build_queries(docs, clusters, chosen_cids)
     sys.stderr.write(f"built {len(queries)} queries\n")
 
     corpus = {
-        "docs": [{"id": i, "type": by_id[i]["type"], "text": by_id[i].get("text", ""),
-                  "metadata": by_id[i].get("metadata", {})} for i in chosen_ids],
+        "docs": [
+            {
+                "id": i,
+                "type": by_id[i]["type"],
+                "text": by_id[i].get("text", ""),
+                "metadata": by_id[i].get("metadata", {}),
+            }
+            for i in chosen_ids
+        ],
         "queries": queries,
     }
     idset = set(d["id"] for d in corpus["docs"])
@@ -397,16 +434,27 @@ def main():
     fp = corpus["fingerprint"]
     n_para = fp.get("paraphrase_queries", 0)
     n_fill = fp["n_queries"] - fp["hard_queries"] - n_para
-    sys.stderr.write(f"wrote {OUT_PATH}: {fp['n_docs']} docs, {fp['n_queries']} queries "
-                     f"(hard {fp['hard_queries']}, fill {n_fill}, paraphrase {n_para}), "
-                     f"mean {fp['golds_per_query_mean']} golds/q "
-                     f"({fp['multi_gold_queries']}/{fp['n_queries']} multi-gold), "
-                     f"hash {fp['content_hash']}\n")
-    print(json.dumps({"docs": fp["n_docs"], "queries": fp["n_queries"],
-                      "mean_golds": fp["golds_per_query_mean"],
-                      "multi_gold": fp["multi_gold_queries"],
-                      "hard": fp["hard_queries"], "paraphrase": n_para, "fill": n_fill,
-                      "hash": fp["content_hash"]}))
+    sys.stderr.write(
+        f"wrote {OUT_PATH}: {fp['n_docs']} docs, {fp['n_queries']} queries "
+        f"(hard {fp['hard_queries']}, fill {n_fill}, paraphrase {n_para}), "
+        f"mean {fp['golds_per_query_mean']} golds/q "
+        f"({fp['multi_gold_queries']}/{fp['n_queries']} multi-gold), "
+        f"hash {fp['content_hash']}\n"
+    )
+    print(
+        json.dumps(
+            {
+                "docs": fp["n_docs"],
+                "queries": fp["n_queries"],
+                "mean_golds": fp["golds_per_query_mean"],
+                "multi_gold": fp["multi_gold_queries"],
+                "hard": fp["hard_queries"],
+                "paraphrase": n_para,
+                "fill": n_fill,
+                "hash": fp["content_hash"],
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ documents assembled from abilities/advancement, recipes, quest values, train and
 trainer sections, empty-section omission, and deterministic output across builds."""
 
 import pytest
+
 from pgrag.documents.skill_profiles import build_skill_profile_documents
 
 
@@ -11,17 +12,26 @@ class FakeDb:
         self.tables = tables
 
 
-def _make_db(skill_entries=None, abilities=None, recipes=None, quests=None,
-             npcs=None, xptables=None, advtables=None):
-    return FakeDb({
-        "skills": skill_entries or {},
-        "abilities": abilities or {},
-        "recipes": recipes or {},
-        "quests": quests or {},
-        "npcs": npcs or {},
-        "xptables": xptables or {},
-        "advancementtables": advtables or {},
-    })
+def _make_db(
+    skill_entries=None,
+    abilities=None,
+    recipes=None,
+    quests=None,
+    npcs=None,
+    xptables=None,
+    advtables=None,
+):
+    return FakeDb(
+        {
+            "skills": skill_entries or {},
+            "abilities": abilities or {},
+            "recipes": recipes or {},
+            "quests": quests or {},
+            "npcs": npcs or {},
+            "xptables": xptables or {},
+            "advancementtables": advtables or {},
+        }
+    )
 
 
 def _base_skill():
@@ -43,9 +53,7 @@ def test_profile_built_for_every_skill():
     assert len(docs) == 1
     assert docs[0]["id"] == "skillprofile_Testcraft"
     assert docs[0]["type"] == "skillprofile"
-    assert docs[0]["metadata"] == {
-        "source": "cdn", "table": "skills", "name": "Testcraft"
-    }
+    assert docs[0]["metadata"] == {"source": "cdn", "table": "skills", "name": "Testcraft"}
 
 
 def test_profile_sections_abilities_advancement_xp():
@@ -53,19 +61,25 @@ def test_profile_sections_abilities_advancement_xp():
         skill_entries={"Testcraft": _base_skill()},
         abilities={
             "ability_1": {
-                "Name": "Squirt", "Skill": "Testcraft",
-                "Description": "Squirt something.", "Keywords": [],
-                "PvE": {"PowerCost": 60}, "ResetTime": 1800,
+                "Name": "Squirt",
+                "Skill": "Testcraft",
+                "Description": "Squirt something.",
+                "Keywords": [],
+                "PvE": {"PowerCost": 60},
+                "ResetTime": 1800,
                 "ItemKeywordReqs": ["Beast"],
             },
             "ability_2": {
-                "Name": "MonsterMove", "Skill": "Testcraft",
+                "Name": "MonsterMove",
+                "Skill": "Testcraft",
                 "Description": "Not for players.",
                 "Keywords": ["Lint_MonsterAbility"],
             },
             "ability_3": {
-                "Name": "OtherSkillMove", "Skill": "Gardening",
-                "Description": "Wrong skill.", "Keywords": [],
+                "Name": "OtherSkillMove",
+                "Skill": "Gardening",
+                "Description": "Wrong skill.",
+                "Keywords": [],
             },
         },
         xptables={
@@ -86,7 +100,9 @@ def test_profile_sections_abilities_advancement_xp():
 
     assert "Skill Profile: Testcraft" in text
     assert "Internal Key: Testcraft" in text
-    assert "Type: Non-Combat | Parents: Gardening | Guest Level Cap: 15 | Max Bonus Levels: 25" in text
+    assert (
+        "Type: Non-Combat | Parents: Gardening | Guest Level Cap: 15 | Max Bonus Levels: 25" in text
+    )
     assert "Level 20: BonusToSkill = Cow" in text
 
     assert "Abilities (1):" in text
@@ -116,7 +132,7 @@ def test_recipe_cap_25_with_more_count():
     docs = build_skill_profile_documents(db)
     text = docs[0]["text"]
 
-    listed = [l for l in text.splitlines() if l.startswith("- Recipe ")]
+    listed = [line for line in text.splitlines() if line.startswith("- Recipe ")]
     assert len(listed) == 25
     assert "- +5 more recipes" in text
 
@@ -135,11 +151,15 @@ def test_quest_matches_reward_and_nested_requirement():
             "Keywords": [],
             "Rewards": [],
             "Requirements": [],
-            "Objectives": [{
-                "Requirements": {
-                    "T": "MinSkillLevel", "Skill": "Testcraft", "Level": 3,
-                },
-            }],
+            "Objectives": [
+                {
+                    "Requirements": {
+                        "T": "MinSkillLevel",
+                        "Skill": "Testcraft",
+                        "Level": 3,
+                    },
+                }
+            ],
         },
         "quest_3": {
             "Name": "Unrelated Quest",
@@ -161,15 +181,18 @@ def test_quest_matches_reward_and_nested_requirement():
 def test_trainers_section():
     npcs = {
         "NPC_One": {
-            "Name": "Trainer One", "AreaFriendlyName": "Serbule",
+            "Name": "Trainer One",
+            "AreaFriendlyName": "Serbule",
             "Services": [{"Type": "Training", "Skills": ["Testcraft"]}],
         },
         "NPC_Two": {
-            "Name": "Barter NPC", "AreaFriendlyName": "Eltibule",
+            "Name": "Barter NPC",
+            "AreaFriendlyName": "Eltibule",
             "Services": [{"Type": "Barter"}],
         },
         "NPC_Three": {
-            "Name": "Other Trainer", "AreaFriendlyName": "Kur",
+            "Name": "Other Trainer",
+            "AreaFriendlyName": "Kur",
             "Services": [{"Type": "Training", "Skills": ["Sword"]}],
         },
     }
@@ -201,8 +224,10 @@ def test_deterministic_two_builds():
         skill_entries={"Testcraft": _base_skill(), "Other": _base_skill()},
         abilities={
             "ability_1": {
-                "Name": "Squirt", "Skill": "Testcraft",
-                "Description": "Squirt.", "Keywords": [],
+                "Name": "Squirt",
+                "Skill": "Testcraft",
+                "Description": "Squirt.",
+                "Keywords": [],
             },
         },
     )
@@ -213,8 +238,8 @@ def test_deterministic_two_builds():
 
 @pytest.mark.slow
 def test_real_data_dungcrafting_profile():
-    from pgrag.loaders.database import GameDatabase
     from pgrag.loaders.cdn_loader import load_database
+    from pgrag.loaders.database import GameDatabase
 
     db = GameDatabase()
     load_database(db)
@@ -232,4 +257,4 @@ def test_real_data_dungcrafting_profile():
     assert "- Level 1-50: ABILITY_RESETTIME_DELTA_ANIMALPOOP = -10" in text
     assert "XP Table (Pooping):" in text
     assert "- Level 25: 250 XP" in text
-    assert "- Graffiti: Mastering \"Poop\"" in text
+    assert '- Graffiti: Mastering "Poop"' in text

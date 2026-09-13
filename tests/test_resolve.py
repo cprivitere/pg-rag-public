@@ -1,10 +1,8 @@
 """Bounded wiki-parent (sibling) expansion for the gap-fill path (deferred
 "request more"): the missing answer may live in a sibling chunk of an
 already-retrieved wiki page, not in a freshly re-retrieved subject."""
-import pytest
 
-from pgrag.rag import resolve
-from pgrag.rag import pipeline
+from pgrag.rag import pipeline, resolve
 
 # --- expand_parents unit tests (patch the lazy index source) ---
 
@@ -26,12 +24,9 @@ def test_expand_parents_appends_siblings_aligned(monkeypatch):
     texts = [A["text"]]
     metas = [A["metadata"]]
     dists = [0.4]
-    out_ids, out_texts, out_metas, out_dists = resolve.expand_parents(
-        ids, texts, metas, dists
-    )
+    out_ids, out_texts, out_metas, out_dists = resolve.expand_parents(ids, texts, metas, dists)
     assert out_ids == ["pA0", "pB0", "pC0"]
-    assert out_dists == [0.4, resolve.EXPAND_PLACEHOLDER_DIST,
-                         resolve.EXPAND_PLACEHOLDER_DIST]
+    assert out_dists == [0.4, resolve.EXPAND_PLACEHOLDER_DIST, resolve.EXPAND_PLACEHOLDER_DIST]
     assert out_metas[1] is B["metadata"]
     # Inputs not mutated.
     assert ids == ["pA0"]
@@ -58,7 +53,10 @@ def test_expand_parents_dedupes_and_respects_char_budget(monkeypatch):
     metas = [A["metadata"], B["metadata"]]
     dists = [0.4, 0.2]
     out_ids, _, _, _ = resolve.expand_parents(
-        ids, texts, metas, dists,
+        ids,
+        texts,
+        metas,
+        dists,
         max_chars=len(C["text"]),
     )
     # pB0 (already retrieved) is kept at its original slot and NOT re-appended
@@ -72,11 +70,8 @@ def test_expand_parents_respects_max_pages(monkeypatch):
         "pgrag.rag.resolve.load_parent_index",
         lambda: (DOC_STORE, {"P": [A, B, C], "Q": [D]}),
     )
-    ids = ["pA0"]
     metas = [{"parent_id": "P"}, {"parent_id": "Q"}]
-    out_ids, _, _, _ = resolve.expand_parents(
-        ["pA0"], [A["text"]], metas, [0.4], max_pages=1
-    )
+    out_ids, _, _, _ = resolve.expand_parents(["pA0"], [A["text"]], metas, [0.4], max_pages=1)
     # Only parent P's siblings expanded (Q has nothing retrievable anyway,
     # but max_pages=1 must stop before P+Q are both searched).
     assert out_ids == ["pA0", "pB0", "pC0"]
@@ -89,18 +84,14 @@ def test_expand_parents_skips_changelog_pages(monkeypatch):
     The directly-retrieved changelog chunk itself is still returned."""
     monkeypatch.setattr("pgrag.rag.resolve.load_parent_index", _fake_load)
     changelog_meta = {"parent_id": "P", "name": "Game updates/2026-01-28"}
-    out_ids, _, _, _ = resolve.expand_parents(
-        ["pA0"], [A["text"]], [changelog_meta], [0.4]
-    )
+    out_ids, _, _, _ = resolve.expand_parents(["pA0"], [A["text"]], [changelog_meta], [0.4])
     # No siblings appended — inputs unchanged.
     assert out_ids == ["pA0"]
     # Meta-file-missing fallback: a changelog whose name came from the
     # filename stem (no slash), e.g. "Game updates2026-06-25", is caught by
     # the `^Game updates\d` regex branch and also never sibling-expanded.
     stem_meta = {"parent_id": "P", "name": "Game updates2026-06-25"}
-    out_ids2, _, _, _ = resolve.expand_parents(
-        ["pA0"], [A["text"]], [stem_meta], [0.4]
-    )
+    out_ids2, _, _, _ = resolve.expand_parents(["pA0"], [A["text"]], [stem_meta], [0.4])
     assert out_ids2 == ["pA0"]
 
 
@@ -109,16 +100,25 @@ def test_expand_parents_skips_changelog_pages(monkeypatch):
 CTX = {
     "ids": [["skillprofile_Pooping_chunk_0"]],
     "documents": [["Skill Profile: Dungcrafting\n\nDescription: poop-based crafting"]],
-    "metadatas": [[{"name": "Dungcrafting", "table": "skills",
-                    "type": "skillprofile", "parent_id": "wiki_Pooping"}]],
+    "metadatas": [
+        [
+            {
+                "name": "Dungcrafting",
+                "table": "skills",
+                "type": "skillprofile",
+                "parent_id": "wiki_Pooping",
+            }
+        ]
+    ],
     "distances": [[0.0]],
 }
 
 
 def _set_entity(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "entity")
-    monkeypatch.setattr("pgrag.rag.pipeline.find_entity",
-                        lambda q: ("skillprofile_Pooping", "skill"))
+    monkeypatch.setattr(
+        "pgrag.rag.pipeline.find_entity", lambda q: ("skillprofile_Pooping", "skill")
+    )
     monkeypatch.setattr(
         "pgrag.rag.pipeline.build_entity_context",
         lambda q, hub, include_leveling=False: CTX,
@@ -146,10 +146,10 @@ def test_gap_fill_expands_before_subject_retrieval(monkeypatch):
 
     def fake_expand(ids, docs, metas, dists, **kw):
         return (
-            ids + ["wiki_Pooping_chunk_2"],
-            docs + ["wiki sibling C content"],
-            metas + [{"parent_id": "wiki_Pooping"}],
-            dists + [1.0],
+            [*ids, "wiki_Pooping_chunk_2"],
+            [*docs, "wiki sibling C content"],
+            [*metas, {"parent_id": "wiki_Pooping"}],
+            [*dists, 1.0],
         )
 
     def boom_retrieve(*a, **k):

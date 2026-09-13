@@ -21,18 +21,30 @@ def make_docs():
     docs = []
     # Recipes, each with a unique name.
     for i in range(20):
-        docs.append({"id": f"recipe_{i}", "type": "recipe",
-                      "text": "x" * (2000 - i * 50),
-                      "metadata": {"name": f"Recipe {i}"}})
+        docs.append(
+            {
+                "id": f"recipe_{i}",
+                "type": "recipe",
+                "text": "x" * (2000 - i * 50),
+                "metadata": {"name": f"Recipe {i}"},
+            }
+        )
     # Items: item_3 shares its name with recipe_3 -> cross-source link.
     for i in range(20):
         name = "Recipe 3" if i == 3 else f"Item {i}"
-        docs.append({"id": f"item_{i}", "type": "item", "text": "short",
-                      "metadata": {"name": name}})
+        docs.append(
+            {"id": f"item_{i}", "type": "item", "text": "short", "metadata": {"name": name}}
+        )
     # Wiki page with multiple chunks sharing one name/base key.
     for i in range(6):
-        docs.append({"id": f"wiki_PageA_chunk_{i}", "type": "wiki",
-                      "text": "y" * 1500, "metadata": {"name": "Page A"}})
+        docs.append(
+            {
+                "id": f"wiki_PageA_chunk_{i}",
+                "type": "wiki",
+                "text": "y" * 1500,
+                "metadata": {"name": "Page A"},
+            }
+        )
     return docs
 
 
@@ -62,10 +74,10 @@ def test_pick_clusters_deterministic_and_bounded():
     by_id = {d["id"]: d for d in docs}
     clusters, _ = build_clusters(docs, by_id)
     a = pick_clusters(clusters, by_id, 25)
-    assert a == pick_clusters(clusters, by_id, 25)          # deterministic (SEED)
+    assert a == pick_clusters(clusters, by_id, 25)  # deterministic (SEED)
     chosen = [i for c in a for i in clusters[c]]
-    assert len(chosen) <= 25                                # respects target
-    assert len(chosen) == len(set(chosen))                  # no dup docs
+    assert len(chosen) <= 25  # respects target
+    assert len(chosen) == len(set(chosen))  # no dup docs
 
 
 def test_build_queries_has_expected_fields_and_golds_in_corpus():
@@ -79,9 +91,9 @@ def test_build_queries_has_expected_fields_and_golds_in_corpus():
     for q in queries:
         assert "id" in q and "text" in q
         assert "expected_doc_ids" in q
-        assert len(q["expected_doc_ids"]) > 0               # golds never empty
+        assert len(q["expected_doc_ids"]) > 0  # golds never empty
         for g in q["expected_doc_ids"]:
-            assert g in corpus_ids                          # gold is retrievable
+            assert g in corpus_ids  # gold is retrievable
     # The wiki page / cross-linked clusters yield multi-gold queries.
     assert any(len(q["expected_doc_ids"]) >= 2 for q in queries)
 
@@ -91,27 +103,38 @@ def test_hard_queries_single_specific_gold():
     fact being asked (skill_level_req in its text), not the whole entity cluster.
     The question must surface that doc, which is what gives MRR/hit range."""
     docs = []
-    for i in range(4):   # recipes: R1/R3 carry a skill_level_req in their text
+    for i in range(4):  # recipes: R1/R3 carry a skill_level_req in their text
         req = "16" if i % 2 == 1 else None
         text = f"Recipe R{i} Required Skill Level: 16" if req else f"Recipe R{i} desc"
-        docs.append({"id": f"recipe_R{i}", "type": "recipe", "text": text,
-                     "metadata": {"name": f"R{i}",
-                                  **({"skill_level_req": req} if req else {})}})
+        docs.append(
+            {
+                "id": f"recipe_R{i}",
+                "type": "recipe",
+                "text": text,
+                "metadata": {"name": f"R{i}", **({"skill_level_req": req} if req else {})},
+            }
+        )
     for i in range(4):
-        docs.append({"id": f"item_I{i}", "type": "item", "text": f"item I{i} value",
-                     "metadata": {"name": f"I{i}"}})
+        docs.append(
+            {
+                "id": f"item_I{i}",
+                "type": "item",
+                "text": f"item I{i} value",
+                "metadata": {"name": f"I{i}"},
+            }
+        )
     by_id = {d["id"]: d for d in docs}
     clusters, _ = build_clusters(docs, by_id)
     chosen = pick_clusters(clusters, by_id, 20)
     queries = build_queries(docs, clusters, chosen, n=12)
     hard = [q for q in queries if q["id"].startswith("q_hard_")]
-    assert hard                                         # hard tier is produced
+    assert hard  # hard tier is produced
     for q in hard:
-        assert len(q["expected_doc_ids"]) == 1          # single specific gold
+        assert len(q["expected_doc_ids"]) == 1  # single specific gold
         gold = by_id[q["expected_doc_ids"][0]]
         assert gold["type"] == "recipe"
-        assert "skill_level_req" in gold["metadata"]    # gold carries the fact
+        assert "skill_level_req" in gold["metadata"]  # gold carries the fact
         assert gold["metadata"]["skill_level_req"] in gold["text"]  # retrievable
-        assert q["expected_doc_ids"][0] in ids(docs)    # gold is in the corpus
-        assert "skill level" in q["text"].lower()       # question targets the fact
+        assert q["expected_doc_ids"][0] in ids(docs)  # gold is in the corpus
+        assert "skill level" in q["text"].lower()  # question targets the fact
         assert q["expected_doc_ids"][0] in ("recipe_R1", "recipe_R3")  # fielded only

@@ -1,8 +1,6 @@
 """Source tree immutability guard unit tests (Phase 6)."""
 
-from pathlib import Path
-
-from tests.conftest import _snapshot_source, _assert_source_unchanged
+from tests.conftest import _assert_source_unchanged, _snapshot_source
 
 
 def test_snapshot_and_assert_unchanged(tmp_path):

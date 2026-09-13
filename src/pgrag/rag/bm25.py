@@ -65,12 +65,9 @@ class BM25:
             qf = tf[term]
             for doc_idx, term_freq in self.postings.get(term, {}).items():
                 denominator = term_freq + self.k1 * (
-                    1 - self.b
-                    + self.b * self.doc_lengths[doc_idx] / self.avgdl
+                    1 - self.b + self.b * self.doc_lengths[doc_idx] / self.avgdl
                 )
-                contribution = (
-                    idf * qf * term_freq * (self.k1 + 1) / denominator
-                )
+                contribution = idf * qf * term_freq * (self.k1 + 1) / denominator
                 scores[doc_idx] = scores.get(doc_idx, 0.0) + contribution
 
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -85,8 +82,7 @@ def _documents_mtime(source_path):
         return None
 
 
-def save_bm25_index(model, documents, path=DEFAULT_PICKLE_PATH,
-                    source_path=DEFAULT_INDEX_PATH):
+def save_bm25_index(model, documents, path=DEFAULT_PICKLE_PATH, source_path=DEFAULT_INDEX_PATH):
     """Persist an indexed BM25 + the doc store to `path`, keyed by the
     documents.json mtime so `load_bm25_index` can detect staleness."""
     payload = {
@@ -126,15 +122,20 @@ def load_bm25_index(path=DEFAULT_INDEX_PATH, pkl_path=DEFAULT_PICKLE_PATH):
                 model.avgdl = state["avgdl"]
                 model.doc_lengths = state["doc_lengths"]
                 model.postings = state["postings"]
-                model.df = Counter(
-                    {term: len(p) for term, p in state["postings"].items()}
-                )
+                model.df = Counter({term: len(p) for term, p in state["postings"].items()})
                 return model, state["documents"]
-        except (OSError, EOFError, pickle.UnpicklingError, AttributeError,
-                KeyError, TypeError, ValueError):
+        except (
+            OSError,
+            EOFError,
+            pickle.UnpicklingError,
+            AttributeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
             pass  # stale/corrupt cache -> rebuild below
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         docs = json.load(f)
     model = BM25()
     model.index([doc["text"] for doc in docs])
@@ -154,6 +155,7 @@ if __name__ == "__main__":
     # hybrid retrieve() pays a multi-minute sync rebuild inline. Run after
     # build-documents to avoid that first-query spike.
     import sys
+
     sys.stdout.reconfigure(line_buffering=True)
     load_bm25_index()
     print("BM25 index ready (rebuilt if documents.json changed)")

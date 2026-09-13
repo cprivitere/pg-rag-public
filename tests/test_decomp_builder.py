@@ -5,8 +5,6 @@ Uses tmp dirs per TEST_CONTRACTS L7 — the real data/il2cpp tree is never read.
 
 import json
 
-import pytest
-
 from pgrag.documents import decomp_builder
 
 
@@ -79,6 +77,8 @@ def test_schema_card_target_classes_only(tmp_path, monkeypatch):
     assert "data model" in text
     assert "- public string m_name" in text
     assert "- public int m_level" in text
+
+
 def test_area_schema_card_via_area_info(tmp_path, monkeypatch):
     dump = (
         "// Dll : GorgonCore.dll\n"
@@ -100,13 +100,15 @@ def test_area_schema_card_via_area_info(tmp_path, monkeypatch):
     text = doc["text"]
     assert "- public int m_AreaID" in text
     assert "- public string DisplayName" in text
-    assert all("il2cpp_schema_Area" != d["id"] for d in docs)
-
+    assert all(d["id"] != "il2cpp_schema_Area" for d in docs)
 
 
 def test_mechanic_allowlist_and_hygiene(tmp_path, monkeypatch):
     stringlit = [
-        {"index": 0, "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle."},
+        {
+            "index": 0,
+            "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle.",
+        },
         {"index": 1, "value": "short"},
         {"index": 2, "value": "<html>both of your combat bars and nonsense"},
         {"index": 3, "value": "{0} both of your combat bars and more nonsense"},
@@ -138,8 +140,14 @@ def test_deterministic_ids_and_order(tmp_path, monkeypatch):
         "}\n"
     )
     stringlit = [
-        {"index": 0, "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle."},
-        {"index": 1, "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle."},
+        {
+            "index": 0,
+            "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle.",
+        },
+        {
+            "index": 1,
+            "value": "When both of your combat bars are full, you gain extra XP toward the skills you used during the battle.",
+        },
     ]
     first = _build(tmp_path, monkeypatch, dump_cs=dump, stringlit=stringlit)
     second = _build(tmp_path, monkeypatch, dump_cs=dump, stringlit=stringlit)

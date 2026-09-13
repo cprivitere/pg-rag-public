@@ -57,7 +57,7 @@ def _advancement_stats_lines(table_data):
 
 
 def _xp_table_lines(xptables, xp_table_name):
-    for table_id, table_data in xptables.items():
+    for _table_id, table_data in xptables.items():
         if not isinstance(table_data, dict):
             continue
         if table_data.get("InternalName") != xp_table_name:
@@ -71,7 +71,7 @@ def _xp_table_lines(xptables, xp_table_name):
 
 def _recipe_lines(recipes, skill_key):
     matches = []
-    for recipe_id, recipe in recipes.items():
+    for _recipe_id, recipe in recipes.items():
         if not isinstance(recipe, dict):
             continue
         if recipe.get("Skill") != skill_key and recipe.get("RewardSkill") != skill_key:
@@ -90,18 +90,24 @@ def _recipe_lines(recipes, skill_key):
 
 def _quest_matches_skill(quest, skill_key):
     for reward in quest.get("Rewards", []):
-        if isinstance(reward, dict) and reward.get("T") == "SkillXp":
-            if reward.get("Skill") == skill_key:
-                return True
+        if (
+            isinstance(reward, dict)
+            and reward.get("T") == "SkillXp"
+            and reward.get("Skill") == skill_key
+        ):
+            return True
 
     def check_requirements(reqs):
         if isinstance(reqs, list):
             for r in reqs:
                 if check_requirements(r):
                     return True
-        elif isinstance(reqs, dict):
-            if reqs.get("T") == "MinSkillLevel" and reqs.get("Skill") == skill_key:
-                return True
+        elif (
+            isinstance(reqs, dict)
+            and reqs.get("T") == "MinSkillLevel"
+            and reqs.get("Skill") == skill_key
+        ):
+            return True
         return False
 
     if check_requirements(quest.get("Requirements", [])):
@@ -116,7 +122,7 @@ def _quest_matches_skill(quest, skill_key):
 
 def _quest_lines(quests, skill_key):
     matches = []
-    for quest_id, quest in quests.items():
+    for _quest_id, quest in quests.items():
         if not isinstance(quest, dict):
             continue
         if "Lint_NotObtainable" in quest.get("Keywords", []):
@@ -145,9 +151,7 @@ def _trainer_lines(npcs, skill_key):
             skills = svc.get("Skills", [])
             if skill_key in skills:
                 area = npc.get("AreaFriendlyName", "")
-                lines.append(
-                    f"- {npc.get('Name', npc_id)} ({area})"
-                )
+                lines.append(f"- {npc.get('Name', npc_id)} ({area})")
                 break
     return lines
 
@@ -224,7 +228,10 @@ def build_skill_profile_documents(db):
         rewards = skill.get("Rewards", {})
         if isinstance(rewards, dict) and rewards:
             reward_lines = []
-            for level in sorted(rewards.keys(), key=lambda x: int(x.split("_")[0]) if str(x).split("_")[0].isdigit() else 0):
+            for level in sorted(
+                rewards.keys(),
+                key=lambda x: int(x.split("_")[0]) if str(x).split("_")[0].isdigit() else 0,
+            ):
                 r = rewards[level]
                 if isinstance(r, dict):
                     for rk, rv in r.items():
@@ -234,9 +241,7 @@ def build_skill_profile_documents(db):
 
         ability_lines = _ability_lines(abilities, skill_id)
         if ability_lines:
-            sections.append(
-                f"Abilities ({len(ability_lines)}):\n" + "\n".join(ability_lines)
-            )
+            sections.append(f"Abilities ({len(ability_lines)}):\n" + "\n".join(ability_lines))
 
         adv_lines = []
         for table_id, table_data in advtables.items():
@@ -253,9 +258,7 @@ def build_skill_profile_documents(db):
         xp_table_name = skill.get("XpTable")
         xp_lines = _xp_table_lines(xptables, xp_table_name) if xp_table_name else []
         if xp_lines:
-            sections.append(
-                f"XP Table ({xp_table_name}):\n" + "\n".join(xp_lines)
-            )
+            sections.append(f"XP Table ({xp_table_name}):\n" + "\n".join(xp_lines))
 
         recipe_lines = _recipe_lines(recipes, skill_id)
         if recipe_lines:
@@ -269,22 +272,24 @@ def build_skill_profile_documents(db):
         if trainer_lines:
             sections.append("Trainers:\n" + "\n".join(trainer_lines))
 
-        documents.append({
-            "id": f"skillprofile_{skill_id}",
-            "type": "skillprofile",
-            "text": "\n\n".join(sections).strip(),
-            "metadata": {
-                "source": "cdn",
-                "table": "skills",
-                "name": name,
+        documents.append(
+            {
+                "id": f"skillprofile_{skill_id}",
+                "type": "skillprofile",
+                "text": "\n\n".join(sections).strip(),
+                "metadata": {
+                    "source": "cdn",
+                    "table": "skills",
+                    "name": name,
+                },
             }
-        })
+        )
 
     return documents
 
 
 def _xp_amounts(xptables, xp_table_name):
-    for table_id, table_data in xptables.items():
+    for _table_id, table_data in xptables.items():
         if not isinstance(table_data, dict):
             continue
         if table_data.get("InternalName") != xp_table_name:
@@ -329,7 +334,7 @@ def _recipe_ladder_lines(matches):
 
 def _skill_recipes(recipes, skill_key):
     matches = []
-    for recipe_id, recipe in recipes.items():
+    for _recipe_id, recipe in recipes.items():
         if not isinstance(recipe, dict):
             continue
         if recipe.get("Skill") != skill_key and recipe.get("RewardSkill") != skill_key:
@@ -395,9 +400,7 @@ def build_leveling_documents(db):
                     "XP needed to reach each level (through recipe unlock range):\n"
                     + "\n".join(xp_lines)
                 )
-            recipe_section = "Recipes (by unlock level):\n" + "\n".join(
-                _recipe_ladder_lines(shown)
-            )
+            recipe_section = "Recipes (by unlock level):\n" + "\n".join(_recipe_ladder_lines(shown))
             omitted = len(matches) - k
             if omitted > 0:
                 next_level = matches[k].get("SkillLevelReq", 0) or 0

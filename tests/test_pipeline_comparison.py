@@ -22,20 +22,20 @@ def test_two_entity_comparison_uses_multi_entity_context(monkeypatch):
     def fake_multi(question, entities, trace=None):
         return {
             "ids": [["ability_punch", "ability_front_kick", "recipe_shared"]],
-            "documents": [[
-                "=== Punch (ability) ===",
-                "Punch does 6 damage.",
-                "=== Front Kick (ability) ===",
-                "Front Kick does 11 damage.",
-            ]],
+            "documents": [
+                [
+                    "=== Punch (ability) ===",
+                    "Punch does 6 damage.",
+                    "=== Front Kick (ability) ===",
+                    "Front Kick does 11 damage.",
+                ]
+            ],
             "metadatas": [[]],
             "distances": [[0.0, 0.0, 0.0]],
             "rerank_used": False,
         }
 
-    monkeypatch.setattr(
-        "pgrag.rag.entity_retrieval.build_multi_entity_context", fake_multi
-    )
+    monkeypatch.setattr("pgrag.rag.entity_retrieval.build_multi_entity_context", fake_multi)
 
     def fake_generate(prompt, **kwargs):
         captured["prompt"] = prompt

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -67,7 +68,7 @@ def rerank_documents(query, documents, top_n):
 def load_stats():
     try:
         return json.loads(STATS_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return {"failures": 0, "last_failure": None, "last_success": None}
 
 
@@ -95,9 +96,7 @@ def _write_stats(stats):
             os.replace(tmp, STATS_FILE)
         finally:
             if os.path.exists(tmp):
-                try:
+                with contextlib.suppress(OSError):
                     os.remove(tmp)
-                except OSError:
-                    pass
     except OSError as exc:
         logger.warning("rerank stats write failed: %s", exc)

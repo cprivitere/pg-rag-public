@@ -40,32 +40,89 @@ _GIFT_ITEM = re.compile(
     re.I,
 )
 # Recipe/ability verbs that make a structured filter worth attempting.
-_RECIPE = re.compile(r"\b(?:recipe|recipes|craft|crafter|crafting|make|"
-                     r"making|produce|produces|crafted)\b", re.I)
+_RECIPE = re.compile(
+    r"\b(?:recipe|recipes|craft|crafter|crafting|make|"
+    r"making|produce|produces|crafted)\b",
+    re.I,
+)
 _ABILITY = re.compile(r"\b(?:ability|abilities|spell|power)\b", re.I)
 
 # Skill words likely to name a recipe/ability skill. Only a curated subset is
 # worth matching; an unknown skill simply yields no skill clause (still safe).
 _SKILL_WORDS = [
-    "alchemy", "mycology", "blacksmithing", "bladesmithing", "swordcrafting",
-    "armorsmithing", "leatherworking", "tailoring", "carpentry", "cooking",
-    "brewing", "baking", "cheesemaking", "fishing", "angling", "foraging",
-    "gardening", "farming", "mushroom farming", "flower arrangement",
-    "candle making", "dye making", "jewelry crafting", "calligraphy",
-    "fletching", "bowyery", "glassblowing", "toolcrafting", "metallurgy",
-    "chemistry", "medicine", "first aid", "anatomy", "shamanic infusion",
-    "necromancy", "psychology", "meditation", "fire magic", "ice magic",
-    "ice conjuration", "holy magic", "dark magic", "trauma surgery",
-    "phrenology", "pottery", "sculpting", "embroidery", "saddlery",
-    "sigil scripting", "surveying", "racing", "hoplology", "unarmed",
-    "staff", "hammer", "sword", "knife", "bow", "shield", "armor",
-    "logistics", "pig latin", "telepathy", "mentalism", "bard",
-    "nature awareness", "tracking", "sprinting", "sailing", "fishing",
+    "alchemy",
+    "mycology",
+    "blacksmithing",
+    "bladesmithing",
+    "swordcrafting",
+    "armorsmithing",
+    "leatherworking",
+    "tailoring",
+    "carpentry",
+    "cooking",
+    "brewing",
+    "baking",
+    "cheesemaking",
+    "fishing",
+    "angling",
+    "foraging",
+    "gardening",
+    "farming",
+    "mushroom farming",
+    "flower arrangement",
+    "candle making",
+    "dye making",
+    "jewelry crafting",
+    "calligraphy",
+    "fletching",
+    "bowyery",
+    "glassblowing",
+    "toolcrafting",
+    "metallurgy",
+    "chemistry",
+    "medicine",
+    "first aid",
+    "anatomy",
+    "shamanic infusion",
+    "necromancy",
+    "psychology",
+    "meditation",
+    "fire magic",
+    "ice magic",
+    "ice conjuration",
+    "holy magic",
+    "dark magic",
+    "trauma surgery",
+    "phrenology",
+    "pottery",
+    "sculpting",
+    "embroidery",
+    "saddlery",
+    "sigil scripting",
+    "surveying",
+    "racing",
+    "hoplology",
+    "unarmed",
+    "staff",
+    "hammer",
+    "sword",
+    "knife",
+    "bow",
+    "shield",
+    "armor",
+    "logistics",
+    "pig latin",
+    "telepathy",
+    "mentalism",
+    "bard",
+    "nature awareness",
+    "tracking",
+    "sprinting",
+    "sailing",
+    "fishing",
 ]
 _SKILL_WORDS.sort(key=len, reverse=True)
-_SKILL = re.compile(
-    r"\b(" + "|".join(_SKILL_WORDS) + r")\b", re.I
-)
+_SKILL = re.compile(r"\b(" + "|".join(_SKILL_WORDS) + r")\b", re.I)
 
 _LEVEL = re.compile(
     r"\b(?:(\d{1,3})\s*(?:lv|level|lvl)|(?:lv|level|lvl)\s*(\d{1,3}))\b",
@@ -84,7 +141,8 @@ _COMBAT_XP_LEVEL = re.compile(
 
 _INGREDIENT_INTRO = re.compile(
     r"\b(?:using|use|with|needs?|requir(?:es|ed|ing)?|consumes?|"
-    r"made\s+from|made\s+with|asked\s+for)\b", re.I
+    r"made\s+from|made\s+with|asked\s+for)\b",
+    re.I,
 )
 
 # Player-facing ingredient names that don't match the canonical token
@@ -100,20 +158,34 @@ _INGREDIENT_SYNONYMS: dict[str, list[str]] = {
 
 # Element/damage tokens -> canonical metadata value (title-case, exact).
 _DAMAGE_WORDS = [
-    ("fire", "Fire"), ("ice", "Cold"), ("cold", "Cold"),
-    ("electric", "Electricity"), ("lightning", "Electricity"),
-    ("acid", "Acid"), ("poison", "Poison"), ("toxic", "Poison"),
-    ("crushing", "Crushing"), ("slashing", "Slashing"),
-    ("piercing", "Piercing"), ("psychic", "Psychic"),
-    ("darkness", "Darkness"), ("holy", "Smiting"), ("nature", "Nature"),
-    ("nothingness", "Nothingness"), ("trauma", "Trauma"),
-    ("demonic", "Demonic"), ("regeneration", "Regeneration"),
+    ("fire", "Fire"),
+    ("ice", "Cold"),
+    ("cold", "Cold"),
+    ("electric", "Electricity"),
+    ("lightning", "Electricity"),
+    ("acid", "Acid"),
+    ("poison", "Poison"),
+    ("toxic", "Poison"),
+    ("crushing", "Crushing"),
+    ("slashing", "Slashing"),
+    ("piercing", "Piercing"),
+    ("psychic", "Psychic"),
+    ("darkness", "Darkness"),
+    ("holy", "Smiting"),
+    ("nature", "Nature"),
+    ("nothingness", "Nothingness"),
+    ("trauma", "Trauma"),
+    ("demonic", "Demonic"),
+    ("regeneration", "Regeneration"),
     ("smiting", "Smiting"),
 ]
-_DAMAGE = re.compile(r"\b(?:fire|ice|cold|electric|lightning|acid|poison|"
-                     r"toxic|crushing|slashing|piercing|psychic|darkness|"
-                     r"holy|nature|nothingness|trauma|demonic|regeneration|"
-                     r"smiting)\b", re.I)
+_DAMAGE = re.compile(
+    r"\b(?:fire|ice|cold|electric|lightning|acid|poison|"
+    r"toxic|crushing|slashing|piercing|psychic|darkness|"
+    r"holy|nature|nothingness|trauma|demonic|regeneration|"
+    r"smiting)\b",
+    re.I,
+)
 
 # Creature-location listing: "the locations with deer, sheep, goats, ..." /
 # "where do deer live" enumerates spawn zones. The authoritative answer table
@@ -125,12 +197,14 @@ _DAMAGE = re.compile(r"\b(?:fire|ice|cold|electric|lightning|acid|poison|"
 # traps itself in the creatures table.
 _CREATURE_LOCATION = re.compile(
     r"\b(?:all\s+)?locations?\s+(?:with|of|containing|featuring|that\s+(?:have|hold))"
-    r"|\bwhere[\s\S]*?\b(?:live|spawn|roam|graze|are found)\b", re.I
+    r"|\bwhere[\s\S]*?\b(?:live|spawn|roam|graze|are found)\b",
+    re.I,
 )
 _ANIMAL = re.compile(
     r"(?:deer|sheep|goats?|cows?|oxen|\box(?:en)?\b|bison|cattle|gazelle|yaks?|"
     r"bighorn|rams?|ewes?|lambs?|calves?\b|bulls?|pigs?|boars?|turkeys?|"
-    r"moose|elk|caribou|mammoths?|stags?|buffalo|critters?|animals?|creatures?)", re.I
+    r"moose|elk|caribou|mammoths?|stags?|buffalo|critters?|animals?|creatures?)",
+    re.I,
 )
 
 
@@ -170,10 +244,12 @@ def _find_ingredient(q):
     m = _INGREDIENT_INTRO.search(q)
     if not m:
         return None
-    rest = q[m.end():].strip()
+    rest = q[m.end() :].strip()
     # Up to two words of a noun phrase; stop at a recipe/ability/level word.
-    stop = re.compile(r"(?:damage|level|recipe|requir|them|it|that|which|and|"
-                      r"for|to\b|\d)")
+    stop = re.compile(
+        r"(?:damage|level|recipe|requir|them|it|that|which|and|"
+        r"for|to\b|\d)"
+    )
     words = []
     for w in rest.split():
         if stop.search(w):
@@ -195,10 +271,14 @@ def _find_ingredient(q):
     # Only drop a trailing "s" when the preceding letter is a consonant
     # ("mushroom-s", "root-s") — mass nouns like "feces"/"species"/"glass"
     # (suffix -es/-ss) are left exact so the token still matches.
-    if (token.endswith("s") and token[-2] not in "esiu"):
+    if token.endswith("s") and token[-2] not in "esiu":
         token = token[:-1]
     if len(token.replace(" ", "")) < 2 or token.lower() in (
-        "Using", "With", "Need", "Require", "Use"
+        "Using",
+        "With",
+        "Need",
+        "Require",
+        "Use",
     ):
         return None
     return token
@@ -252,7 +332,6 @@ def plan_query(question):
             "label": "creature locations",
         }
 
-
     # --- Gift-recipient listing ("who can I gift hammers to") ---------------
     if _GIFT_RECIPIENT.search(q) and _GIFT_ITEM.search(q):
         # Native filter narrows to the computed summary family; no token
@@ -267,7 +346,7 @@ def plan_query(question):
         }
 
     # --- Combat XP level comparison (max/efficient per archetype at a level) ---
-    combat_xp_plan = _plan_combat_xp_level(q )
+    combat_xp_plan = _plan_combat_xp_level(q)
     if combat_xp_plan is not None:
         return combat_xp_plan
 
@@ -294,11 +373,13 @@ def plan_query(question):
                 # plans, a recall regression the acceptance forbids).
                 clauses.append({"skill_level_req": {"$lte": n}})
                 return {
-                    "native": _and(clauses), "token": {},
+                    "native": _and(clauses),
+                    "token": {},
                     "label": f"recipe skill={skill} level<={n}",
                 }
             return {
-                "native": _and(clauses), "token": {},
+                "native": _and(clauses),
+                "token": {},
                 "label": f"recipe skill={skill}",
             }
         # --- Recipe ingredient (post-fusion delimited token) ---
@@ -306,9 +387,7 @@ def plan_query(question):
         if ing:
             syns = _INGREDIENT_SYNONYMS.get(ing)
             if syns:
-                token = {"ingredients": {"$or": [
-                    {"$eq": v} for v in [ing, *syns]
-                ]}}
+                token = {"ingredients": {"$or": [{"$eq": v} for v in [ing, *syns]]}}
                 label = f"recipe ingredient={ing} (syn: {','.join(syns)})"
             else:
                 token = {"ingredients": ing}

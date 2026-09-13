@@ -4,8 +4,8 @@ Generate ChatML training dataset for Unsloth QLoRA fine-tuning of
 Ornith-1.5-9B.
 
 Phases:
-  1. Golden evals (42 × 3 rephrasings + 1 truncated-context negative ≈ 168 rows)
-  2. Synthetic QA from document corpus (~300 docs × 3 QA pairs ≈ 900+ rows)
+  1. Golden evals (42 x 3 rephrasings + 1 truncated-context negative ≈ 168 rows)
+  2. Synthetic QA from document corpus (~300 docs x 3 QA pairs ≈ 900+ rows)
 
 Teacher: deepseek-ai/DeepSeek-V4-Flash via CoreWeave/W&B API.
 Output: data/training/unsloth_train.jsonl + data/training/unsloth_eval.jsonl
@@ -30,7 +30,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import requests
 
@@ -59,12 +59,14 @@ STATE_PATH = OUTPUT_DIR / "generation_state.json"
 # API configuration — read from omp credential store + env
 # ---------------------------------------------------------------------------
 
+
 # Resolve the CoreWeave/W&B API key
 def _get_api_key() -> str:
     """Resolve the wandb API key from the omp agent database."""
     agent_db = Path(os.path.expanduser("~/.omp/agent/agent.db"))
     if agent_db.exists():
         import sqlite3
+
         try:
             conn = sqlite3.connect(str(agent_db))
             row = conn.execute(
@@ -122,10 +124,10 @@ DOC_SAMPLE_TARGETS: list[dict[str, Any]] = [
 
 # Comparison pair templates
 COMPARISON_PAIRS = [
-    ("ability", "ability"),   # Fireball vs Fire Breath, Punch vs Front Kick
-    ("item", "item"),          # Healing Potion vs Healing Potion Omega
-    ("skill", "skill"),        # Sword vs Unarmed burst
-    ("recipe", "recipe"),      # Orcish Flour vs Basic Flatbread
+    ("ability", "ability"),  # Fireball vs Fire Breath, Punch vs Front Kick
+    ("item", "item"),  # Healing Potion vs Healing Potion Omega
+    ("skill", "skill"),  # Sword vs Unarmed burst
+    ("recipe", "recipe"),  # Orcish Flour vs Basic Flatbread
 ]
 
 # ---------------------------------------------------------------------------
@@ -143,7 +145,7 @@ def _load_documents():
     if _all_docs:
         return
     log.info("Loading documents from %s ...", DOCUMENTS_PATH)
-    with open(DOCUMENTS_PATH, "r", encoding="utf-8") as f:
+    with open(DOCUMENTS_PATH, encoding="utf-8") as f:
         _all_docs = json.load(f)
     log.info("Loaded %d documents", len(_all_docs))
 
@@ -170,7 +172,7 @@ def _get_docs_by_name(name: str) -> list[dict]:
     return _docs_by_name.get(name.lower().strip(), [])
 
 
-def _get_doc_by_id(doc_id: str) -> Optional[dict]:
+def _get_doc_by_id(doc_id: str) -> dict | None:
     """Find a document by its id field."""
     _load_documents()
     return _docs_by_id.get(doc_id)
@@ -182,7 +184,7 @@ def _get_docs_by_type(dtype: str) -> list[dict]:
     return _docs_by_type.get(dtype, [])
 
 
-def _sample_docs(dtype: str, count: int, exclude_ids: Optional[set] = None) -> list[dict]:
+def _sample_docs(dtype: str, count: int, exclude_ids: set | None = None) -> list[dict]:
     """Sample documents of a given type, optionally excluding certain IDs."""
     pool = _get_docs_by_type(dtype)
     if exclude_ids:
@@ -191,25 +193,27 @@ def _sample_docs(dtype: str, count: int, exclude_ids: Optional[set] = None) -> l
         return []
     # Prioritize documents with more substantive text
     pool.sort(key=lambda d: len(d.get("text", "")), reverse=True)
-    return pool[:count * 3] if len(pool) > count * 3 else pool
+    return pool[: count * 3] if len(pool) > count * 3 else pool
 
 
 # ---------------------------------------------------------------------------
 # API client
 # ---------------------------------------------------------------------------
 _session = requests.Session()
-_session.headers.update({
-    "Authorization": f"Bearer {API_KEY}",
-    "OpenAI-Project": COREWEAVE_PROJECT,
-    "Content-Type": "application/json",
-})
+_session.headers.update(
+    {
+        "Authorization": f"Bearer {API_KEY}",
+        "OpenAI-Project": COREWEAVE_PROJECT,
+        "Content-Type": "application/json",
+    }
+)
 
 
 def call_teacher(
     messages: list[dict],
     temperature: float = 0.7,
     max_tokens: int = 4096,
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
     strip_thinking: bool = False,
 ) -> str:
     """Call DeepSeek V4 Flash via CoreWeave/W&B API.
@@ -219,7 +223,7 @@ def call_teacher(
         temperature: Sampling temperature (0.0 for deterministic).
         max_tokens: Max output tokens.
         system_prompt: Optional system message prepended.
-        strip_thinking: If True, remove  ～\n...\n block from output.
+        strip_thinking: If True, remove  ~\n...\n block from output.
 
     Returns:
         The response text.
@@ -292,8 +296,9 @@ def call_teacher_structured(
 
     Returns (thinking, answer).
     """
-    content = call_teacher(messages, temperature=temperature, max_tokens=max_tokens,
-                          system_prompt=system_prompt)
+    content = call_teacher(
+        messages, temperature=temperature, max_tokens=max_tokens, system_prompt=system_prompt
+    )
     # Split on thinking block — handle multiple formats
     # Format:  thinking\n...\n\n... (Ornith-native)
     # Also handle: Thinking:\n...\n\n... (teacher variations)
@@ -313,7 +318,8 @@ def call_teacher_structured(
 # Context construction helpers
 # ---------------------------------------------------------------------------
 
-def _extract_entity_name(question: str) -> Optional[str]:
+
+def _extract_entity_name(question: str) -> str | None:
     """Extract the primary entity name from a golden eval question."""
     # Known entity patterns from golden evals
     # Try to match common patterns: "What does X do?", "How to level X?",
@@ -340,11 +346,21 @@ def _build_entity_context(entity_name: str) -> list[str]:
     # Sort: skill profile/leveling first, then type-specific, then wiki
     def _sort_key(d):
         t = d.get("type", "")
-        priority = {"skillprofile": 0, "leveling": 0, "summary": 1,
-                     "skill": 2, "item": 2, "ability": 2, "recipe": 2,
-                     "quest": 2, "npc": 2, "curated": 2,
-                     "wiki": 3}
+        priority = {
+            "skillprofile": 0,
+            "leveling": 0,
+            "summary": 1,
+            "skill": 2,
+            "item": 2,
+            "ability": 2,
+            "recipe": 2,
+            "quest": 2,
+            "npc": 2,
+            "curated": 2,
+            "wiki": 3,
+        }
         return priority.get(t, 4)
+
     docs.sort(key=_sort_key)
 
     texts = []
@@ -374,12 +390,13 @@ def _build_comparison_context(entity1: str, entity2: str) -> list[str]:
             seen_texts.add(norm)
             result.append(text)
 
-    return result[:CONTEXT_BUDGET // 200] 
+    return result[: CONTEXT_BUDGET // 200]
 
 
 # ---------------------------------------------------------------------------
 # Golden fact validation
 # ---------------------------------------------------------------------------
+
 
 def _normalize(text: str) -> str:
     """Normalize text for fact matching."""
@@ -403,11 +420,12 @@ def _check_facts(answer: str, fact_variants: list[list[str]]) -> dict[str, bool]
 # Phase 1: Golden Eval Processing
 # ---------------------------------------------------------------------------
 
+
 def _load_golden_evals() -> list[dict]:
     """Load all golden eval JSON files."""
     evals = []
     for path in sorted(GOLDEN_DIR.glob("*.json")):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             evals.append(json.load(f))
     log.info("Loaded %d golden evals", len(evals))
     return evals
@@ -426,18 +444,18 @@ Output exactly 3 variants, one per line, with no numbering, bullets, or extra te
         temperature=0.8,
         max_tokens=1024,
     )
-    lines = [l.strip() for l in response.split("\n") if l.strip()]
+    lines = [line.strip() for line in response.split("\n") if line.strip()]
     return lines[:3]
 
 
-def _generate_ideal_answer(question: str, context_text: str, query_type: str, facts: list[list[str]]) -> tuple[str, str]:
+def _generate_ideal_answer(
+    question: str, context_text: str, query_type: str, facts: list[list[str]]
+) -> tuple[str, str]:
     """Generate ideal answer with thinking trace from teacher.
 
     Returns (thinking, answer).
     """
-    fact_hints = "; ".join(
-        f"[{', '.join(vs[:3])}]" for vs in facts
-    )
+    fact_hints = "; ".join(f"[{', '.join(vs[:3])}]" for vs in facts)
 
     prompt = f"""You are a Project Gorgon game assistant. Your task is to generate an IDEAL answer to a player's question, using ONLY the provided context.
 
@@ -498,9 +516,7 @@ def _generate_truncated_negative(
 
     # Check which facts survive
     # We'll just generate the answer with guidance to acknowledge missing info
-    fact_hints = "; ".join(
-        f"[{', '.join(vs[:3])}]" for vs in facts
-    )
+    fact_hints = "; ".join(f"[{', '.join(vs[:3])}]" for vs in facts)
 
     prompt = f"""You are a Project Gorgon game assistant. Your task is to generate an answer to a player's question using ONLY the provided context.
 
@@ -521,7 +537,6 @@ Format example:
 Your reasoning here...
 <blank line>
 Your answer here."""
-
 
     system = "You are a Project Gorgon game assistant generating ideal training data."
     thinking, answer = call_teacher_structured(
@@ -571,8 +586,11 @@ def process_golden_eval(
     context_text = "\n\n---\n\n".join(context)
 
     if dry_run:
-        log.info("[DRY RUN] Would process golden eval: %s (context: %d chars)",
-                 golden["id"], len(context_text))
+        log.info(
+            "[DRY RUN] Would process golden eval: %s (context: %d chars)",
+            golden["id"],
+            len(context_text),
+        )
         return []
 
     rows = []
@@ -587,17 +605,17 @@ def process_golden_eval(
     for variant in variants:
         try:
             thinking, answer = _generate_ideal_answer(
-                variant, context_text, query_type, golden["facts"],
+                variant,
+                context_text,
+                query_type,
+                golden["facts"],
             )
         except Exception as e:
             log.error("Failed to generate answer for %s variant: %s", golden["id"], e)
             continue
 
         # Build assistant content
-        if thinking:
-            assistant = f"  thinking\n{thinking}\n\n{answer}"
-        else:
-            assistant = answer
+        assistant = f"  thinking\n{thinking}\n\n{answer}" if thinking else answer
 
         row = {
             "messages": [
@@ -623,7 +641,10 @@ def process_golden_eval(
     # --- Generate truncated-context negative ---
     try:
         neg_thinking, neg_answer, truncated_ctx = _generate_truncated_negative(
-            golden, context, query_type, golden["facts"],
+            golden,
+            context,
+            query_type,
+            golden["facts"],
         )
         truncated_text = "\n\n---\n\n".join(truncated_ctx)
         if neg_thinking:
@@ -709,6 +730,7 @@ Question:
 # ---------------------------------------------------------------------------
 # Phase 2: Synthetic QA from Documents
 # ---------------------------------------------------------------------------
+
 
 def _generate_synthetic_qa(
     doc_text: str,
@@ -822,7 +844,8 @@ IMPORTANT: The thinking marker must be exactly "  thinking" (two spaces + "think
 
 
 def _generate_comparison_qa(
-    doc1: dict, doc2: dict,
+    doc1: dict,
+    doc2: dict,
     dry_run: bool = False,
 ) -> list[dict]:
     """Generate comparison QA from two documents."""
@@ -836,8 +859,8 @@ def _generate_comparison_qa(
     prompt = f"""You are a data augmentation assistant. Generate a comparison question-answer pair from the two documents below.
 
 The question should ask about the differences, similarities, or which is better between:
-- Document 1: {name1} ({doc1.get('type', 'unknown')})
-- Document 2: {name2} ({doc2.get('type', 'unknown')})
+- Document 1: {name1} ({doc1.get("type", "unknown")})
+- Document 2: {name2} ({doc2.get("type", "unknown")})
 
 Write the answer using ONLY the provided information. Include a  thinking block with reasoning.
 
@@ -913,7 +936,7 @@ def _generate_negative_qa(
 The question should be about a completely different topic than the document. The answer should acknowledge the information is not in the provided context.
 
 Document text:
-{doc['text']}
+{doc["text"]}
 
 Output:
 Player question: <question about a different topic>
@@ -959,9 +982,7 @@ IMPORTANT: The thinking marker must be exactly "  thinking" (two spaces + "think
             "doc_type": "negative",
             "doc_name": name,
             "truncated": False,
-        
         },
-
     }
     rows = [row]
     return rows
@@ -971,6 +992,7 @@ IMPORTANT: The thinking marker must be exactly "  thinking" (two spaces + "think
 # Main pipeline
 # ---------------------------------------------------------------------------
 
+
 def phase1_golden(dry_run: bool = False) -> list[dict]:
     """Phase 1: Generate training rows from golden evals."""
     log.info("=== Phase 1: Golden Evals ===")
@@ -978,8 +1000,13 @@ def phase1_golden(dry_run: bool = False) -> list[dict]:
     all_rows = []
 
     for i, golden in enumerate(evals):
-        log.info("[%d/%d] Processing golden eval: %s (%s)",
-                 i + 1, len(evals), golden["id"], golden.get("type", "general"))
+        log.info(
+            "[%d/%d] Processing golden eval: %s (%s)",
+            i + 1,
+            len(evals),
+            golden["id"],
+            golden.get("type", "general"),
+        )
         try:
             rows = process_golden_eval(golden, dry_run=dry_run)
             all_rows.extend(rows)
@@ -995,7 +1022,7 @@ def phase1_golden(dry_run: bool = False) -> list[dict]:
 def phase2_synthetic(
     target: int = 1200,
     dry_run: bool = False,
-    resume_ids: Optional[set] = None,
+    resume_ids: set | None = None,
 ) -> list[dict]:
     """Phase 2: Generate synthetic training rows from document corpus.
 
@@ -1044,7 +1071,9 @@ def phase2_synthetic(
 
         try:
             rows = _generate_synthetic_qa(
-                doc_text, doc_name, doc_type,
+                doc_text,
+                doc_name,
+                doc_type,
                 num_questions=num_q,
             )
             all_rows.extend(rows)
@@ -1088,7 +1117,10 @@ def phase2_synthetic(
 # Output
 # ---------------------------------------------------------------------------
 
-def _split_train_eval(rows: list[dict], eval_ratio: float = 0.1, seed: int = RANDOM_SEED) -> tuple[list[dict], list[dict]]:
+
+def _split_train_eval(
+    rows: list[dict], eval_ratio: float = 0.1, seed: int = RANDOM_SEED
+) -> tuple[list[dict], list[dict]]:
     """Split rows into train/eval sets, keeping golden variants together."""
     # Group rows by source+golden_id for stratified split
     golden_rows = [r for r in rows if r["metadata"]["source"] == "golden"]
@@ -1123,10 +1155,15 @@ def _split_train_eval(rows: list[dict], eval_ratio: float = 0.1, seed: int = RAN
     rng.shuffle(train)
     rng.shuffle(eval_set)
 
-    log.info("Split: %d train + %d eval (golden: %d train/%d eval, synthetic: %d train/%d eval)",
-             len(train), len(eval_set),
-             len(train_golden), len(eval_golden),
-             len(train_synthetic), len(eval_synthetic))
+    log.info(
+        "Split: %d train + %d eval (golden: %d train/%d eval, synthetic: %d train/%d eval)",
+        len(train),
+        len(eval_set),
+        len(train_golden),
+        len(eval_golden),
+        len(train_synthetic),
+        len(eval_synthetic),
+    )
 
     return train, eval_set
 
@@ -1143,6 +1180,7 @@ def _write_jsonl(rows: list[dict], path: Path, mode: str = "w"):
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 def validate_golden_rows(rows: list[dict]) -> dict:
     """Validate golden-sourced rows against their facts.
@@ -1177,11 +1215,13 @@ def validate_golden_rows(rows: list[dict]) -> dict:
             elif not is_truncated:
                 # Only flag missed facts for non-truncated rows
                 fact_variants = golden["facts"][int(fact_idx)]
-                missed_facts.append({
-                    "golden_id": gid,
-                    "fact_index": fact_idx,
-                    "variants": fact_variants,
-                })
+                missed_facts.append(
+                    {
+                        "golden_id": gid,
+                        "fact_index": fact_idx,
+                        "variants": fact_variants,
+                    }
+                )
 
     summary = {
         "total_golden_rows": len(golden_rows),
@@ -1193,8 +1233,13 @@ def validate_golden_rows(rows: list[dict]) -> dict:
         "missed_details": missed_facts[:20],  # First 20 for inspection
     }
 
-    log.info("Validation: %d/%d facts found (%s), %d missed",
-             found_facts, total_facts, summary["fact_accuracy"], len(missed_facts))
+    log.info(
+        "Validation: %d/%d facts found (%s), %d missed",
+        found_facts,
+        total_facts,
+        summary["fact_accuracy"],
+        len(missed_facts),
+    )
     if missed_facts:
         log.warning("Missed facts: %s", json.dumps(missed_facts[:5], indent=2))
 
@@ -1204,6 +1249,7 @@ def validate_golden_rows(rows: list[dict]) -> dict:
 def _check_context_support(rows: list[dict], sample: int = 10) -> dict:
     """Check that answer claims are supported by the context for a sample."""
     import random as _random
+
     _random.seed(RANDOM_SEED)
     sample_rows = _random.sample(rows, min(sample, len(rows)))
 
@@ -1220,13 +1266,15 @@ def _check_context_support(rows: list[dict], sample: int = 10) -> dict:
         numbers_in_answer = re.findall(r"\b(\d{2,5})\b", assistant_msg)
         missing_numbers = [n for n in numbers_in_answer if n not in context]
 
-        results.append({
-            "row_type": row["metadata"]["source"],
-            "doc_name": row["metadata"].get("doc_name", row["metadata"].get("golden_id", "?")),
-            "numbers_in_answer": len(numbers_in_answer),
-            "numbers_not_in_context": len(missing_numbers),
-            "missing_numbers_sample": missing_numbers[:5],
-        })
+        results.append(
+            {
+                "row_type": row["metadata"]["source"],
+                "doc_name": row["metadata"].get("doc_name", row["metadata"].get("golden_id", "?")),
+                "numbers_in_answer": len(numbers_in_answer),
+                "numbers_not_in_context": len(missing_numbers),
+                "missing_numbers_sample": missing_numbers[:5],
+            }
+        )
 
     return {
         "sampled": len(sample_rows),
@@ -1238,6 +1286,7 @@ def _check_context_support(rows: list[dict], sample: int = 10) -> dict:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main():
     import argparse
 
@@ -1245,25 +1294,21 @@ def main():
         description="Generate ChatML training dataset for Unsloth QLoRA fine-tuning"
     )
     parser.add_argument(
-        "--source", choices=["golden", "synthetic", "all"], default="all",
-        help="Source for training data generation (default: all)"
+        "--source",
+        choices=["golden", "synthetic", "all"],
+        default="all",
+        help="Source for training data generation (default: all)",
     )
     parser.add_argument(
-        "--validate", action="store_true",
-        help="Run golden-fact validation on output"
+        "--validate", action="store_true", help="Run golden-fact validation on output"
     )
     parser.add_argument(
-        "--scale", type=int, default=1200,
-        help="Target number of synthetic rows (default: 1200)"
+        "--scale", type=int, default=1200, help="Target number of synthetic rows (default: 1200)"
     )
     parser.add_argument(
-        "--resume", action="store_true",
-        help="Skip already-written rows in output file"
+        "--resume", action="store_true", help="Skip already-written rows in output file"
     )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Print plan without calling API"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Print plan without calling API")
     args = parser.parse_args()
 
     if args.dry_run:
@@ -1329,13 +1374,15 @@ def main():
         ctx_check = _check_context_support(all_rows, sample=10)
 
         log.info("Fact accuracy: %s", val_summary["fact_accuracy"])
-        log.info("Context support: %d/%d rows sampled",
-                 ctx_check["sampled"], len(all_rows))
+        log.info("Context support: %d/%d rows sampled", ctx_check["sampled"], len(all_rows))
         for r in ctx_check["results"]:
             if r["numbers_not_in_context"] > 0:
-                log.warning("  %s: %d numbers missing from context: %s",
-                            r["doc_name"], r["numbers_not_in_context"],
-                            r["missing_numbers_sample"])
+                log.warning(
+                    "  %s: %d numbers missing from context: %s",
+                    r["doc_name"],
+                    r["numbers_not_in_context"],
+                    r["missing_numbers_sample"],
+                )
 
     # Print summary
     source_counts = {}

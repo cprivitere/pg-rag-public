@@ -2,12 +2,13 @@
 and pgrag.rag.llm.generate: unreachable/timeout servers raise EmbeddingServerError
 /LLMServerError with the endpoint in the message, and HTTP errors propagate."""
 
-import pytest
-import requests
 from unittest.mock import patch
 
-from pgrag.embeddings.llama_embeddings import embed_batch, EmbeddingServerError, EMBEDDING_URL
-from pgrag.rag.llm import generate, LLMServerError, LLM_URL
+import pytest
+import requests
+
+from pgrag.embeddings.llama_embeddings import EMBEDDING_URL, EmbeddingServerError, embed_batch
+from pgrag.rag.llm import LLM_URL, LLMServerError, generate
 
 
 def test_embedding_server_unreachable():

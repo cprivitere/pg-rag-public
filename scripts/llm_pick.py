@@ -10,6 +10,7 @@ Usage:
     uv run python scripts/llm_pick.py --list     # print available models
     uv run python scripts/llm_pick.py qwen-9b --no-restart  # switch, skip restart
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,7 +20,6 @@ import sys
 import time
 
 # ── shared registry & helpers from golden bakeoff ──────────────────────────
-
 from llm_golden_bakeoff import (
     CANDIDATES,
     HEALTH_URL,
@@ -29,7 +29,6 @@ from llm_golden_bakeoff import (
     start_llm,
     stop_llm,
 )
-
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
@@ -115,7 +114,7 @@ def _interactive(no_restart: bool = False) -> None:
     while True:
         try:
             choice = input(f"Pick model [1-{len(keys)}/q]: ").strip()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             print()
             return
 
@@ -177,19 +176,20 @@ def _non_interactive(key_str: str, no_restart: bool) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Pick the default LLM model from tested candidates"
-    )
+    ap = argparse.ArgumentParser(description="Pick the default LLM model from tested candidates")
     ap.add_argument(
-        "model_key", nargs="?",
+        "model_key",
+        nargs="?",
         help="Candidate key (case-insensitive prefix match). Omit for interactive menu.",
     )
     ap.add_argument(
-        "--no-restart", action="store_true",
+        "--no-restart",
+        action="store_true",
         help="Skip LLM server restart after switching",
     )
     ap.add_argument(
-        "--list", action="store_true",
+        "--list",
+        action="store_true",
         help="Print available models and exit",
     )
     args = ap.parse_args()

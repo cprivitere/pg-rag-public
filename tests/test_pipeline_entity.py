@@ -5,8 +5,6 @@ synthesis, fallback to the general corpus on a hub miss, and the gap-fill
 re-retrieval loop firing at most once with an empty-subject/answer fallback.
 """
 
-import pytest
-
 from pgrag.rag import pipeline
 
 HUB_CTX = {
@@ -28,9 +26,7 @@ HUB_CTX = {
 
 
 def _set_entity(monkeypatch, ctx=HUB_CTX):
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.classify_query", lambda q: "entity"
-    )
+    monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "entity")
     monkeypatch.setattr(
         "pgrag.rag.pipeline.find_entity", lambda q: ("skillprofile_Pooping", "skill")
     )
@@ -195,12 +191,15 @@ def test_gap_fill_empty_answer_retries_without_retrieve(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.generate", fake_generate)
     monkeypatch.setattr(
         "pgrag.rag.pipeline.retrieve",
-        lambda *a, **k: retrieved.append(a) or {
-            "ids": [["quest_quest_197_chunk_1"]],
-            "documents": [["quest text"]],
-            "metadatas": [[{}]],
-            "distances": [[0.2]],
-        },
+        lambda *a, **k: (
+            retrieved.append(a)
+            or {
+                "ids": [["quest_quest_197_chunk_1"]],
+                "documents": [["quest text"]],
+                "metadatas": [[{}]],
+                "distances": [[0.2]],
+            }
+        ),
     )
 
     result = pipeline.ask("what is Dungcrafting", allow_gap_fill=True)
@@ -223,12 +222,15 @@ def test_gap_fill_empty_answer_then_retrieve(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.generate", fake_generate)
     monkeypatch.setattr(
         "pgrag.rag.pipeline.retrieve",
-        lambda *a, **k: retrieved.append(a) or {
-            "ids": [["quest_quest_197_chunk_1"]],
-            "documents": [["quest text"]],
-            "metadatas": [[{}]],
-            "distances": [[0.2]],
-        },
+        lambda *a, **k: (
+            retrieved.append(a)
+            or {
+                "ids": [["quest_quest_197_chunk_1"]],
+                "documents": [["quest text"]],
+                "metadatas": [[{}]],
+                "distances": [[0.2]],
+            }
+        ),
     )
 
     result = pipeline.ask("what is Dungcrafting", allow_gap_fill=True)

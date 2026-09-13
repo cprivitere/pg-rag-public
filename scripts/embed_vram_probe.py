@@ -6,6 +6,7 @@ and the service-flag sweeper (vram_sweep.py) import _url_args / _total_vram_mb
 data/embed_vram.json was superseded by the bake-off's per-PID measurement and
 removed.
 """
+
 import re
 import subprocess
 from pathlib import Path
@@ -14,8 +15,10 @@ DATA = Path(__file__).resolve().parent.parent / "data"
 PORT = 8084
 HOST = "Scamper"
 
+
 def get_base_url():
     import socket
+
     try:
         addrs = socket.getaddrinfo(HOST, PORT, socket.AF_INET6, socket.SOCK_STREAM)
         for res in addrs:
@@ -29,15 +32,24 @@ def get_base_url():
         pass
     return f"http://{HOST}:{PORT}"
 
+
 def _total_vram_mb():
     out = subprocess.run(
-        ["pwsh", "-NoProfile", "-Command",
-         "(Get-Counter '\\GPU Adapter Memory(*)\\Dedicated Usage' -ErrorAction SilentlyContinue)"
-         ".CounterSamples | Measure-Object -Property CookedValue -Sum"],
-        capture_output=True, text=True, timeout=60,
+        [
+            "pwsh",
+            "-NoProfile",
+            "-Command",
+            (
+                "(Get-Counter '\\GPU Adapter Memory(*)\\Dedicated Usage' -ErrorAction SilentlyContinue)"
+                ".CounterSamples | Measure-Object -Property CookedValue -Sum"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     # Output contains ANSI color codes; strip them
-    cleaned = re.sub(r'\x1b\[[0-9;]*m', '', out.stdout)
+    cleaned = re.sub(r"\x1b\[[0-9;]*m", "", out.stdout)
     m = re.search(r"Sum\s*:\s*([\d.]+)", cleaned)
     return (float(m.group(1)) / 1e6) if m else None  # MB
 
@@ -50,12 +62,20 @@ def get_per_pid_vram(pid):
     adapter total. Reliable for attributing one llama-server's VRAM.
     """
     out = subprocess.run(
-        ["pwsh", "-NoProfile", "-Command",
-         f"(Get-Counter '\\GPU Process Memory(*)\\Dedicated Usage' "
-         f"-ErrorAction SilentlyContinue).CounterSamples | "
-         f"Where-Object {{ $_.InstanceName -match '^pid_{pid}_' }} | "
-         f"Measure-Object -Property CookedValue -Sum"],
-        capture_output=True, text=True, timeout=60,
+        [
+            "pwsh",
+            "-NoProfile",
+            "-Command",
+            (
+                f"(Get-Counter '\\GPU Process Memory(*)\\Dedicated Usage' "
+                f"-ErrorAction SilentlyContinue).CounterSamples | "
+                f"Where-Object {{ $_.InstanceName -match '^pid_{pid}_' }} | "
+                f"Measure-Object -Property CookedValue -Sum"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     cleaned = re.sub(r"\x1b\[[0-9;]*m", "", out.stdout)
     m = re.search(r"Sum\s*:\s*([\d.]+)", cleaned)

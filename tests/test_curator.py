@@ -18,17 +18,22 @@ def _write_wiki(tmp, files):
 
 def _run(tmp):
     curated = Path(tmp) / "curated"
-    with patch("scripts.curator.WIKI_DIR", Path(tmp) / "wiki"), \
-         patch("scripts.curator.CURATED_DIR", curated):
+    with (
+        patch("scripts.curator.WIKI_DIR", Path(tmp) / "wiki"),
+        patch("scripts.curator.CURATED_DIR", curated),
+    ):
         return run_curator()
 
 
 def test_v20_curator_creates_curated_doc(tmp_path):
-    wiki = _write_wiki(tmp_path, {
-        "area1.txt": "Eltibule is a level 20 area with good zones.",
-        "area2.txt": "Serbule Hills is a level 20 area too.",
-        "area3.txt": "Gazluk is a level 40 area for endgame.",
-    })
+    wiki = _write_wiki(
+        tmp_path,
+        {
+            "area1.txt": "Eltibule is a level 20 area with good zones.",
+            "area2.txt": "Serbule Hills is a level 20 area too.",
+            "area3.txt": "Gazluk is a level 40 area for endgame.",
+        },
+    )
     _run(tmp_path)
     created = list(wiki.parent.joinpath("curated").glob("*_curated.txt"))
     assert len(created) == 1
@@ -36,20 +41,26 @@ def test_v20_curator_creates_curated_doc(tmp_path):
 
 
 def test_v20_curator_regenerates_on_source_change(tmp_path):
-    _write_wiki(tmp_path, {
-        "area1.txt": "Eltibule is a level 20 area with good zones.",
-        "area2.txt": "Serbule Hills is a level 20 area too.",
-        "area3.txt": "Gazluk is a level 40 area for endgame.",
-    })
+    _write_wiki(
+        tmp_path,
+        {
+            "area1.txt": "Eltibule is a level 20 area with good zones.",
+            "area2.txt": "Serbule Hills is a level 20 area too.",
+            "area3.txt": "Gazluk is a level 40 area for endgame.",
+        },
+    )
     _run(tmp_path)
-    curated_file = list(Path(tmp_path).joinpath("curated").glob("*_curated.txt"))[0]
+    curated_file = next(iter(Path(tmp_path).joinpath("curated").glob("*_curated.txt")))
     first = curated_file.read_text(encoding="utf-8")
 
-    _write_wiki(tmp_path, {
-        "area1.txt": "Eltibule is a level 25 area now — updated.",
-        "area2.txt": "Serbule Hills is a level 25 area now — updated.",
-        "area3.txt": "Gazluk is a level 45 area for endgame.",
-    })
+    _write_wiki(
+        tmp_path,
+        {
+            "area1.txt": "Eltibule is a level 25 area now — updated.",
+            "area2.txt": "Serbule Hills is a level 25 area now — updated.",
+            "area3.txt": "Gazluk is a level 45 area for endgame.",
+        },
+    )
     _run(tmp_path)
     second = curated_file.read_text(encoding="utf-8")
 

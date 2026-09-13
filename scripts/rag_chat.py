@@ -41,9 +41,7 @@ def respond(message, history):
     sources = result["sources"]
     if sources:
         shown = sources[:5]
-        source_block = "\n".join(
-            f"- {s['citation']}" for s in shown
-        )
+        source_block = "\n".join(f"- {s['citation']}" for s in shown)
         hidden = len(sources) - len(shown)
         if hidden > 0:
             source_block += f"\n\n…and {hidden} more not shown."

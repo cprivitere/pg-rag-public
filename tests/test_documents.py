@@ -8,28 +8,36 @@ test_gathering_summaries.py (gathering summaries), test_wiki_builder.py
 (wiki parser), test_skill_profiles.py, test_chunking.py.
 """
 
-from unittest.mock import patch
-
 from pgrag.documents.builder import (
+    build_ability_documents,
+    build_area_documents,
+    build_effect_documents,
     build_item_documents,
+    build_landmark_documents,
+    build_lorebook_documents,
+    build_npc_documents,
+    build_quest_documents,
     build_recipe_documents,
     build_skill_documents,
-    build_quest_documents,
-    build_ability_documents,
-    build_npc_documents,
-    build_effect_documents,
-    build_lorebook_documents,
-    build_directedgoal_documents,
-    build_area_documents,
-    build_landmark_documents,
     build_title_documents,
     build_vault_documents,
 )
 
 
-def _make_db(items=None, recipes=None, skills=None, quests=None,
-             abilities=None, npcs=None, effects=None, lorebooks=None,
-             areas=None, landmarks=None, playertitles=None, storagevaults=None):
+def _make_db(
+    items=None,
+    recipes=None,
+    skills=None,
+    quests=None,
+    abilities=None,
+    npcs=None,
+    effects=None,
+    lorebooks=None,
+    areas=None,
+    landmarks=None,
+    playertitles=None,
+    storagevaults=None,
+):
     class FakeDB:
         def __init__(self):
             self.tables = {}
@@ -58,6 +66,7 @@ def _make_db(items=None, recipes=None, skills=None, quests=None,
             if storagevaults is not None:
                 self.tables["storagevaults"] = storagevaults
             self.wiki = {}
+
     return FakeDB()
 
 
@@ -78,7 +87,15 @@ def test_item_document_shape():
 
 
 def test_recipe_document_shape():
-    recipes = {"recipe_1": {"Name": "Healing Potion", "Skill": "Alchemy", "SkillLevelReq": 5, "Ingredients": [], "ResultItems": []}}
+    recipes = {
+        "recipe_1": {
+            "Name": "Healing Potion",
+            "Skill": "Alchemy",
+            "SkillLevelReq": 5,
+            "Ingredients": [],
+            "ResultItems": [],
+        }
+    }
     db = _make_db(recipes=recipes)
     docs = build_recipe_documents(db)
     assert len(docs) == 1
@@ -94,9 +111,18 @@ def test_recipe_document_shape():
 
 def test_build_documents_sets_type_in_metadata():
     items = {"item_1": {"Name": "Bunny Juice"}}
-    recipes = {"recipe_1": {"Name": "Healing Potion", "Skill": "Alchemy", "SkillLevelReq": 5, "Ingredients": [], "ResultItems": []}}
+    recipes = {
+        "recipe_1": {
+            "Name": "Healing Potion",
+            "Skill": "Alchemy",
+            "SkillLevelReq": 5,
+            "Ingredients": [],
+            "ResultItems": [],
+        }
+    }
     db = _make_db(items=items, recipes=recipes)
     from pgrag.documents.builder import build_documents
+
     docs = build_documents(db)
     for doc in docs:
         assert doc["metadata"]["type"] == doc["type"]
@@ -106,6 +132,7 @@ def test_build_documents_derives_name_from_text_when_missing():
     items = {"item_1": {"Name": "Bunny Juice"}}
     db = _make_db(items=items)
     from pgrag.documents.builder import build_documents
+
     docs = build_documents(db)
     item_doc = next(d for d in docs if d["id"] == "item_1")
     assert item_doc["metadata"]["name"] == "Bunny Juice"
@@ -115,8 +142,20 @@ def test_build_documents_includes_summaries():
     from pgrag.documents.builder import build_documents
 
     recipes = {
-        "r1": {"Name": "Cheese A", "Skill": "Cheesemaking", "SkillLevelReq": 10, "Ingredients": [], "ResultItems": []},
-        "r2": {"Name": "Cheese B", "Skill": "Cheesemaking", "SkillLevelReq": 50, "Ingredients": [], "ResultItems": []},
+        "r1": {
+            "Name": "Cheese A",
+            "Skill": "Cheesemaking",
+            "SkillLevelReq": 10,
+            "Ingredients": [],
+            "ResultItems": [],
+        },
+        "r2": {
+            "Name": "Cheese B",
+            "Skill": "Cheesemaking",
+            "SkillLevelReq": 50,
+            "Ingredients": [],
+            "ResultItems": [],
+        },
     }
     db = _make_db(recipes=recipes)
     docs = build_documents(db)
@@ -133,7 +172,12 @@ def test_wiki_gathering_summary_supplants_cdn_gathering_summary():
         "i1": {"Name": "Parasol Mushroom", "Keywords": ["Mushroom1"]},
     }
     recipes = {
-        "r1": {"Name": "Gather Mushrooms", "ItemMenuKeywordReq": "Mushroom1", "Skill": "Mycology", "SkillLevelReq": 0},
+        "r1": {
+            "Name": "Gather Mushrooms",
+            "ItemMenuKeywordReq": "Mushroom1",
+            "Skill": "Mycology",
+            "SkillLevelReq": 0,
+        },
     }
     db = _make_db(items=items, recipes=recipes)
     db.wiki = {
@@ -160,7 +204,12 @@ def test_cdn_gathering_summary_kept_when_no_wiki_summary():
         "i1": {"Name": "Rat Pelt", "Keywords": ["Skin1"]},
     }
     recipes = {
-        "r1": {"Name": "Skin Rat", "ItemMenuKeywordReq": "Skin1", "Skill": "Tanning", "SkillLevelReq": 1},
+        "r1": {
+            "Name": "Skin Rat",
+            "ItemMenuKeywordReq": "Skin1",
+            "Skill": "Tanning",
+            "SkillLevelReq": 1,
+        },
     }
     db = _make_db(items=items, recipes=recipes)
     docs = build_documents(db)
@@ -178,7 +227,9 @@ def test_gift_summary_built_from_sources_items():
         items={"item_4651": {"Name": "Peening Hammer"}},
         npcs={"NPC_Amutasa": {"Name": "Amutasa"}},
     )
-    db.tables["sources_items"] = {"item_4651": {"entries": [{"type": "NpcGift", "npc": "NPC_Amutasa"}]}}
+    db.tables["sources_items"] = {
+        "item_4651": {"entries": [{"type": "NpcGift", "npc": "NPC_Amutasa"}]}
+    }
     docs = build_documents(db)
     gift = next(d for d in docs if d["metadata"]["name"] == "Amutasa Gift Preferences")
     assert "Amutasa accepts these items as gifts:" in gift["text"]
@@ -193,7 +244,9 @@ def test_gift_summary_skips_unresolvable_npc_keys():
     from pgrag.documents.builder import build_documents
 
     db = _make_db(items={"item_1": {"Name": "Cheese"}})
-    db.tables["sources_items"] = {"item_1": {"entries": [{"type": "NpcGift", "npc": "NPC_OrcStuff"}]}}
+    db.tables["sources_items"] = {
+        "item_1": {"entries": [{"type": "NpcGift", "npc": "NPC_OrcStuff"}]}
+    }
     docs = build_documents(db)
     assert not [d for d in docs if "Gift Preferences" in d["metadata"].get("name", "")]
 
@@ -271,11 +324,16 @@ def test_skill_document_includes_rewards_and_hints():
 def test_quest_document_shape():
     quests = {
         "Graffiti_Glyph27": {
-            "Name": "Graffiti: Mastering \"Poop\"",
+            "Name": 'Graffiti: Mastering "Poop"',
             "Description": "Learn the poop symbol.",
             "PrefaceText": "The animal-turd symbol.",
             "Objectives": [
-                {"Description": "Poop in public", "Type": "UseAbility", "Number": 1, "Target": "AnimalPoop"},
+                {
+                    "Description": "Poop in public",
+                    "Type": "UseAbility",
+                    "Number": 1,
+                    "Target": "AnimalPoop",
+                },
             ],
             "Requirements": [],
             "Rewards": [{"Skill": "Lore", "T": "SkillXp", "Xp": 15}],
@@ -314,7 +372,12 @@ def test_quest_document_includes_objectives_and_rewards():
             "Name": "Kill Stuff",
             "Description": "Kill 5 skeletons.",
             "Objectives": [
-                {"Description": "Kill Skeletons", "Type": "Kill", "Number": 5, "Target": "Skeleton"},
+                {
+                    "Description": "Kill Skeletons",
+                    "Type": "Kill",
+                    "Number": 5,
+                    "Target": "Skeleton",
+                },
             ],
             "Requirements": [
                 {"T": "MinSkillLevel", "Skill": "Sword", "Level": 10},
@@ -340,10 +403,20 @@ def test_build_documents_includes_skills_and_quests():
     from pgrag.documents.builder import build_documents
 
     skills = {
-        "TestSkill": {"Name": "TestSkill", "Description": "A test skill.", "Parents": [], "Rewards": {}}
+        "TestSkill": {
+            "Name": "TestSkill",
+            "Description": "A test skill.",
+            "Parents": [],
+            "Rewards": {},
+        }
     }
     quests = {
-        "TestQuest": {"Name": "Test Quest", "Description": "A test quest.", "Objectives": [], "Keywords": []}
+        "TestQuest": {
+            "Name": "Test Quest",
+            "Description": "A test quest.",
+            "Objectives": [],
+            "Keywords": [],
+        }
     }
     db = _make_db(skills=skills, quests=quests)
     docs = build_documents(db)
@@ -478,7 +551,12 @@ def test_area_document_shape():
 def test_landmark_document_shape():
     landmarks = {
         "AreaStatehelm": [
-            {"Name": "Portal", "Desc": "Return to Statehelm", "Type": "Portal", "Loc": "x:0 y:0 z:0"},
+            {
+                "Name": "Portal",
+                "Desc": "Return to Statehelm",
+                "Type": "Portal",
+                "Loc": "x:0 y:0 z:0",
+            },
         ]
     }
     db = _make_db(landmarks=landmarks)
@@ -526,11 +604,24 @@ def test_build_documents_includes_all_new_types():
         abilities={"a1": {"Name": "Test Ability", "Description": "Does stuff.", "Keywords": []}},
         npcs={"n1": {"Name": "Test NPC", "Desc": "A person.", "AreaFriendlyName": "Town"}},
         effects={"e1": {"Name": "Test Effect", "Desc": "Does a thing.", "Keywords": []}},
-        lorebooks={"b1": {"Title": "Test Book", "Text": "Once upon a time.", "Category": "Fiction"}},
+        lorebooks={
+            "b1": {"Title": "Test Book", "Text": "Once upon a time.", "Category": "Fiction"}
+        },
         areas={"a1": {"FriendlyName": "Test Area", "ShortFriendlyName": "TA"}},
-        landmarks={"a1": [{"Name": "Test Landmark", "Desc": "A place.", "Type": "POI", "Loc": "x:0 y:0 z:0"}]},
+        landmarks={
+            "a1": [
+                {"Name": "Test Landmark", "Desc": "A place.", "Type": "POI", "Loc": "x:0 y:0 z:0"}
+            ]
+        },
         playertitles={"t1": {"Title": "Hero"}},
-        storagevaults={"v1": {"Area": "Town", "NpcFriendlyName": "Bank", "NumSlots": 10, "HasAssociatedNpc": True}},
+        storagevaults={
+            "v1": {
+                "Area": "Town",
+                "NpcFriendlyName": "Bank",
+                "NumSlots": 10,
+                "HasAssociatedNpc": True,
+            }
+        },
     )
     docs = build_documents(db)
     types = {d["type"] for d in docs}

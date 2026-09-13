@@ -4,10 +4,10 @@ Covers load_documents refusing a stale or missing DOCUMENTS_VERSION marker,
 embedding_hash vs metadata_hash change detection, and _get_existing_dim.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 from pgrag.vectorstore.build_index import _get_existing_dim, load_documents
+from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 
 
 def test_documents_version_refuses_stale(monkeypatch, tmp_path):
@@ -15,9 +15,7 @@ def test_documents_version_refuses_stale(monkeypatch, tmp_path):
     the current generator — the classic build-index/build-documents trap."""
     marker = tmp_path / "documents_version.json"
     marker.write_text('{"version": 1}', encoding="utf-8")
-    monkeypatch.setattr(
-        "pgrag.vectorstore.build_index.DOCUMENTS_VERSION_FILE", marker
-    )
+    monkeypatch.setattr("pgrag.vectorstore.build_index.DOCUMENTS_VERSION_FILE", marker)
     try:
         load_documents()
     except ValueError as exc:
@@ -29,9 +27,7 @@ def test_documents_version_refuses_stale(monkeypatch, tmp_path):
 
 def test_documents_version_refuses_missing_marker(monkeypatch, tmp_path):
     marker = tmp_path / "documents_version.json"
-    monkeypatch.setattr(
-        "pgrag.vectorstore.build_index.DOCUMENTS_VERSION_FILE", marker
-    )
+    monkeypatch.setattr("pgrag.vectorstore.build_index.DOCUMENTS_VERSION_FILE", marker)
     try:
         load_documents()
     except ValueError as exc:

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 from pgrag.rag.retrieval_eval import (
@@ -20,7 +20,9 @@ from pgrag.rag.retrieval_eval import (
 )
 
 
-def format_table(headers: list[str], rows: list[list[str]], alignments: list[str] | None = None) -> str:
+def format_table(
+    headers: list[str], rows: list[list[str]], alignments: list[str] | None = None
+) -> str:
     """Format a clean ASCII table with header borders and aligned columns."""
     if not rows:
         return ""
@@ -39,9 +41,9 @@ def format_table(headers: list[str], rows: list[list[str]], alignments: list[str
             w = col_widths[i]
             align = alignments[i] if i < len(alignments) else "<"
             if align == ">":
-                formatted.append(f"{str(cell):>{w}}")
+                formatted.append(f"{cell!s:>{w}}")
             else:
-                formatted.append(f"{str(cell):<{w}}")
+                formatted.append(f"{cell!s:<{w}}")
         return "| " + " | ".join(formatted) + " |"
 
     sep = "+-" + "-+-".join("-" * w for w in col_widths) + "-+"
@@ -76,16 +78,18 @@ def print_stage_table(stages_data: dict[str, dict[str, float]]) -> None:
     )
     for stg in sorted_stages:
         m = stages_data[stg]
-        rows.append([
-            stg,
-            f"{m.get('recall@1', 0.0):.4f}",
-            f"{m.get('recall@5', 0.0):.4f}",
-            f"{m.get('recall@10', 0.0):.4f}",
-            f"{m.get('mrr', 0.0):.4f}",
-            f"{m.get('ndcg@5', 0.0):.4f}",
-            f"{m.get('hit@5', 0.0):.4f}",
-            f"{int(m.get('cases_evaluated', 0))}",
-        ])
+        rows.append(
+            [
+                stg,
+                f"{m.get('recall@1', 0.0):.4f}",
+                f"{m.get('recall@5', 0.0):.4f}",
+                f"{m.get('recall@10', 0.0):.4f}",
+                f"{m.get('mrr', 0.0):.4f}",
+                f"{m.get('ndcg@5', 0.0):.4f}",
+                f"{m.get('hit@5', 0.0):.4f}",
+                f"{int(m.get('cases_evaluated', 0))}",
+            ]
+        )
     print(format_table(headers, rows))
 
 
@@ -109,14 +113,16 @@ def print_category_table(categories: dict[str, dict[str, Any]]) -> None:
         rr_n5 = f"{stgs['rerank']['ndcg@5']:.4f}" if "rerank" in stgs else "-"
         uplift = data.get("reranker_uplift", 0.0)
         uplift_str = f"{uplift:+.4f}" if "rerank" in stgs else "-"
-        rows.append([
-            cat,
-            str(data.get("count", 0)),
-            bm25_n5,
-            hyb_n5,
-            rr_n5,
-            uplift_str,
-        ])
+        rows.append(
+            [
+                cat,
+                str(data.get("count", 0)),
+                bm25_n5,
+                hyb_n5,
+                rr_n5,
+                uplift_str,
+            ]
+        )
     print("\n--- Category Breakdown ---")
     print(format_table(headers, rows))
 
@@ -148,14 +154,16 @@ def print_comparison_diff(comparison: dict[str, Any]) -> None:
         ]
         rows = []
         for stg, deltas in sorted(stage_deltas.items()):
-            rows.append([
-                stg,
-                f"{deltas.get('recall@1', 0.0):+.4f}",
-                f"{deltas.get('recall@5', 0.0):+.4f}",
-                f"{deltas.get('mrr', 0.0):+.4f}",
-                f"{deltas.get('ndcg@5', 0.0):+.4f}",
-                f"{deltas.get('hit@5', 0.0):+.4f}",
-            ])
+            rows.append(
+                [
+                    stg,
+                    f"{deltas.get('recall@1', 0.0):+.4f}",
+                    f"{deltas.get('recall@5', 0.0):+.4f}",
+                    f"{deltas.get('mrr', 0.0):+.4f}",
+                    f"{deltas.get('ndcg@5', 0.0):+.4f}",
+                    f"{deltas.get('hit@5', 0.0):+.4f}",
+                ]
+            )
         print("\n--- Stage Metric Deltas ---")
         print(format_table(headers, rows))
 
@@ -256,7 +264,9 @@ def main() -> int:
     print(f"Stages:   {', '.join(stages)}")
     print(f"Output:   {args.out}")
     if baseline_data:
-        print(f"Compare:  {args.compare} (loaded baseline with {baseline_data.get('total_cases', 0)} cases)")
+        print(
+            f"Compare:  {args.compare} (loaded baseline with {baseline_data.get('total_cases', 0)} cases)"
+        )
     print("Running benchmark...\n")
 
     try:
@@ -274,18 +284,22 @@ def main() -> int:
 
     print(f"Total Cases Evaluated: {results.get('total_cases', 0)}")
     print(f"Total Execution Time:  {results.get('total_time_ms', 0.0):.1f} ms")
-    print(f"Query Classifier Accuracy: {summary.get('classifier_accuracy', 0.0)*100:.1f}%")
-    print(f"Entity Resolution Accuracy: {summary.get('entity_accuracy', 0.0)*100:.1f}%")
+    print(f"Query Classifier Accuracy: {summary.get('classifier_accuracy', 0.0) * 100:.1f}%")
+    print(f"Entity Resolution Accuracy: {summary.get('entity_accuracy', 0.0) * 100:.1f}%")
     if "rerank" in stages_data and "hybrid" in stages_data:
         print(f"Reranker Uplift (NDCG@5):  {summary.get('reranker_uplift', 0.0):+.4f}")
 
     gold = results.get("gold_report", {})
     if gold:
-        print(f"Gold-Set Hygiene: {gold.get('missing_count', 0)} cases with missing ids, "
-              f"{gold.get('fanout_count', 0)} fan-out cases")
+        print(
+            f"Gold-Set Hygiene: {gold.get('missing_count', 0)} cases with missing ids, "
+            f"{gold.get('fanout_count', 0)} fan-out cases"
+        )
         for issue in gold.get("issues", []):
             if issue["kind"] == "missing":
-                print(f"  [!] {issue['id']} relevant_ids absent from corpus: {issue['relevant_ids']}")
+                print(
+                    f"  [!] {issue['id']} relevant_ids absent from corpus: {issue['relevant_ids']}"
+                )
             else:
                 print(f"  [!] {issue['id']} relevant set size {issue['relevant_size']} (fan-out)")
 
@@ -313,8 +327,12 @@ def main() -> int:
             )
             match_sym = "✓" if q.get("classifier_match") else "✗"
             print(f"[{q['id']}] {q['query']}")
-            print(f"  Classifier: {match_sym} {q.get('predicted_classifier')} (expected: {q.get('expected_classifier')})")
-            print(f"  Entities:   {q.get('predicted_entities')} (score: {q.get('entity_accuracy', 0.0):.2f})")
+            print(
+                f"  Classifier: {match_sym} {q.get('predicted_classifier')} (expected: {q.get('expected_classifier')})"
+            )
+            print(
+                f"  Entities:   {q.get('predicted_entities')} (score: {q.get('entity_accuracy', 0.0):.2f})"
+            )
             print(f"  Stages:     {stg_info}")
             print(f"  Relevant:   {q.get('relevant_ids')[:5]}")
             print()

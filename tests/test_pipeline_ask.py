@@ -29,12 +29,8 @@ def _retrieve_result(extra_docs=()):
 
 
 def _setup_general(monkeypatch, generate):
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.classify_query", lambda q: "general"
-    )
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.should_synthesize", lambda *a, **k: False
-    )
+    monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "general")
+    monkeypatch.setattr("pgrag.rag.pipeline.should_synthesize", lambda *a, **k: False)
     monkeypatch.setattr("pgrag.rag.pipeline.generate", generate)
 
 
@@ -107,8 +103,7 @@ def test_general_plan_propagates_native_and_token_filters(monkeypatch):
     (token) filters and is recorded in the trace."""
     seen = {}
 
-    def fake_retrieve(question, metadata_filter=None, token_filter=None,
-                      **kwargs):
+    def fake_retrieve(question, metadata_filter=None, token_filter=None, **kwargs):
         seen["mf"] = metadata_filter
         seen["tf"] = token_filter
         return _retrieve_result()
@@ -131,8 +126,7 @@ def test_general_user_filter_beats_plan(monkeypatch):
     """A caller-supplied metadata_filter must not be overridden by a plan."""
     seen = {}
 
-    def fake_retrieve(question, metadata_filter=None, token_filter=None,
-                      **kwargs):
+    def fake_retrieve(question, metadata_filter=None, token_filter=None, **kwargs):
         seen["mf"] = metadata_filter
         seen["tf"] = token_filter
         return _retrieve_result()
@@ -155,8 +149,7 @@ def test_creature_location_plan_filters_table_and_widens_count(monkeypatch):
     (80, not the general 40) so "list all" queries don't drop valid spawns."""
     seen = {}
 
-    def fake_retrieve(question, metadata_filter=None, token_filter=None,
-                      count=None, **kwargs):
+    def fake_retrieve(question, metadata_filter=None, token_filter=None, count=None, **kwargs):
         seen["mf"] = metadata_filter
         seen["count"] = count
         return _retrieve_result()
@@ -164,9 +157,7 @@ def test_creature_location_plan_filters_table_and_widens_count(monkeypatch):
     _setup_general(monkeypatch, lambda p: "Serbule Hills: Valley Sheep")
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", fake_retrieve)
 
-    pipeline.ask(
-        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
-    )
+    pipeline.ask("List all the locations with deer, sheep, goats, cows, or oxen in the game.")
 
     assert seen["mf"] == {"table": "creatures"}
     assert seen["count"] == 80

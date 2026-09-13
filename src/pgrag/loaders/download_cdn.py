@@ -1,6 +1,8 @@
 import os
 import sys
+
 import requests
+
 from pgrag.config import CDN_DIR
 
 sys.stdout.reconfigure(line_buffering=True)
@@ -9,13 +11,33 @@ CDN_BASE = "https://cdn.projectgorgon.com"
 VERSION_URL = "http://client.projectgorgon.com/fileversion.txt"
 
 DATA_FILES = [
-    "items", "skills", "abilities", "recipes", "effects", "npcs",
-    "areas", "attributes", "xptables", "advancementtables",
-    "abilitykeywords", "abilitydynamicdots", "abilitydynamicspecialvalues",
-    "ai", "directedgoals", "itemuses", "landmarks", "lorebooks",
-    "lorebookinfo", "playertitles", "quests", "sources_abilities",
-    "sources_items", "sources_recipes", "storagevaults",
-    "tsysclientinfo", "tsysprofiles",
+    "items",
+    "skills",
+    "abilities",
+    "recipes",
+    "effects",
+    "npcs",
+    "areas",
+    "attributes",
+    "xptables",
+    "advancementtables",
+    "abilitykeywords",
+    "abilitydynamicdots",
+    "abilitydynamicspecialvalues",
+    "ai",
+    "directedgoals",
+    "itemuses",
+    "landmarks",
+    "lorebooks",
+    "lorebookinfo",
+    "playertitles",
+    "quests",
+    "sources_abilities",
+    "sources_items",
+    "sources_recipes",
+    "storagevaults",
+    "tsysclientinfo",
+    "tsysprofiles",
 ]
 
 

@@ -5,13 +5,18 @@ import chromadb
 
 from pgrag.config import CONTEXT_BUDGET
 from pgrag.embeddings.llama_embeddings import embed_text
-from pgrag.rag.query_classifier import classify_query, find_entity, find_entities, is_leveling_intent
 from pgrag.rag.entity_retrieval import build_entity_context
-from pgrag.rag.retriever import retrieve
+from pgrag.rag.llm import generate, stream_generate
+from pgrag.rag.prompts import build_prompt
+from pgrag.rag.query_classifier import (
+    classify_query,
+    find_entities,
+    find_entity,
+    is_leveling_intent,
+)
 from pgrag.rag.query_plan import plan_query
 from pgrag.rag.resolve import expand_parents
-from pgrag.rag.prompts import build_prompt
-from pgrag.rag.llm import generate, stream_generate
+from pgrag.rag.retriever import retrieve
 from pgrag.rag.synthesis_detector import should_synthesize
 from pgrag.rag.synthesis_generator import synthesize_answer
 
@@ -35,17 +40,43 @@ _AGENTIC_MAX_ROUNDS = 1
 
 # Query terms hinting at a gathering/harvesting question
 _GATHERING_TERMS = {
-    "mushroom", "mushrooms", "gather", "gathering", "harvest", "harvestable",
-    "pick", "pickable", "forage", "foraging", "mine", "mining", "fish",
-    "fishing", "mycology", "tanning", "collect", "collecting",
+    "mushroom",
+    "mushrooms",
+    "gather",
+    "gathering",
+    "harvest",
+    "harvestable",
+    "pick",
+    "pickable",
+    "forage",
+    "foraging",
+    "mine",
+    "mining",
+    "fish",
+    "fishing",
+    "mycology",
+    "tanning",
+    "collect",
+    "collecting",
 }
 
 # Query terms hinting at a crafting/recipe question — these must NOT route to
 # gathering summaries, even when they share a skill word (e.g. "Mycology
 # recipe" is about recipes, not harvesting).
 _CRAFTING_TERMS = {
-    "recipe", "recipes", "craft", "crafting", "cook", "cooking", "make",
-    "makeable", "learn", "train", "ability", "abilities", "craftable",
+    "recipe",
+    "recipes",
+    "craft",
+    "crafting",
+    "cook",
+    "cooking",
+    "make",
+    "makeable",
+    "learn",
+    "train",
+    "ability",
+    "abilities",
+    "craftable",
 }
 
 
@@ -97,6 +128,7 @@ def _find_matching_summary(question):
         results["documents"][0],
         results["metadatas"][0],
         results["distances"][0],
+        strict=False,
     ):
         score = _summary_score(question, doc, meta, dist)
         if best_score is None or score > best_score:
@@ -107,7 +139,10 @@ def _find_matching_summary(question):
     # Rechunked summaries split into `_chunk_` docs — pull the whole artifact
     # so "all recipes for X" isn't answered from a single fragment.
     _, best_texts, _, _ = expand_parents(
-        [best_id], [best], [best_meta], [best_dist],
+        [best_id],
+        [best],
+        [best_meta],
+        [best_dist],
     )
     return "\n\n".join(best_texts)
 
@@ -139,9 +174,9 @@ def _build_sources(ids, distances, metadatas):
             "id": doc_id,
             "distance": distance,
             "metadata": metadata,
-            "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})"
+            "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})",
         }
-        for doc_id, distance, metadata in zip(ids, distances, metadatas)
+        for doc_id, distance, metadata in zip(ids, distances, metadatas, strict=False)
     ]
 
 
@@ -158,7 +193,18 @@ def _resolve_expansion(ids, docs, metas, dists):
     return ids, docs, metas, dists, len(docs) - before
 
 
-def _gap_fill(question, answer, ids, docs, metas, dists, query_type, generation=None, trace=None, allow_gap_fill=False):
+def _gap_fill(
+    question,
+    answer,
+    ids,
+    docs,
+    metas,
+    dists,
+    query_type,
+    generation=None,
+    trace=None,
+    allow_gap_fill=False,
+):
     """One-shot targeted re-retrieval on the missing subject (V36).
     Bare "I do not know." carries no subject -> fall back to the question itself.
     Empty answer also counts as missing.
@@ -230,7 +276,9 @@ def _prepare_entity(question):
     (ids, docs, metas, dists, rerank_used) or None if no hub found."""
     hub_id, _ = find_entity(question)
     ctx = build_entity_context(
-        question, hub_id, include_leveling=is_leveling_intent(question),
+        question,
+        hub_id,
+        include_leveling=is_leveling_intent(question),
     )
     if ctx is None:
         return None
@@ -251,8 +299,16 @@ def _ask_entity(question, generation=None, trace=None, allow_gap_fill=False):
 
     answer = _generate_with(question, docs, "entity", generation=generation)
     answer, ids, docs, metas, dist, gap_used = _gap_fill(
-        question, answer, ids, docs, metas, dists, "entity",
-        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
+        question,
+        answer,
+        ids,
+        docs,
+        metas,
+        dists,
+        "entity",
+        generation=generation,
+        trace=trace,
+        allow_gap_fill=allow_gap_fill,
     )
 
     return {
@@ -279,8 +335,7 @@ def _prepare_multi_entity(question, entities, generation=None, trace=None):
     docs = ctx["documents"][0]
     if trace is not None:
         trace["entities"] = [
-            {"name": name, "id": hub, "dtype": dtype}
-            for name, hub, dtype in entities
+            {"name": name, "id": hub, "dtype": dtype} for name, hub, dtype in entities
         ]
     answer = _generate_with(question, docs, "comparison", generation=generation)
     return {
@@ -309,7 +364,9 @@ def _apply_plan(question, metadata_filter, trace=None):
     return plan["native"], plan["token"] or None
 
 
-def _prepare_general(question, query_type, metadata_filter=None, token_filter=None, trace=None, generation=None):
+def _prepare_general(
+    question, query_type, metadata_filter=None, token_filter=None, trace=None, generation=None
+):
     """Retrieve (and possibly synthesize) context for a general/comparison
     query. Returns (query_type, ids, documents, metadatas, distances,
     rerank_used). Does not call the LLM."""
@@ -325,9 +382,9 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     # table, per-NPC gift summaries) is what enumeration questions need.
     # "List all the locations with <animals>" / "who can I gift X to?" must
     # surface their complete member list, not a tight generic top-k.
-    mf_tables = {
-        c.get("table") for c in (metadata_filter or {}).get("$and", [])
-    } | {(metadata_filter or {}).get("table")}
+    mf_tables = {c.get("table") for c in (metadata_filter or {}).get("$and", [])} | {
+        (metadata_filter or {}).get("table")
+    }
     plan_count = 80 if mf_tables & {"creatures", "summaries"} else (40 if is_wide else 3)
     results = retrieve(
         question,
@@ -345,22 +402,25 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     metadatas = results["metadatas"][0]
 
     _expanded = False
-    if is_wide and any(
-        isinstance(m, dict) and m.get("parent_id") for m in metadatas
-    ):
+    if is_wide and any(isinstance(m, dict) and m.get("parent_id") for m in metadatas):
         # Wiki page expansion: pull sibling chunks via parent_id so
         # "how-to" answers aren't lost in a non-retrieved chunk.
         before = len(ids)
         ids, documents, metadatas, distances = expand_parents(
-            ids, documents, metadatas, distances,
+            ids,
+            documents,
+            metadatas,
+            distances,
         )
         _expanded = len(ids) > before
         if trace is not None and _expanded:
-            parent_ids = sorted({
-                m.get("parent_id")
-                for m in metadatas
-                if isinstance(m, dict) and m.get("parent_id")
-            })
+            parent_ids = sorted(
+                {
+                    m.get("parent_id")
+                    for m in metadatas
+                    if isinstance(m, dict) and m.get("parent_id")
+                }
+            )
             trace["expansion"] = {
                 "parent_ids": parent_ids,
                 "chars": sum(len(d) for d in documents[before:]),
@@ -370,7 +430,7 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     if query_type == "comparison":
         summary = _find_matching_summary(question)
         if summary:
-            documents = [summary] + documents
+            documents = [summary, *documents]
 
     # Check if synthesis should be triggered. When wiki expansion spliced
     # sibling chunks into the context, the assembled page IS the coherent
@@ -378,7 +438,7 @@ def _prepare_general(question, query_type, metadata_filter=None, token_filter=No
     # summaries) would throw the specific row away.
     result_dicts = [
         {"text": doc, "metadata": meta, "distance": dist}
-        for doc, meta, dist in zip(documents, metadatas, distances)
+        for doc, meta, dist in zip(documents, metadatas, distances, strict=False)
     ]
 
     if should_synthesize(result_dicts, query_type) and not _expanded:
@@ -410,7 +470,9 @@ def _stream_generation(question, documents, query_type, generation=None):
     return stream_generate(prompt, **(generation or {}))
 
 
-def _stream_answer(question, ids, docs, metas, dists, query_type, generation=None, trace=None, allow_gap_fill=False):
+def _stream_answer(
+    question, ids, docs, metas, dists, query_type, generation=None, trace=None, allow_gap_fill=False
+):
     """Stream the answer (and any gap-fill re-answer) for a prepared context.
 
     Yields {"type": "token", "text"} deltas and {"type": "reset"} before a
@@ -502,19 +564,31 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
         if prepared is not None:
             ids, docs, metas, dists, rerank_used = prepared
             answer, ids, docs, metas, dists, gap_used = yield from _stream_answer(
-                question, ids, docs, metas, dists, "entity",
-                generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
+                question,
+                ids,
+                docs,
+                metas,
+                dists,
+                "entity",
+                generation=generation,
+                trace=trace,
+                allow_gap_fill=allow_gap_fill,
             )
             if trace is not None:
                 trace["generation"] = dict(generation or {})
-                trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get("query", question)
-            yield {"type": "final", "result": {
-                "answer": answer,
-                "documents": docs,
-                "query_type": "entity",
-                "rerank_used": rerank_used or gap_used,
-                "sources": _build_sources(ids, dists, metas),
-            }}
+                trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get(
+                    "query", question
+                )
+            yield {
+                "type": "final",
+                "result": {
+                    "answer": answer,
+                    "documents": docs,
+                    "query_type": "entity",
+                    "rerank_used": rerank_used or gap_used,
+                    "sources": _build_sources(ids, dists, metas),
+                },
+            }
             return
         query_type = "general"
 
@@ -522,12 +596,17 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
         ents = find_entities(question)
         if len(ents) >= 2:
             multi = _prepare_multi_entity(
-                question, ents, generation=generation, trace=trace,
+                question,
+                ents,
+                generation=generation,
+                trace=trace,
             )
             if multi is not None:
                 if trace is not None:
                     trace["generation"] = dict(generation or {})
-                    trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get("query", question)
+                    trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get(
+                        "query", question
+                    )
                 yield {"type": "final", "result": multi}
                 return
         # No entities found → widen comparison to general retrieval for
@@ -547,31 +626,37 @@ def ask_stream(question, metadata_filter=None, generation=None, trace=None, allo
         qt = "comparison"
 
     answer, ids, documents, metadatas, distances, gap_used = yield from _stream_answer(
-        question, ids, documents, metadatas, distances, qt,
-        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
+        question,
+        ids,
+        documents,
+        metadatas,
+        distances,
+        qt,
+        generation=generation,
+        trace=trace,
+        allow_gap_fill=allow_gap_fill,
     )
     if trace is not None:
         trace["generation"] = dict(generation or {})
         trace["corrected_query"] = (trace.get("retrieval_calls") or [{}])[0].get("query", question)
-    yield {"type": "final", "result": {
-        "answer": answer,
-        "documents": documents,
-        "query_type": qt,
-        "rerank_used": rerank_used or gap_used,
-        "sources": [
-            {
-                "id": doc_id,
-                "distance": distance,
-                "metadata": metadata,
-                "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})"
-            }
-            for doc_id, distance, metadata in zip(
-                ids,
-                distances,
-                metadatas
-            )
-        ],
-    }}
+    yield {
+        "type": "final",
+        "result": {
+            "answer": answer,
+            "documents": documents,
+            "query_type": qt,
+            "rerank_used": rerank_used or gap_used,
+            "sources": [
+                {
+                    "id": doc_id,
+                    "distance": distance,
+                    "metadata": metadata,
+                    "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})",
+                }
+                for doc_id, distance, metadata in zip(ids, distances, metadatas, strict=False)
+            ],
+        },
+    }
 
 
 def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_fill=False):
@@ -584,14 +669,19 @@ def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_f
     if query_type == "entity":
         prepared = _prepare_entity(question)
         if prepared is not None:
-            return _ask_entity(question, generation=generation, trace=trace, allow_gap_fill=allow_gap_fill)
+            return _ask_entity(
+                question, generation=generation, trace=trace, allow_gap_fill=allow_gap_fill
+            )
         query_type = "general"
 
     if query_type == "comparison":
         ents = find_entities(question)
         if len(ents) >= 2:
             multi = _prepare_multi_entity(
-                question, ents, generation=generation, trace=trace,
+                question,
+                ents,
+                generation=generation,
+                trace=trace,
             )
             if multi is not None:
                 return multi
@@ -612,16 +702,20 @@ def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_f
 
     context = "\n\n---\n\n".join(_fit_context(documents))
 
-    prompt = build_prompt(
-        question,
-        context,
-        query_type=qt
-    )
+    prompt = build_prompt(question, context, query_type=qt)
 
     answer = generate(prompt, **(generation or {}))
     answer, ids, documents, metadatas, distances, gap_used = _gap_fill(
-        question, answer, ids, documents, metadatas, distances, qt,
-        generation=generation, trace=trace, allow_gap_fill=allow_gap_fill,
+        question,
+        answer,
+        ids,
+        documents,
+        metadatas,
+        distances,
+        qt,
+        generation=generation,
+        trace=trace,
+        allow_gap_fill=allow_gap_fill,
     )
 
     if trace is not None:
@@ -638,12 +732,8 @@ def ask(question, metadata_filter=None, generation=None, trace=None, allow_gap_f
                 "id": doc_id,
                 "distance": distance,
                 "metadata": metadata,
-                "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})"
+                "citation": f"{metadata.get('name', doc_id)} ({metadata.get('table', 'unknown')})",
             }
-            for doc_id, distance, metadata in zip(
-                ids,
-                distances,
-                metadatas
-            )
-        ]
+            for doc_id, distance, metadata in zip(ids, distances, metadatas, strict=False)
+        ],
     }

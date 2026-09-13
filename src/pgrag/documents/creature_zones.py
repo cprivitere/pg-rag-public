@@ -59,12 +59,12 @@ def _lead_paragraph(raw: str) -> str:
     """
     body = _MOB_INFOBOX.sub(" ", raw)
     body = _MOB_LOCATION.sub(" ", body)
-    body = _TEMPLATE.sub(" ", body)          # drop remaining {{...}}
-    body = _SECTION.split(body, 1)[0]        # stop at the first heading
-    body = _WIKILINK.sub(r"\1", body)        # [[X|Y]] -> Y ; [[X]] -> X
-    body = body.replace("'''", "")           # '''bold''' markup
-    body = re.sub(r"__[A-Z]+__(?:\s*|$)", " ", body)   # __NOTOC__/__FORCETOC__
-    body = re.sub(r"[{}|]+", " ", body)      # sweep stray braces/pipes
+    body = _TEMPLATE.sub(" ", body)  # drop remaining {{...}}
+    body = _SECTION.split(body, 1)[0]  # stop at the first heading
+    body = _WIKILINK.sub(r"\1", body)  # [[X|Y]] -> Y ; [[X]] -> X
+    body = body.replace("'''", "")  # '''bold''' markup
+    body = re.sub(r"__[A-Z]+__(?:\s*|$)", " ", body)  # __NOTOC__/__FORCETOC__
+    body = re.sub(r"[{}|]+", " ", body)  # sweep stray braces/pipes
     body = re.sub(r"\s+", " ", body).strip()
     body = body[:_DESCRIPTION_MAX].strip()
     body = re.sub(r"[{}|]+", " ", body).strip()
@@ -120,22 +120,23 @@ def build_creature_zones_documents(db) -> list[dict]:
             lines.append(f"Description: {description}")
         if ctype:
             lines.append(
-                f"{title} is {_indef_article(ctype)} {ctype} creature. "
-                f"It can be found in {join}."
+                f"{title} is {_indef_article(ctype)} {ctype} creature. It can be found in {join}."
             )
         else:
             lines.append(f"{title} can be found in {join}.")
 
-        documents.append({
-            "id": "creature_" + title.replace(" ", "_"),
-            "type": "wiki",
-            "text": "\n".join(lines),
-            "metadata": {
-                "source": "wiki",
-                "table": "creatures",
-                "name": title,
-                "creature_type": ctype,
-                "locations": " | ".join(zones),
-            },
-        })
+        documents.append(
+            {
+                "id": "creature_" + title.replace(" ", "_"),
+                "type": "wiki",
+                "text": "\n".join(lines),
+                "metadata": {
+                    "source": "wiki",
+                    "table": "creatures",
+                    "name": title,
+                    "creature_type": ctype,
+                    "locations": " | ".join(zones),
+                },
+            }
+        )
     return documents

@@ -5,18 +5,18 @@ _name_injection_ids longest-span injection, _is_fragment_id, and
 _apply_name_promotion."""
 
 from pgrag.rag.retriever import (
-    _term_overlap,
-    _rerank,
+    MAX_TSYS_BASES,
+    MAX_TSYS_CHUNK_MEMBERS,
+    RERANK_MULTIPLIER,
+    _apply_name_promotion,
+    _entity_name_match,
     _hybrid_fuse,
+    _is_fragment_id,
+    _name_injection_ids,
+    _rerank,
+    _term_overlap,
     _tsys_base_id,
     _tsys_origin_id,
-    _entity_name_match,
-    _name_injection_ids,
-    _apply_name_promotion,
-    _is_fragment_id,
-    MAX_TSYS_CHUNK_MEMBERS,
-    MAX_TSYS_BASES,
-    RERANK_MULTIPLIER,
 )
 
 
@@ -48,13 +48,21 @@ def test_term_overlap_case_insensitive():
 def test_rerank_returns_correct_count():
     query = "potion making"
     ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
-    docs = ["potion recipe", "sword sharpening", "potion brewing tips", "shield block", "potion effects guide", "arrow fletching", "potion history book", "helmet polishing", "potion ingredients list"]
+    docs = [
+        "potion recipe",
+        "sword sharpening",
+        "potion brewing tips",
+        "shield block",
+        "potion effects guide",
+        "arrow fletching",
+        "potion history book",
+        "helmet polishing",
+        "potion ingredients list",
+    ]
     metas = [{}] * len(docs)
     dists = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
 
-    result_ids, result_docs, result_metas, result_dists = _rerank(
-        query, ids, docs, metas, dists, 3
-    )
+    result_ids, result_docs, result_metas, result_dists = _rerank(query, ids, docs, metas, dists, 3)
 
     assert len(result_ids) == 3
     assert len(result_docs) == 3
@@ -130,7 +138,9 @@ def test_hybrid_fuse_preserves_distinct_docs_without_tsys():
     texts = ["ta", "tb", "tc"]
     metas = [{}, {}, {}]
     dists = [0.3, 0.2, 0.1]
-    ids, *_ = _hybrid_fuse(dense, texts, metas, dists, ["c", "b", "a"], [{"id": d} for d in dense], 3)
+    ids, *_ = _hybrid_fuse(
+        dense, texts, metas, dists, ["c", "b", "a"], [{"id": d} for d in dense], 3
+    )
     assert set(ids) == {"a", "b", "c"}
 
 
@@ -138,7 +148,7 @@ def test_hybrid_fuse_caps_distinct_tsys_bases():
     # 6 distinct bare tsys_power_* bases (the pollution form: un-chunked
     # treasure powers) + a distinct target. The window must cap distinct tsys
     # bases to MAX_TSYS_BASES so the real target survives.
-    dense = [f"tsys_power_{2000+i}" for i in range(6)] + ["ability_ability_9"]
+    dense = [f"tsys_power_{2000 + i}" for i in range(6)] + ["ability_ability_9"]
     texts = [f"text {i}" for i in range(len(dense))]
     metas = [{}] * len(dense)
     dists = [0.05] * len(dense)
@@ -177,9 +187,7 @@ def test_name_injection_ids_prefers_longest_span_and_skips_fragments(monkeypatch
         "healing potion omega": ["item_1", "recipe_2", "wiki_X_table_0_row_1"],
         "healing potion": ["item_3"],
     }
-    monkeypatch.setattr(
-        "pgrag.rag.retriever._NAME_INDEX", fake_idx
-    )
+    monkeypatch.setattr("pgrag.rag.retriever._NAME_INDEX", fake_idx)
     res = _name_injection_ids("What is the Healing Potion Omega recipe?")
     # longest span "healing potion omega" wins, fragment row excluded
     assert "item_1" in res
@@ -214,8 +222,16 @@ def test_apply_name_promotion_floats_entity_and_skips_fragments():
     ranked_dists = [0.1] * 4
 
     ids, *_ = _apply_name_promotion(
-        query, pool_ids, pool_docs, pool_metas, pool_dists,
-        ranked_ids, ranked_docs, ranked_metas, ranked_dists, 4,
+        query,
+        pool_ids,
+        pool_docs,
+        pool_metas,
+        pool_dists,
+        ranked_ids,
+        ranked_docs,
+        ranked_metas,
+        ranked_dists,
+        4,
     )
     # the two substantive gold items float ahead of "other"; the fragment row
     # keeps its relative position (after them), "other" pushed down
@@ -238,8 +254,16 @@ def test_apply_name_promotion_splices_matched_doc_missing_from_topn():
     ranked_metas = [pool_metas[1], pool_metas[2], pool_metas[3]]
     ranked_dists = [0.1] * 3
     ids, *_ = _apply_name_promotion(
-        query, pool_ids, pool_docs, pool_metas, pool_dists,
-        ranked_ids, ranked_docs, ranked_metas, ranked_dists, 3,
+        query,
+        pool_ids,
+        pool_docs,
+        pool_metas,
+        pool_dists,
+        ranked_ids,
+        ranked_docs,
+        ranked_metas,
+        ranked_dists,
+        3,
     )
     assert ids[0] == "area_AreaGazlukKeep"
 
@@ -251,7 +275,15 @@ def test_apply_name_promotion_noop_without_match():
     pool_metas = [{"name": "Foo Bar"}, {"name": "Baz Qux"}]
     pool_dists = [0.1, 0.2]
     ids, docs, metas, dists = _apply_name_promotion(
-        query, pool_ids, pool_docs, pool_metas, pool_dists,
-        ["a", "b"], ["x", "y"], pool_metas, [0.1, 0.2], 2,
+        query,
+        pool_ids,
+        pool_docs,
+        pool_metas,
+        pool_dists,
+        ["a", "b"],
+        ["x", "y"],
+        pool_metas,
+        [0.1, 0.2],
+        2,
     )
     assert ids == ["a", "b"]

@@ -14,20 +14,15 @@ from unittest.mock import MagicMock, patch
 
 from pgrag.loaders import download_wiki
 from pgrag.loaders.download_wiki import (
-    api_call_with_retry,
-    enumerate_category_pages,
+    BASE_DELAY,
     fetch_page_content_batch,
-    fetch_timestamps,
     get_stable_filename,
     load_metadata,
+    remove_orphan_files,
+    remove_stale_files,
     save_metadata,
     write_page_content,
-    remove_stale_files,
-    remove_orphan_files,
-    BASE_DELAY,
-    MAX_RETRIES,
 )
-
 
 # --- V43: batching ---
 
@@ -60,7 +55,9 @@ def test_v43_batch_splits_titles_into_groups_of_50():
         status_code=200,
     )
 
-    with patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)):
+    with patch(
+        "pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)
+    ):
         result = fetch_page_content_batch(session, titles)
 
     assert len(result) == 120
@@ -83,7 +80,9 @@ def test_v43_batch_of_one_sends_one():
                 }
         return {"query": {"pages": pages}}
 
-    with patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)):
+    with patch(
+        "pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)
+    ):
         result = fetch_page_content_batch(session, ["Single Page"])
 
     assert "Single Page" in result
@@ -96,15 +95,7 @@ def test_v43_batch_of_one_sends_one():
 def test_v44_skip_delay_uses_base_delay(monkeypatch, tmp_path):
     """Skipped pages must use BASE_DELAY, not shorter."""
     delays = []
-    original_sleep = time.sleep
     monkeypatch.setattr(time, "sleep", lambda d: delays.append(d))
-
-    session = MagicMock()
-    session.get.return_value = MagicMock(
-        json=lambda: {"query": {"pages": {}}},
-        raise_for_status=lambda: None,
-        headers={},
-    )
 
     meta = {
         "pages": {
@@ -119,7 +110,12 @@ def test_v44_skip_delay_uses_base_delay(monkeypatch, tmp_path):
     test_file.write_text("old content", encoding="utf-8")
 
     try:
-        with patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api:
+        with (
+            patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api,
+            patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+            patch.object(download_wiki, "WIKI_DIR", tmp_path),
+            patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+        ):
             mock_api.return_value = {
                 "query": {
                     "pages": {
@@ -131,10 +127,7 @@ def test_v44_skip_delay_uses_base_delay(monkeypatch, tmp_path):
                     }
                 }
             }
-            with patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta):
-                with patch.object(download_wiki, "WIKI_DIR", tmp_path):
-                    with patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
-                        download_wiki.main()
+            download_wiki.main()
 
         skip_delays = [d for d in delays if d >= 0.1]
         assert all(d >= BASE_DELAY for d in skip_delays if d < 1.0), (
@@ -150,6 +143,7 @@ def test_v44_skip_delay_uses_base_delay(monkeypatch, tmp_path):
 
 def test_v49_redirect_pageid_negative_treated_as_missing():
     """pageid < 0 (redirect) → treated as missing, no content written."""
+
     session = MagicMock()
 
     def fake_call(s, params):
@@ -165,7 +159,9 @@ def test_v49_redirect_pageid_negative_treated_as_missing():
                 }
         return {"query": {"pages": pages}}
 
-    with patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)):
+    with patch(
+        "pgrag.loaders.download_wiki.api_call_with_retry", side_effect=lambda s, p: fake_call(s, p)
+    ):
         result = fetch_page_content_batch(session, ["Redirect Page", "Normal Page"])
 
     assert result["Redirect Page"] == ("", True), "redirect should be treated as missing"
@@ -177,30 +173,36 @@ def test_v49_redirect_pageid_negative_treated_as_missing():
 
 def test_v50_category_failure_aborts(monkeypatch, tmp_path):
     """Category enumeration exception → sync aborts with exit code 1."""
-    session = MagicMock()
     meta = {"pages": {}}
 
-    with patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api:
+    with (
+        patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api,
+        patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+    ):
         mock_api.side_effect = RuntimeError("Connection lost")
-        with patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta):
-            with patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
-                with patch.object(download_wiki, "WIKI_DIR", tmp_path):
-                    result = download_wiki.main()
+        result = download_wiki.main()
 
     assert result == 1, "should abort on category enumeration failure"
 
 
 def test_v50_content_fetch_failure_aborts(monkeypatch, tmp_path):
     """Content fetch exception → sync aborts with exit code 1."""
-    session = MagicMock()
     meta = {"pages": {}}
 
     with (
-        patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=RuntimeError("Connection lost")),
+        patch(
+            "pgrag.loaders.download_wiki.api_call_with_retry",
+            side_effect=RuntimeError("Connection lost"),
+        ),
         patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
         patch("pgrag.loaders.download_wiki.enumerate_category_pages", return_value=["New Page"]),
         patch("pgrag.loaders.download_wiki.enumerate_category_pages_recursive", return_value=[]),
-        patch("pgrag.loaders.download_wiki.fetch_timestamps", return_value={"New Page": "2026-01-01T00:00:00Z"}),
+        patch(
+            "pgrag.loaders.download_wiki.fetch_timestamps",
+            return_value={"New Page": "2026-01-01T00:00:00Z"},
+        ),
         patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
         patch.object(download_wiki, "WIKI_DIR", tmp_path),
     ):
@@ -214,9 +216,20 @@ def test_v50_content_fetch_failure_aborts(monkeypatch, tmp_path):
 
 def test_v45_absent_title_aborts(tmp_path):
     """Title absent from timestamp response (truncation) → abort before content fetch."""
-    session = MagicMock()
 
-    with patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api:
+    with (
+        patch("pgrag.loaders.download_wiki.api_call_with_retry") as mock_api,
+        patch(
+            "pgrag.loaders.download_wiki.enumerate_category_pages",
+            return_value=["Page A", "Page B"],
+        ),
+        patch(
+            "pgrag.loaders.download_wiki.fetch_timestamps",
+            return_value={"Page A": "2026-01-01T00:00:00Z"},
+        ),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+    ):
         mock_api.return_value = {
             "query": {
                 "pages": {
@@ -224,11 +237,7 @@ def test_v45_absent_title_aborts(tmp_path):
                 }
             }
         }
-        with patch("pgrag.loaders.download_wiki.enumerate_category_pages", return_value=["Page A", "Page B"]):
-            with patch("pgrag.loaders.download_wiki.fetch_timestamps", return_value={"Page A": "2026-01-01T00:00:00Z"}):
-                with patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
-                    with patch.object(download_wiki, "WIKI_DIR", tmp_path):
-                        result = download_wiki.main()
+        result = download_wiki.main()
 
     assert result == 1, "should abort when timestamp response is incomplete"
 
@@ -237,22 +246,38 @@ def test_v45_missing_title_deletes_tombstones(tmp_path):
     """Explicit `missing` timestamp → delete local .txt, tombstone meta, no abort."""
     stale_file = tmp_path / "Gone_Page_00000000.txt"
     stale_file.write_text("old", encoding="utf-8")
-    meta = {"pages": {"Gone Page": {"touched": "2026-01-01T00:00:00Z", "filename": "Gone_Page_00000000.txt"}}}
+    meta = {
+        "pages": {
+            "Gone Page": {"touched": "2026-01-01T00:00:00Z", "filename": "Gone_Page_00000000.txt"}
+        }
+    }
 
     try:
         with (
-            patch("pgrag.loaders.download_wiki.enumerate_category_pages", return_value=["Gone Page", "Alive Page"]),
-            patch("pgrag.loaders.download_wiki.enumerate_category_pages_recursive", return_value=[]),
-            patch("pgrag.loaders.download_wiki.fetch_timestamps", return_value={"Gone Page": None, "Alive Page": "2026-01-01T00:00:00Z"}),
-            patch("pgrag.loaders.download_wiki.fetch_page_content_batch", return_value={
-                "Gone Page": ("", True),
-                "Alive Page": ("content", False),
-            }),
+            patch(
+                "pgrag.loaders.download_wiki.enumerate_category_pages",
+                return_value=["Gone Page", "Alive Page"],
+            ),
+            patch(
+                "pgrag.loaders.download_wiki.enumerate_category_pages_recursive",
+                return_value=[],
+            ),
+            patch(
+                "pgrag.loaders.download_wiki.fetch_timestamps",
+                return_value={"Gone Page": None, "Alive Page": "2026-01-01T00:00:00Z"},
+            ),
+            patch(
+                "pgrag.loaders.download_wiki.fetch_page_content_batch",
+                return_value={
+                    "Gone Page": ("", True),
+                    "Alive Page": ("content", False),
+                },
+            ),
             patch.object(download_wiki, "WIKI_DIR", tmp_path),
             patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+            patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
         ):
-            with patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta):
-                result = download_wiki.main()
+            result = download_wiki.main()
 
         assert result == 0, "should not abort on explicit missing title"
         assert not stale_file.exists(), "stale .txt for missing page should be deleted"
@@ -266,11 +291,15 @@ def test_v45_missing_title_deletes_tombstones(tmp_path):
 
 def test_v48_category_failure_aborts(tmp_path):
     """Category enumeration failure → abort before timestamps."""
-    session = MagicMock()
 
-    with patch("pgrag.loaders.download_wiki.enumerate_category_pages", side_effect=RuntimeError("API down")), \
-         patch.object(download_wiki, "WIKI_DIR", tmp_path), \
-         patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
+    with (
+        patch(
+            "pgrag.loaders.download_wiki.enumerate_category_pages",
+            side_effect=RuntimeError("API down"),
+        ),
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+    ):
         result = download_wiki.main()
 
     assert result == 1, "should abort on category failure"
@@ -428,7 +457,6 @@ def test_skip_existing_pages_download_new_pages(tmp_path):
     existing_file.write_text("old content", encoding="utf-8")
 
     def fake_api(s, params):
-        action = params.get("action", "")
         if params.get("list") == "categorymembers":
             return {
                 "query": {
@@ -467,12 +495,14 @@ def test_skip_existing_pages_download_new_pages(tmp_path):
             return {"query": {"pages": pages}}
         return {"query": {"pages": {}}}
 
-    with patch.object(download_wiki, "WIKI_DIR", tmp_path):
-        with patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api):
-            with patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta):
-                with patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}):
-                    with patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
-                        result = download_wiki.main()
+    with (
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
+        patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+        patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+    ):
+        result = download_wiki.main()
 
     assert result == 0
     assert not existing_file.exists() or existing_file.read_text(encoding="utf-8") == "old content"
@@ -490,11 +520,7 @@ def test_stale_metadata_existing_file_still_skipped(tmp_path):
 
     def fake_api(s, params):
         if params.get("list") == "categorymembers":
-            return {
-                "query": {
-                    "categorymembers": [{"pageid": 1, "title": "Orphan Page"}]
-                }
-            }
+            return {"query": {"categorymembers": [{"pageid": 1, "title": "Orphan Page"}]}}
         if "prop" in params and params["prop"] == "info":
             return {
                 "query": {
@@ -521,12 +547,14 @@ def test_stale_metadata_existing_file_still_skipped(tmp_path):
             }
         return {"query": {"pages": {}}}
 
-    with patch.object(download_wiki, "WIKI_DIR", tmp_path):
-        with patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api):
-            with patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta):
-                with patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}):
-                    with patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"):
-                        result = download_wiki.main()
+    with (
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
+        patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+        patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+    ):
+        result = download_wiki.main()
 
     assert result == 0
     assert existing_file.read_text(encoding="utf-8") == "existing content", (

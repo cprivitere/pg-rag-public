@@ -263,5 +263,20 @@ description = "Tail reranker server log (live, last 20 lines)"
 run = "Get-Content '{{ env.LOGS_DIR }}/rerank.log' -ErrorAction SilentlyContinue -Wait -Tail 20"
 alias = "tlr"
 
+# --- Lint / format ---
+
+[tasks.lint]
+description = "Ruff check: static analysis of src/, scripts/, tests/ (fails on regression)"
+run = "uv run ruff check src scripts tests"
+alias = "li"
+
+[tasks.fmt]
+description = "Ruff format + safe autofix (import sort, unused imports, f-strings)"
+run = [
+  "uv run ruff format src scripts tests",
+  "uv run ruff check src scripts tests --fix",
+]
+alias = "fo"
+
 [tools]
 ruff = "latest"

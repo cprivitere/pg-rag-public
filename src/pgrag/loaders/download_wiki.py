@@ -1,18 +1,19 @@
+import contextlib
+import hashlib
 import json
 import os
+import random
 import sys
 import time
-import random
-import hashlib
+from datetime import UTC, datetime
+
 import requests
-from datetime import datetime, timezone
-from pathlib import Path
+
 from pgrag.config import WIKI_DIR
 
-try:
-    sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
-except (AttributeError, ValueError):
-    pass  # not a real stream (e.g. captured by pytest)
+with contextlib.suppress(AttributeError, ValueError):
+    # not a real stream (e.g. captured by pytest)
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 
 META_FILE = WIKI_DIR / ".meta.json"
 
@@ -20,11 +21,23 @@ WIKI_HOST = "wiki.projectgorgon.com"
 WIKI_API_URL = f"https://{WIKI_HOST}/api.php"
 
 TARGET_CATEGORIES = [
-    "Game updates", "Game Blogs", "NPCs", "Skills", "Abilities", "Beast Forms",
-    "Arthropod", "Animal Handling Creatures", "Aberration", "Bear and Bugbear",
-    "Anagoge Creatures", "Anagoge Records Facility Creatures",
-    "Aktaari Cave Creatures", "Animal Nexus Creatures",
-    "Amaluk Valley Cave Creatures", "Animal Town Creatures", "Augury",
+    "Game updates",
+    "Game Blogs",
+    "NPCs",
+    "Skills",
+    "Abilities",
+    "Beast Forms",
+    "Arthropod",
+    "Animal Handling Creatures",
+    "Aberration",
+    "Bear and Bugbear",
+    "Anagoge Creatures",
+    "Anagoge Records Facility Creatures",
+    "Aktaari Cave Creatures",
+    "Animal Nexus Creatures",
+    "Amaluk Valley Cave Creatures",
+    "Animal Town Creatures",
+    "Augury",
     "Quests",
 ]
 
@@ -40,11 +53,28 @@ CONNECT_TIMEOUT = 15
 READ_TIMEOUT = 60
 
 RESERVED_NAMES = {
-    "CON", "NUL", "AUX", "PRN",
-    "COM1", "COM2", "COM3", "COM4", "COM5",
-    "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
-    "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON",
+    "NUL",
+    "AUX",
+    "PRN",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
 }
 MAX_FILENAME_LEN = 150
 
@@ -100,10 +130,7 @@ def api_call_with_retry(session: requests.Session, params: dict) -> dict:
                 error_code = data["error"].get("code", "")
                 if error_code in {"ratelimited", "maxlag", "readonly"}:
                     retry_after = response.headers.get("Retry-After")
-                    if retry_after:
-                        delay = int(retry_after)
-                    else:
-                        delay = (2 ** attempt) + random.uniform(0, 1)
+                    delay = int(retry_after) if retry_after else 2**attempt + random.uniform(0, 1)
                     print(f"[{_ts()}]   API error {error_code}, retrying in {delay:.1f}s...")
                     time.sleep(delay)
                     continue
@@ -113,7 +140,7 @@ def api_call_with_retry(session: requests.Session, params: dict) -> dict:
 
         except requests.exceptions.RequestException as e:
             if attempt < MAX_RETRIES - 1:
-                delay = (2 ** attempt) + random.uniform(0, 1)
+                delay = (2**attempt) + random.uniform(0, 1)
                 print(f"[{_ts()}]   Request failed, retrying in {delay:.1f}s... ({e})")
                 time.sleep(delay)
             else:
@@ -192,7 +219,7 @@ def enumerate_category_pages_recursive(
 def fetch_timestamps(session: requests.Session, titles: list[str]) -> dict[str, str]:
     touched = {}
     for i in range(0, len(titles), 50):
-        batch = titles[i:i+50]
+        batch = titles[i : i + 50]
         params = {
             "action": "query",
             "format": "json",
@@ -211,10 +238,12 @@ def fetch_timestamps(session: requests.Session, titles: list[str]) -> dict[str, 
     return touched
 
 
-def fetch_page_content_batch(session: requests.Session, titles: list[str]) -> dict[str, tuple[str, bool]]:
+def fetch_page_content_batch(
+    session: requests.Session, titles: list[str]
+) -> dict[str, tuple[str, bool]]:
     results = {}
     for batch_start in range(0, len(titles), BATCH_SIZE):
-        batch = titles[batch_start:batch_start + BATCH_SIZE]
+        batch = titles[batch_start : batch_start + BATCH_SIZE]
         params = {
             "action": "query",
             "format": "json",
@@ -282,9 +311,7 @@ def remove_orphan_files(meta: dict) -> int:
     the index forever. Returns the number of files removed.
     """
     tracked = {
-        info.get("filename")
-        for info in meta.get("pages", {}).values()
-        if info.get("filename")
+        info.get("filename") for info in meta.get("pages", {}).values() if info.get("filename")
     }
     removed = 0
     for f in WIKI_DIR.glob("*.txt"):
@@ -300,17 +327,15 @@ def remove_orphan_files(meta: dict) -> int:
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).strftime("%H:%M:%S")
+    return datetime.now(UTC).strftime("%H:%M:%S")
 
 
 def main() -> int:
     WIKI_DIR.mkdir(parents=True, exist_ok=True)
 
     for f in WIKI_DIR.glob("*.tmp"):
-        try:
+        with contextlib.suppress(Exception):
             f.unlink()
-        except Exception:
-            pass
 
     print(f"[{_ts()}] Connecting to {WIKI_HOST}...")
     session = make_session()
@@ -331,7 +356,9 @@ def main() -> int:
             try:
                 pages = enumerate_category_pages_recursive(session, root, max_depth)
                 all_titles.extend(pages)
-                print(f"[{_ts()}]   Recursive category '{root}' (depth {max_depth}): {len(pages)} pages")
+                print(
+                    f"[{_ts()}]   Recursive category '{root}' (depth {max_depth}): {len(pages)} pages"
+                )
                 time.sleep(BASE_DELAY)
             except Exception as e:
                 print(f"[{_ts()}]   Recursive category '{root}' failed: {e}")
@@ -414,7 +441,7 @@ def main() -> int:
         print(f"[{_ts()}] Downloading {len(to_download)} pages...")
 
     for batch_start in range(0, len(to_download), BATCH_SIZE):
-        batch = to_download[batch_start:batch_start + BATCH_SIZE]
+        batch = to_download[batch_start : batch_start + BATCH_SIZE]
         batch_num = batch_start // BATCH_SIZE + 1
         total_batches = (len(to_download) + BATCH_SIZE - 1) // BATCH_SIZE
         print(f"[{_ts()}]   Batch {batch_num}/{total_batches} ({len(batch)} pages)...")
@@ -464,7 +491,9 @@ def main() -> int:
     meta["pages"] = {k: v for k, v in pages_meta.items() if k in current_title_set}
     save_metadata(meta)
 
-    print(f"[{_ts()}] Complete. {new_count} new, {updated_count} updated, {skipped_count} skipped. Saved to '{WIKI_DIR}'.")
+    print(
+        f"[{_ts()}] Complete. {new_count} new, {updated_count} updated, {skipped_count} skipped. Saved to '{WIKI_DIR}'."
+    )
     return 0
 
 

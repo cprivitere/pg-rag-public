@@ -3,6 +3,7 @@ contracts: which document fields each key, determinism, key-order
 independence, and required fields."""
 
 import pytest
+
 from pgrag.vectorstore.hashes import embedding_hash, metadata_hash
 
 

@@ -15,13 +15,14 @@ Reuses from existing code:
 Run: uv run python scripts/vram_sweep.py [--server embed|llm|reranker] [--only <variant>]
 Writes: data/vram_sweep.json
 """
+
 import argparse
 import json
 import subprocess
 import sys
 import time
-from pathlib import Path
 import tomllib
+from pathlib import Path
 
 import requests
 
@@ -29,10 +30,10 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
 try:
-    from scripts.embed_vram_probe import _url_args, _total_vram_mb, get_per_pid_vram  # noqa: E402
+    from scripts.embed_vram_probe import _total_vram_mb, _url_args, get_per_pid_vram
 except ModuleNotFoundError:
     sys.path.insert(0, str(ROOT))
-    from scripts.embed_vram_probe import _url_args, _total_vram_mb, get_per_pid_vram
+    from scripts.embed_vram_probe import _total_vram_mb, _url_args, get_per_pid_vram
 
 # Production model refs — single source is mise.toml [env]. Read the live
 # values so a model swap propagates into the sweep with no literal drift.
@@ -45,7 +46,7 @@ try:
     LLM_MODEL = _model_env.get("LLM_MODEL") or _LLM_FALLBACK
     RERANK_MODEL = _model_env.get("RERANK_MODEL") or _RERANK_FALLBACK
     EMBED_MODEL = _model_env.get("EMBED_MODEL") or _EMBED_FALLBACK
-except (OSError, tomllib.TOMLDecodeError):
+except OSError, tomllib.TOMLDecodeError:
     LLM_MODEL, RERANK_MODEL, EMBED_MODEL = _LLM_FALLBACK, _RERANK_FALLBACK, _EMBED_FALLBACK
 
 PORTS = {"embed": 8084, "llm": 8085, "reranker": 8086}
@@ -62,12 +63,14 @@ def llm_variants():
     # thinking capped at @4096(no MTP draft;the production LLM_FLAGS carries no
     # --spec-type). The swept dimensions are context window + flash-attention only.
     base = ["-ngl", "999", "-np", "1", "--reasoning-budget", "4096"]
+
     def v(name, fa="auto", c=16384):
         flags = list(base)
         if fa:
             flags += ["-fa", fa]
         flags += ["-c", str(c)]
         return (name, flags)
+
     return [
         v("baseline", fa="on", c=16384),
         v("ctx-8192", fa="on", c=8192),
@@ -77,10 +80,11 @@ def llm_variants():
 
 
 def rerank_variants():
-    base = ["--reranking", "--pooling", "rank", "--alias",
-            "bge-reranker-v2-m3", "-ngl", "99"]
+    base = ["--reranking", "--pooling", "rank", "--alias", "bge-reranker-v2-m3", "-ngl", "99"]
+
     def v(name, c, batch):
-        return (name, base + ["-c", str(c), "-b", str(batch), "-ub", str(batch)])
+        return (name, [*base, "-c", str(c), "-b", str(batch), "-ub", str(batch)])
+
     return [
         v("baseline", 32768, 8192),
         v("ctx-8192", 8192, 8192),
@@ -91,9 +95,10 @@ def rerank_variants():
 
 def embed_variants():
     base = ["--embedding", "--pooling", "mean", "-ngl", "99", "-np", "1"]
+
     def v(name, c, batch, ubatch):
-        return (name, base + ["-c", str(c), "-b", str(batch),
-                              "--ubatch-size", str(ubatch)])
+        return (name, [*base, "-c", str(c), "-b", str(batch), "--ubatch-size", str(ubatch)])
+
     return [
         v("baseline", 4096, 4096, 4096),
         v("ctx-2048", 2048, 4096, 4096),
@@ -102,17 +107,25 @@ def embed_variants():
     ]
 
 
-VARIANT_FN = {"embed": embed_variants, "llm": llm_variants,
-              "reranker": rerank_variants}
+VARIANT_FN = {"embed": embed_variants, "llm": llm_variants, "reranker": rerank_variants}
 
 
 def _spawn(kind, name, flags, port):
     log_path = DATA / f"vram_sweep_{kind}_{name}.log"
-    log_fh = open(log_path, "w", encoding="utf-8")
+    log_fh = open(log_path, "w", encoding="utf-8")  # noqa: SIM115 — lifetime spans _spawn/_stop
     proc = subprocess.Popen(
-        ["llama-server", *_url_args(_model_of(kind)),
-         *flags, "--host", "127.0.0.1", "--port", str(port)],
-        stdout=log_fh, stderr=subprocess.STDOUT)
+        [
+            "llama-server",
+            *_url_args(_model_of(kind)),
+            *flags,
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ],
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+    )
     return proc, log_fh
 
 
@@ -123,16 +136,19 @@ def _model_of(kind):
 def _warm(kind, base_url):
     try:
         if kind == "embed":
-            requests.post(f"{base_url}/embedding",
-                          json={"content": WARM_EMBED}, timeout=60)
+            requests.post(f"{base_url}/embedding", json={"content": WARM_EMBED}, timeout=60)
         elif kind == "llm":
-            requests.post(f"{base_url}/completion",
-                          json={"prompt": WARM_LLM, "n_predict": 1,
-                                "stream": False}, timeout=120)
+            requests.post(
+                f"{base_url}/completion",
+                json={"prompt": WARM_LLM, "n_predict": 1, "stream": False},
+                timeout=120,
+            )
         else:
-            requests.post(f"{base_url}/rerank",
-                          json={"query": WARM_RERANK_Q,
-                                "documents": [WARM_RERANK_D]}, timeout=60)
+            requests.post(
+                f"{base_url}/rerank",
+                json={"query": WARM_RERANK_Q, "documents": [WARM_RERANK_D]},
+                timeout=60,
+            )
     except Exception as e:
         sys.stderr.write(f"    warm request failed: {e}\n")
 
@@ -165,9 +181,15 @@ def run_variant(kind, name, flags, port):
             except Exception:
                 continue
         if not up:
-            return {"server": kind, "variant": name, "flags": flags,
-                    "vram_mb": None, "per_pid_mb": None,
-                    "ok": False, "note": "start timeout"}
+            return {
+                "server": kind,
+                "variant": name,
+                "flags": flags,
+                "vram_mb": None,
+                "per_pid_mb": None,
+                "ok": False,
+                "note": "start timeout",
+            }
         _warm(kind, base_url)
         time.sleep(3)
         # Decision metric: per-PID committed for this spawn (process-scoped;
@@ -183,34 +205,42 @@ def run_variant(kind, name, flags, port):
             time.sleep(0.5)
         post = max(samples) if samples else None
         vram = (post - base) if (post is not None and base is not None) else None
-        return {"server": kind, "variant": name, "flags": flags,
-                "vram_mb": vram, "per_pid_mb": per_pid_mb,
-                "ok": per_pid_mb is not None, "note": None}
+        return {
+            "server": kind,
+            "variant": name,
+            "flags": flags,
+            "vram_mb": vram,
+            "per_pid_mb": per_pid_mb,
+            "ok": per_pid_mb is not None,
+            "note": None,
+        }
     finally:
         _stop(proc, log_fh)
 
 
 def main():
     ap = argparse.ArgumentParser(description="VRAM launch-flag sweep, in isolation")
-    ap.add_argument("--server", choices=sorted(VARIANT_FN), default=None,
-                    help="sweep only this server")
+    ap.add_argument(
+        "--server", choices=sorted(VARIANT_FN), default=None, help="sweep only this server"
+    )
     ap.add_argument("--only", default=None, help="sweep only this variant name")
     args = ap.parse_args()
 
     servers = [s for s in VARIANT_FN if args.server is None or s == args.server]
     results = []
     for kind in servers:
-        variants = [(n, f) for n, f in VARIANT_FN[kind]()
-                     if args.only is None or n == args.only]
+        variants = [(n, f) for n, f in VARIANT_FN[kind]() if args.only is None or n == args.only]
         sys.stderr.write(f"-- {kind} ({len(variants)} variants on :{PORTS[kind]})\n")
         for name, flags in variants:
             rec = run_variant(kind, name, flags, PORTS[kind])
             v = rec["per_pid_mb"]
             a = rec["vram_mb"]
-            sys.stderr.write(f"   {name:12} "
-                             f"per-pid {('%.0f MB' % v) if v is not None else 'FAIL':>10}  "
-                             f"adapter {('%.0f MB' % a) if a is not None else '—':>10}  "
-                             f"{rec['note'] or ''}\n")
+            sys.stderr.write(
+                f"   {name:12} "
+                f"per-pid {(f'{v:.0f} MB' if v is not None else 'FAIL'):>10}  "
+                f"adapter {(f'{a:.0f} MB' if a is not None else '—'):>10}  "
+                f"{rec['note'] or ''}\n"
+            )
             results.append(rec)
 
     DATA.mkdir(exist_ok=True)

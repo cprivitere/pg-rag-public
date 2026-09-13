@@ -3,10 +3,11 @@ to entity/general/comparison, find_entity (longest-name wins, word boundary,
 plural append, typo fallback, real alias/lorebook index), and find_entities
 greedy multi-entity resolution in query order."""
 
+from pathlib import Path
+
 import pytest
 
-from pgrag.rag.query_classifier import classify_query, find_entity, find_entities
-from pathlib import Path
+from pgrag.rag.query_classifier import classify_query, find_entities, find_entity
 
 SYNTHETIC_INDEX = [
     ("Dungcrafting", "skill_Pooping", "skill"),
@@ -48,9 +49,7 @@ def test_bare_name_entity():
 
 
 def test_entity_hub_miss_fallback(monkeypatch):
-    monkeypatch.setattr(
-        "pgrag.rag.query_classifier._load_entity_index", lambda: []
-    )
+    monkeypatch.setattr("pgrag.rag.query_classifier._load_entity_index", lambda: [])
     assert classify_query("what is the Dungcrafting skill") == "general"
 
 
@@ -81,9 +80,7 @@ def test_unknown_query_general():
 
 
 def test_find_entity_typo_fallback(monkeypatch):
-    monkeypatch.setattr(
-        "pgrag.rag.query_classifier.correct_query", lambda q: "what is mushroom"
-    )
+    monkeypatch.setattr("pgrag.rag.query_classifier.correct_query", lambda q: "what is mushroom")
     hub, dtype = find_entity("what is msurhoom")
     assert hub == "item_900"
     assert dtype == "item"
@@ -97,7 +94,8 @@ def _identity(q):
 
 
 def test_find_entities_two_hubs_in_query_order(monkeypatch):
-    index = SYNTHETIC_INDEX + [
+    index = [
+        *SYNTHETIC_INDEX,
         ("Punch", "ability_1001", "ability"),
         ("Front Kick", "ability_1002", "ability"),
     ]
@@ -123,9 +121,7 @@ def test_find_entities_longest_non_overlap(monkeypatch):
 
 
 def test_find_entities_empty_when_none(monkeypatch):
-    monkeypatch.setattr(
-        "pgrag.rag.query_classifier._load_entity_index", lambda: []
-    )
+    monkeypatch.setattr("pgrag.rag.query_classifier._load_entity_index", lambda: [])
     assert find_entities("no entities here") == []
 
 
@@ -143,7 +139,7 @@ def test_plural_append_resolves_entity(monkeypatch):
     """'{entity}s' / '{entity}es' (append to the full name) resolves the
     entity: 'Field Mushrooms' -> 'Field Mushroom'. NOT a stem match: 'gardens'
     is not 'Gardening'+'s' and must stay unmatched."""
-    index = SYNTHETIC_INDEX + [("Field Mushroom", "item_11004", "item")]
+    index = [*SYNTHETIC_INDEX, ("Field Mushroom", "item_11004", "item")]
     monkeypatch.setattr(
         "pgrag.rag.query_classifier._load_entity_index",
         lambda: sorted(index, key=lambda t: len(t[0]), reverse=True),
@@ -181,7 +177,8 @@ def test_lorebook_type_indexed(monkeypatch):
 
 
 def test_classify_two_entities_is_comparison(monkeypatch):
-    index = SYNTHETIC_INDEX + [
+    index = [
+        *SYNTHETIC_INDEX,
         ("Punch", "ability_1001", "ability"),
         ("Front Kick", "ability_1002", "ability"),
     ]

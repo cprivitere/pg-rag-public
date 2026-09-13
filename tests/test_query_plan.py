@@ -4,10 +4,11 @@ A plan is only emitted when the constraint is unambiguous; ambiguous or
 unsupported questions must return None so retrieval stays broad (a false
 negative is worse than a false positive).
 """
+
 from pgrag.rag.query_plan import plan_query
 
-
 # --- recipe + skill ---
+
 
 def test_recipe_skill_and_max_level():
     p = plan_query("which alchemy recipes can I make at level 30?")
@@ -46,6 +47,7 @@ def test_recipe_skill_canonicalizes_collapsed_name():
 
 # --- recipe ingredient ---
 
+
 def test_recipe_ingredient_token():
     p = plan_query("recipes crafted with spider silk")
     assert p is not None
@@ -70,9 +72,7 @@ def test_mass_noun_ingredient_not_singularized():
     # exact (non-singularized) "Animal Feces".
     p = plan_query("what recipes use animal feces?")
     assert p is not None
-    assert p["token"] == {"ingredients": {"$or": [
-        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
-    ]}}
+    assert p["token"] == {"ingredients": {"$or": [{"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}]}}
 
 
 def test_recipe_ingredient_synonym_token():
@@ -81,9 +81,7 @@ def test_recipe_ingredient_synonym_token():
     p = plan_query("What recipes use Animal Feces?")
     assert p is not None
     assert p["native"] == {"type": "recipe"}
-    assert p["token"] == {"ingredients": {"$or": [
-        {"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}
-    ]}}
+    assert p["token"] == {"ingredients": {"$or": [{"$eq": "Animal Feces"}, {"$eq": "Animal Poop"}]}}
     assert p["label"] == "recipe ingredient=Animal Feces (syn: Animal Poop)"
 
 
@@ -95,6 +93,7 @@ def test_recipe_ingredient_no_synonym_stays_scalar():
 
 
 # --- ability + damage type ---
+
 
 def test_ability_damage_type():
     p = plan_query("which abilities deal fire damage?")
@@ -132,6 +131,7 @@ def test_native_where_is_chroma_valid():
 
 # --- no-filter fallbacks ---
 
+
 def test_location_gathering_question_unplanned():
     # Needs the entity index to know item vs npc/area; ambiguity -> no filter.
     assert plan_query("where can I find the mushroom trainer?") is None
@@ -154,9 +154,7 @@ def test_creature_location_listing_plans_to_creatures_table():
     """'List the locations with deer, sheep, goats, cows, or oxen' — the
     authoritative answer table is `creatures`; the Chroma where narrows to it
     so rarer spawns (Infernal Buck at dense-rank ~106) are not starved out."""
-    p = plan_query(
-        "List all the locations with deer, sheep, goats, cows, or oxen in the game."
-    )
+    p = plan_query("List all the locations with deer, sheep, goats, cows, or oxen in the game.")
     assert p == {"native": {"table": "creatures"}, "token": {}, "label": "creature locations"}
 
 
@@ -171,6 +169,7 @@ def test_non_creature_location_listing_unplanned():
     itself in the creatures table (e.g. blacksmithing trainers)."""
     assert plan_query("the locations of blacksmithing trainers") is None
     assert plan_query("where can I find the mushroom trainer?") is None
+
 
 def test_combat_xp_level_plans_to_comparison_doc():
     p = plan_query("most efficient combat exp at level   40")

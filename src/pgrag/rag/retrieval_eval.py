@@ -6,18 +6,18 @@ Entity Accuracy), stage-by-stage evaluation, dataset loader, and benchmark aggre
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 import datetime
 import json
 import logging
 import math
-from pathlib import Path
 import re
 import time
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
-from pgrag.rag.query_classifier import classify_query, find_entities, find_entity
 from pgrag.rag.entity_retrieval import build_entity_context_offline
+from pgrag.rag.query_classifier import classify_query, find_entities, find_entity
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +272,8 @@ def validate_gold(
             issues.append({"id": cid, "kind": "missing", "relevant_ids": missing})
             logger.warning(
                 "gold-validation: %s has relevant_ids absent from the corpus: %s",
-                cid, missing,
+                cid,
+                missing,
             )
 
         resolved = resolve_relevant_ids(case, doc_store=doc_store, doc_name_map=name_map)
@@ -281,15 +282,14 @@ def validate_gold(
             issues.append({"id": cid, "kind": "fanout", "relevant_size": len(resolved)})
             logger.warning(
                 "gold-validation: %s relevant set is %d (fan-out; recall@k capped near zero)",
-                cid, len(resolved),
+                cid,
+                len(resolved),
             )
 
     return {"missing_count": missing_count, "fanout_count": fanout_count, "issues": issues}
 
 
-def _dossier_coverage(
-    dossier_ids: Sequence[str], relevant_ids: Sequence[str] | set[str]
-) -> float:
+def _dossier_coverage(dossier_ids: Sequence[str], relevant_ids: Sequence[str] | set[str]) -> float:
     """Fraction of canonical relevant units present anywhere in a context dossier.
 
     A comparison dossier is a context blob production feeds to the LLM in
@@ -317,9 +317,7 @@ def compute_stage_metrics(
     rel_set = {canonical_doc_id(r) for r in relevant_ids}
     seen: set[str] = set()
     ranked_ids = [
-        t
-        for r in ranked_ids
-        if (t := canonical_doc_id(r)) not in seen and not seen.add(t)
+        t for r in ranked_ids if (t := canonical_doc_id(r)) not in seen and not seen.add(t)
     ]
     return {
         "recall@1": recall_at_k(ranked_ids, rel_set, 1),
@@ -366,9 +364,7 @@ def evaluate_query(
     query_type = classify_query(query)
     predicted_classifier = query_type
     expected_classifier = case.get("expected_classifier") or case.get("classifier")
-    classifier_match = (
-        predicted_classifier == expected_classifier if expected_classifier else True
-    )
+    classifier_match = predicted_classifier == expected_classifier if expected_classifier else True
 
     # 2. Entity identification
     found_entities_list = find_entities(query)
@@ -474,6 +470,7 @@ def evaluate_query(
                 docs = doc_store
             else:
                 from pgrag.rag.entity_retrieval import _load_docs
+
                 docs = _load_docs()
             dossier = build_entity_context_offline(single_hub, docs=docs)
             if dossier:
@@ -537,7 +534,7 @@ def load_benchmark_cases(path: Path | str) -> list[dict[str, Any]]:
         raise FileNotFoundError(f"Benchmark cases not found at: {p}")
 
     text = p.read_text(encoding="utf-8")
-    if p.suffix == ".jsonl" or "\n" in text.strip() and not text.strip().startswith("{"):
+    if p.suffix == ".jsonl" or ("\n" in text.strip() and not text.strip().startswith("{")):
         cases = []
         for line in text.splitlines():
             line = line.strip()
@@ -606,7 +603,7 @@ def run_benchmark(
 
     if not cases:
         return {
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "total_cases": 0,
             "offline": offline,
             "summary": {},
@@ -735,7 +732,7 @@ def run_benchmark(
                 )
 
     benchmark_result = {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "total_cases": len(evaluated_queries),
         "total_time_ms": total_time_ms,
         "offline": offline,
@@ -818,11 +815,19 @@ def compare_benchmarks(
 
         # Compare primary metric (NDCG@5 on highest available stage)
         curr_primary_stg = next(
-            (s for s in ("comparison", "rerank", "hybrid", "bm25", "dense") if s in curr_q["stages"]),
+            (
+                s
+                for s in ("comparison", "rerank", "hybrid", "bm25", "dense")
+                if s in curr_q["stages"]
+            ),
             None,
         )
         base_primary_stg = next(
-            (s for s in ("comparison", "rerank", "hybrid", "bm25", "dense") if s in base_q["stages"]),
+            (
+                s
+                for s in ("comparison", "rerank", "hybrid", "bm25", "dense")
+                if s in base_q["stages"]
+            ),
             None,
         )
 

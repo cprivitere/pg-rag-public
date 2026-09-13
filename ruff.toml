@@ -1,0 +1,40 @@
+# Ruff configuration — the repo linter. Single source: this file.
+# Run: `mise lint` (check), `mise fmt` (format), or `uv run ruff check . --fix`.
+# `tests/test_lint.py` gates this config: `mise test` fails on regressions.
+# LLM artifacts and generated files are excluded — never hand-lint those.
+line-length = 100
+
+extend-exclude = ["notebooks", "data", ".tmp", ".venv", "logs", ".ruff_cache", ".pytest_cache"]      # LLM artifacts + gitignored build outputs
+
+[format]
+quote-style = "double"      # repo dominant already
+indent-style = "space"
+
+[lint]
+# Defaults (E4,E7,E9,F): bugbear-level correctness only.
+# Added: I (import sort), RUF (ruff-specific), SIM (simplify), UP (modernize),
+#        B (bugbear strict), W, ISC (string concat), FLY (join perf).
+# Deliberately OFF: E501 (line length — formatter's job), ANN (typer/annotating),
+#        N (naming), D (docstrings), S (bandit), DTZ, RET, PERF, FURB, C4, PIE.
+select = ["E4", "E7", "E9", "F", "I", "W", "B", "UP", "SIM", "ISC", "FLY", "RUF"]
+ignore = ["B008"]   # typer Click-style default=... patterns in cli.py
+
+# scripts/ runs as one-off host tooling — pragmatic exemptions.
+[lint.per-file-ignores]
+"scripts/**" = [
+    "BLE001",       # one-off ops scripts intentionally catch Exception broadly
+    "PLW1510",      # subprocess without check — scripts intentionally inspect return codes
+    "S110", "S112", # try/except pass-continue in polling loops
+    "DTZ005",       # datetime.now() without tz — local host time is the point
+    "RUF059", "F841", # unused unpack/vars in probe scripts
+]
+# tests use bare asserts, broad catches, unused args by design
+"tests/**" = ["BLE001", "RUF059"]
+"scripts/pg_rag.py" = [
+    "E402",         # sys.path bootstrap precedes pgrag imports by design (AGENTS.md contract)
+]
+
+[lint.isort]
+case-sensitive = false
+combine-as-imports = true
+force-sort-within-sections = false

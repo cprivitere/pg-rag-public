@@ -29,17 +29,19 @@ os.chdir(PG_ROOT)
 
 from pydantic import BaseModel, Field
 
+from pgrag.rag.llm import generate
+from pgrag.rag.prompts import build_prompt
 from pgrag.rag.query_classifier import classify_query
 from pgrag.rag.retriever import retrieve
-from pgrag.rag.prompts import build_prompt
-from pgrag.rag.llm import generate
 from pgrag.rag.synthesis_detector import should_synthesize
 from pgrag.rag.synthesis_generator import synthesize_answer
 
 
 class Pipe:
     class Valves(BaseModel):
-        TOP_K: int = Field(default=40, description="Number of context chunks to retrieve (general queries)")
+        TOP_K: int = Field(
+            default=40, description="Number of context chunks to retrieve (general queries)"
+        )
         USE_HYBRID: bool = Field(default=True, description="Enable hybrid BM25 + semantic search")
         USE_RERANK: bool = Field(default=True, description="Enable reranking of results")
 
@@ -88,9 +90,9 @@ class Pipe:
         # Check if synthesis should be triggered
         result_dicts = [
             {"text": doc, "metadata": meta, "distance": dist}
-            for doc, meta, dist in zip(docs, metadatas, distances)
+            for doc, meta, dist in zip(docs, metadatas, distances, strict=False)
         ]
-        
+
         synthesis_used = False
         if should_synthesize(result_dicts, query_type):
             try:
@@ -111,17 +113,18 @@ class Pipe:
             return "Sorry, the answer could not be generated. Please try again."
 
         sources = []
-        for doc_id, dist, meta in zip(
+        for doc_id, _dist, meta in zip(
             results["ids"][0],
             results["distances"][0],
             results["metadatas"][0],
+            strict=False,
         ):
             name = meta.get("name", doc_id)
             table = meta.get("table", "unknown")
             sources.append(f"- {name} ({table})")
 
         source_block = "\n".join(sources) if sources else "No sources found."
-        
+
         # Add synthesis status if used
         synthesis_note = ""
         if synthesis_used:

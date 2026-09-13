@@ -2,6 +2,7 @@
 persisted to disk. Regression for the removed curated-dir write (V24/V20)."""
 
 import pytest
+
 from pgrag.config import DERIVED_DIR
 from pgrag.rag import pipeline
 
@@ -22,9 +23,7 @@ def test_synthesis_uses_ephemeral_context(monkeypatch):
     monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "general")
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", _fake_retrieve)
     monkeypatch.setattr("pgrag.rag.pipeline.should_synthesize", lambda *a, **k: True)
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.synthesize_answer", lambda *a, **k: "SYNTHESIZED BODY"
-    )
+    monkeypatch.setattr("pgrag.rag.pipeline.synthesize_answer", lambda *a, **k: "SYNTHESIZED BODY")
     monkeypatch.setattr("pgrag.rag.pipeline.generate", lambda prompt: "final answer")
 
     result = pipeline.ask("how do mushrooms grow")
@@ -48,9 +47,7 @@ def test_synthesis_writes_nothing():
     monkeypatch.setattr("pgrag.rag.pipeline.classify_query", lambda q: "general")
     monkeypatch.setattr("pgrag.rag.pipeline.retrieve", _fake_retrieve)
     monkeypatch.setattr("pgrag.rag.pipeline.should_synthesize", lambda *a, **k: True)
-    monkeypatch.setattr(
-        "pgrag.rag.pipeline.synthesize_answer", lambda *a, **k: "SYNTHESIZED BODY"
-    )
+    monkeypatch.setattr("pgrag.rag.pipeline.synthesize_answer", lambda *a, **k: "SYNTHESIZED BODY")
     monkeypatch.setattr("pgrag.rag.pipeline.generate", lambda prompt: "final answer")
     try:
         pipeline.ask("how do mushrooms grow")
