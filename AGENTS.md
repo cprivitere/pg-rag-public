@@ -46,6 +46,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
   - `rag/` — `retriever.py`, `reranker_client.py`, `bm25.py`, `query_classifier.py`, `query_plan.py`, `spelling.py`, `entity_retrieval.py`, `resolve.py`, `synthesis_detector.py`+`synthesis_generator.py`, `pipeline.py` (+ `ask_stream`), `prompts.py`, `llm.py`.
 - `scripts/` — eval + service tooling (see Important Files).
 - `tests/` — pytest suite, imports the installed `pgrag` package.
+- `notebooks/` — training notebooks NOT part of the RAG pipeline: `gen_synthetic.training.py` (distill/generation notebook) + `molab-mirror/` (snapshot of the molab training sandbox: bf16-final teacher config, pipeline scripts, decision trail incl. fp8 retirement), with `notebooks/molab-mirror/README.md` as the restore path.
 - `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`), `il2cpp/` (decomp artifacts: client binaries `GameAssembly.dll` + `global-metadata.dat` quoted verbatim from the Steam client, dumper output `out_lean/Dump0/{dump.cs,stringliteral.json}` the document builder reads, survey tools + the cargo-built dumper under `tools/il2cpp-dumper-rs` — refreshed by `mise sync-il2cpp`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `rerank.log`, `chat.log`, and `webui.log` when run).
 - `.omp/` — oh-my-pi config: `RULES.md`, `config.yml`, `WATCHDOG.md`, `skills/` (`pg-rag`, `pg-data`, `retrieval`, `evaluation`, `testing`).
 
@@ -67,7 +68,7 @@ mise golden                        # golden eval (needs :8080 + :8081)
 mise golden-short                  # quick tier (~3-5 min; alias gds)
 mise golden-one -- fireball-ability   # rerun named golden case(s) fast (alias go; comma-separate ids)
 mise golden-flaky / golden-flaky-list # focus on historically-troublesome golden cases / audit stats
-mise chat                          # Gradio chat (primary UI; also started by `mise start`; needs embed + LLM up)
+mise chat                          # Gradio chat (primary UI; also started by `mise start` = start-all; needs embed + LLM up)
 mise lint                        # ruff check src scripts tests (alias li) — run after editing code
 mise fmt                         # ruff format + safe autofix (alias fo)
 uv run pytest                      # offline test suite
@@ -104,10 +105,10 @@ mise drift                        # check docs/skills against the repo (aliases:
   | svc | port | model / note |
   |-----|------|--------------|
   | Embeddings | 8081 | `EMBED_MODEL` (`[env]`) — bge-small f16, cls pooling, hard 512-token server cap (input chars clipped to `llama_embeddings.MAX_EMBED_CHARS` = 2000); needed for Q&A/eval |
-  | LLM | 8080 | `LLM_MODEL` (`[env]`; `LLM_FLAGS` carries launch tuning, e.g. `--jinja`) — RAG Q&A; a running instance OOMs before start → `mise down` first |
+  | LLM | 8080 | `LLM_MODEL` (`[env]`; `LLM_FLAGS` carries launch tuning, e.g. `--jinja`) — RAG Q&A; a running instance OOMs before start → `mise down` (alias of `stop-all`) first |
   | Reranker | 8082 | `RERANK_MODEL` (`[env]`) — bge-reranker cross-encoder; optional, lexical fallback |
-  | Chat (Gradio) | 7860 | primary UI — part of `mise start`; `mise chat` foreground; history in browser localStorage |
-  | OpenWebUI | 3000 | optional (legacy) — `mise webui-start`/`webui-stop`; no longer in `mise start`/`mise down` |
+  | Chat (Gradio) | 7860 | primary UI — part of `mise start` (alias of `start-all`); `mise chat` foreground; history in browser localStorage |
+  | OpenWebUI | 3000 | optional (legacy) — `mise webui-start`/`webui-stop`; no longer in `start-all`/`stop-all` |
 - **Single-source models**: refs + tuning flags live once in `mise.toml [env]` (`*_MODEL`/`*_FLAGS`); consumed by `.mise/tasks/*-start.ps1` (`$env:`), `mise debug-*` (`{{ env.* }}`), `scripts/vram_sweep.py` and `scripts/embed_eval.py` (tomllib). `mise drift` fails if any consumer hardcodes a model literal.
 - `scripts/rag_chat.py` and `pg_rag.py` assume these services up.
 - Tests import the installed `pgrag` package — after changing `src/pgrag/`, no reinstall needed (editable install).
