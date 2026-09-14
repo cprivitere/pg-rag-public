@@ -114,15 +114,17 @@ The suite is better than the original audit claimed:
 5. **Module docstrings for the remaining test files** — done: 34 added across
    the suite (files already having one skipped), each derived from the file it
    heads. Verified by AST-parse + full suite: **547 passed, 14 deselected,
-   0 failures**.
+   0 failures** at the time (suite later grew to 597 passed / 42 skipped /
+   16 deselected; see AGENTS.md "Testing & QA" for the live tally).
 
 ### P2 — coverage depth (LANDED 2026-08-21, premise-corrected)
-6. **Golden-set expansion** — premise stale: the set is **already 34** (not 5;
-   docs said 5/"expand to 20-30"). Left as-is (well-formed, passes collection);
-   corrected the count in `evaluation/SKILL.md` + `pg-rag/SKILL.md`. Imbalance
-   noted: comparison = 1/34 vs entity = 18/34 — future goldens should favor
-   comparison. Grounding spot-checked against `documents.json` (facts present,
-   no fabrication).
+6. **Golden-set expansion** — premise stale at write time: the set was already
+   **34** (not 5; docs said 5/"expand to 20-30"). Left well-formed; counts were
+   corrected then in `evaluation/SKILL.md` + `pg-rag/SKILL.md`. Balance then:
+   comparison = 1/34 vs entity = 18/34 — favoring comparison additions. The
+   set has since grown to **42** (20 entity / 14 general / 5 comparison / 3
+   recipe); `evaluation/SKILL.md` now tracks the live balance. Grounded
+   against `documents.json` at review time (facts present, no fabrication).
 7. **Pipeline-set redundancy** — landed via P1.5: every `test_pipeline_*.py`
    and `test_prompts.py` now carries a docstring splitting routing
    (`test_pipeline_*`) from prompt-content (`test_prompts`), and

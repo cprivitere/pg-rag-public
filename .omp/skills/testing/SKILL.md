@@ -5,7 +5,7 @@ description: Regression-triage and test discipline for pg-rag-builder — how to
 
 # testing — regression triage & test discipline
 
-The suite is 547 offline tests (561 collected, 14 slow deselected). When a test
+The suite is 597 passing tests (655 collected, 42 skipped — offline server-guards; 16 slow deselected). When a test
 fails, triage BEFORE editing. The full layer→test contract map is
 `docs/TEST_CONTRACTS.md` — READ IT (this skill is the decision procedure, not
 the map; the map is the single owner of which file defends which contract).
