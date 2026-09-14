@@ -78,13 +78,10 @@ def imports():
 @app.function
 def generate_batch(texts, teacher_model, tokenizer, torch, time, max_new_tokens=512):
     # Single generate() per batch. Static KV cache: cache_implementation="static".
-    # StaticCache stores K/V in key_states.dtype (model dtype -> bf16 = 1.0 GiB/seq @4096);
-    # fp16/bf16 static cache beats fully dynamic by ~1 GiB/seq @4096 ctx (measured).
-    # Measured 128-doc A/B (2026-09-13, B=32 static cache, greedy 512-token): nf4
-    # teacher 74.8 tok/s vs bf16 copy 92.6 tok/s -- bnb 4-bit dequant overhead makes
-    # nf4 SLOWER than plain bf16 here; nf4 kept for VRAM headroom (16.5 vs 55 GB).
-    # (2026-09-14 update) plain bf16 + use_kernels=True piped through the hub kernels is
-    # now the default teacher arm; fp8 evaluated and retired (see molab-mirror READ ME).
+    # NOTE: no fp8 KV path on transformers 5.16.1 -- StaticCache stores K/V in
+    # key_states.dtype (model dtype -> bf16 = 1.0 GiB/seq @4096); QuantizedCache
+    # backends (quanto/hqq) are not installed. Static-vs-dynamic measured: fp16/bf16
+    # static cache beats fully dynamic by ~1 GiB/seq @4096 ctx.
     tokenizer.padding_side = "left"
     enc = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=4096)
     inputs = {k: v.cuda() for k, v in enc.items()}
@@ -126,7 +123,6 @@ def teacher(AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, torch):
         tokenizer.pad_token = tokenizer.eos_token
     print(f"Tokenizer loaded: {type(tokenizer).__name__}, vocab={tokenizer.vocab_size}")
     return teacher_model, tokenizer
-
 
 
 @app.cell
@@ -172,6 +168,7 @@ def memory(torch):
     else:
         _n_params = sum(p.numel() for p in _student.parameters())
         print(f"  [VRAM] free={_free / 2**30:.1f}/{_tot / 2**30:.1f} GiB | student resident: {_n_params / 1e9:.2f}B params")
+
     return
 
 
@@ -194,6 +191,7 @@ def unload_student(torch):
         torch.cuda.empty_cache()
         _free1, _ = torch.cuda.mem_get_info()
         print(f"  [UNLOAD] freed {(_free1 - _free0) / 2**30:.1f} GiB -> free={_free1 / 2**30:.1f}/{_tot / 2**30:.1f} GiB")
+
     return
 
 
@@ -263,12 +261,7 @@ def gen_synthetic(
     #   KV GiB/seq@4096 = 1.0 (64 layers x 4 KV heads x 256 head_dim, bf16 = 262144 B/token)
     #   6.0 GiB margin covers the activation spike beyond KV (peak-alloc rise B=8 -> B=32
     #   is only ~4 GiB of activations vs per-batch KV dominating at B>=8).
-    # Cap 32: B=40 fit VRAM but measured no tok/s gain over B=32 -- the cap is a
-    # decode-bandwidth/throughput plateau, NOT a VRAM limit (bf16 teacher at 54.7 GB
-    # would compute the same formula -> same cap; nf4 does NOT buy batch size).
-    # Why nf4 then: (1) student co-residency needs 16.5-vs-55 GB fit, (2) bnb 4-bit
-    # measured SLOWER than bf16 (74.8 vs 92.6 tok/s @B=32/greedy-512tok, 128-doc A/B this
-    # turn), so if we only ever ran generation a bf16 teacher would be the faster choice.
+    # Cap 32: B=40 fit VRAM but no tok/s gain over B=32 (measured).
     PER_SEQ_KV_GIB = 1.0
     BATCH_MARGIN_GIB = 6.0
     BATCH_CAP = 32

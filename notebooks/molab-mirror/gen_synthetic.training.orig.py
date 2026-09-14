@@ -78,13 +78,13 @@ def imports():
 @app.function
 def generate_batch(texts, teacher_model, tokenizer, torch, time, max_new_tokens=512):
     # Single generate() per batch. Static KV cache: cache_implementation="static".
-    # StaticCache stores K/V in key_states.dtype (model dtype -> bf16 = 1.0 GiB/seq @4096);
-    # fp16/bf16 static cache beats fully dynamic by ~1 GiB/seq @4096 ctx (measured).
+    # NOTE: no fp8 KV path on transformers 5.16.1 -- StaticCache stores K/V in
+    # key_states.dtype (model dtype -> bf16 = 1.0 GiB/seq @4096); QuantizedCache
+    # backends (quanto/hqq) are not installed. Static-vs-dynamic measured: fp16/bf16
+    # static cache beats fully dynamic by ~1 GiB/seq @4096 ctx.
     # Measured 128-doc A/B (2026-09-13, B=32 static cache, greedy 512-token): nf4
     # teacher 74.8 tok/s vs bf16 copy 92.6 tok/s -- bnb 4-bit dequant overhead makes
     # nf4 SLOWER than plain bf16 here; nf4 kept for VRAM headroom (16.5 vs 55 GB).
-    # (2026-09-14 update) plain bf16 + use_kernels=True piped through the hub kernels is
-    # now the default teacher arm; fp8 evaluated and retired (see molab-mirror READ ME).
     tokenizer.padding_side = "left"
     enc = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=4096)
     inputs = {k: v.cuda() for k, v in enc.items()}
@@ -127,6 +127,19 @@ def teacher(AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, torch):
     print(f"Tokenizer loaded: {type(tokenizer).__name__}, vocab={tokenizer.vocab_size}")
     return teacher_model, tokenizer
 
+
+@app.cell
+def load_fp8():
+    # FP8 teacher via in-process transformers 5.16.1: NOT viable (measured 2026-09-13).
+    # Official Qwen/Qwen3.8-27B-FP8 loads, but the finegrained-fp8 path hits two hard problems:
+    #   1) loader gap: gate_proj ships as plain nn.Linear with fp8 weights, no weight_scale_inv
+    #      (manual FP8Linear repair works: 64 modules rebuilt)
+    #   2) kernel gap: after repair, community finegrained-fp8 Triton kernel is ~1000x slower
+    #      than nf4 (smoke: 148.5s for 16 tokens vs nf4 74.8 tok/s) on sm_120 -- unusable
+    # The FP8 speed pass is therefore blocked in-process; NF4 remains the teacher.
+    # Real fp8/nvfp4 speed requires a serving runtime (vLLM/SGLang) per plan Annex.
+
+    return
 
 
 @app.cell
