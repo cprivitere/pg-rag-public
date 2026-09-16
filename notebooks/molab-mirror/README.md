@@ -56,3 +56,26 @@ Mirror of everything relevant on the molab instance (sb-dda4216fe38ee51a), verif
 - Final remote sha256: `9875a4994c16f013984a1c1095aa7efe3a4eb312934f467d81b8f225f410fcb5`.
 - Weight-VRAM after full bf16-bench cycle: 43.8 GiB driver-free, 0.03 GiB torch-alloc
   (everything else is reusable reserved pool).
+
+## Dedicated QA-generator reshape (2026-09-15, sandbox sb-566897114d5cab9c)
+- Notebook reshaped to dedicated synthesizer; live export captured in
+  `notebook_snapshot.live-2026-09-15-qa-gen.py` (26665 bytes, sha256
+  `efc2445bbeb4c6e1b69fd2bdba2208568ea7be55b31e6fdee61dc25b5a5583af`).
+- `teacher_bf16` → private-alias loader (`_torch`/`_AutoModel`/`_AutoTok`), tokenizer fed
+  the repo-id string, not the model object: fixes the deepcopy-of-27B OOM at
+  `AutoTokenizer.from_pretrained(teacher_model)`. Reactive edge Imports→teacher severed.
+- `gen_synthetic` (PKri): `outputs/inputs` → `gen_out/gen_in` (and 2s) — the decode
+  names `generate_batch()` actually returns; previously unconditional NameError at first batch.
+- End-of-run push wiring: final `synthetic_{train,eval}.jsonl` + `gen_state.json` uploaded to
+  `hf://buckets/Nubula/paddock/training/` (bucket write+read verified, canary repo deleted).
+- `setup` cell (first, reserved name): argv-list subprocess probe asserts torch CUDA-warm AND
+  `torch==2.14.0+cu132` (driver 13.2 => `--torch-backend=auto` resolves 2.14.0+cu132). Mismatch
+  triggers the old manual repair line (`uv pip install -U ... --torch-backend=auto`) now unbounded
+  kernels (0.17 verified w/ mamba-ssm torch214 build; needs `einops` installed) → after-repair
+  restart-session reminder. Header deps slimmed: distill-era bitsandbytes/datasets/evaluate/peft/
+  trl/timm/cuda-bindings/cuda-pathfinder/openai removed via ctx.packages.remove.
+- Removed dead `_loaded = globals().get("student_model")` from vram cell; documented
+  unload-via-globals reactive-isolation intent in unload cell.
+- Known kernel runtime: torch 2.14.0+cu132 in `/tmp/uv-venv` (image torch 2.11.0+cu130 shadowed),
+  transformers 5.17.0, kernels 0.16.1 in-venv pre-repair; `kernels-community/mamba-ssm` hub kernel
+  verified loadable under kernels 0.17.0 with `version=3` API.
