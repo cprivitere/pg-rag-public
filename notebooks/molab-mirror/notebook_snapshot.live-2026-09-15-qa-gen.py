@@ -40,31 +40,30 @@ import subprocess as _subprocess
 # driver-matched build; --torch-backend=auto on driver 13.2 resolves
 # torch==2.14.0+cu132 (verified 2026-09-16 via uv dry-run on this fleet).
 # Probe in a SUBPROCESS so the kernel never imports a broken torch (which
-# would poison sys.modules for the whole session). kernels left UNBOUNDED:
-# 0.17.x exists and hub builds verified (mamba-ssm torch214-cu130 and
-# torch212-cu132 variants); einops added because the 0.17 mamba-ssm kernel
-# imports it at load time.
+# would poison sys.modules for the whole session).
+# kernels CONSTRAINED <0.17 (re-verified): transformers 5.17.0 hard-rejects
+# kernels>=0.17 at set_use_kernels ("Kernels are not available... < 0.17.0");
+# unbounded 'kernels' broke use_kernels=True on 2026-09-16. einops kept: the
+# kernels 0.16.x mamba-ssm hub path needs it. torchvision MUST match venv
+# torch ABI-wise: transformers imports it at model-load time, and the IMAGE
+# torchvision (compiled for image torch) dies with "operator
+# torchvision::nms does not exist" once venv torch shadows it (seen live).
 _PROBE_CODE = "import torch; assert torch.cuda.is_available(); print(torch.__version__ + '_' + torch.version.cuda.replace('.', ''))"
 _r = _subprocess.run(
     ["/tmp/uv-venv/bin/python", "-c", _PROBE_CODE],
     capture_output=True, text=True, timeout=120,
 )
 _out = (_r.stdout or "").strip()
-if _r.returncode == 0 and (_out.startswith("2.14.0+cu132_") or _out == "2.14.0+cu132_130"):
+_REPAIR_CMD = (
+    "uv pip install -U "
+    "transformers 'kernels<0.17' marimo[recommended] huggingface-hub transformers torch torchvision einops "
+    "--torch-backend=auto -p /tmp/uv-venv/bin/python"
+)
+if _r.returncode == 0 and _out.startswith("2.14.0+cu132_"):
     print("[ENV] torch 2.14.0+cu132 OK (alloc + reduce) - no repair needed")
-elif _r.returncode == 0 and not _out:
-    _why = "torch importable but probe printed nothing"
-    print("[ENV] env mismatch (%s) -> repairing" % _why)
-    _rr = _subprocess.run(_REPAIR_CMD, shell=True, capture_output=True, text=True, timeout=900)
-    print("[ENV] repair rc=%s" % _rr.returncode)
 else:
     _why = "torch not importable (rc=%s)" % _r.returncode if _r.returncode != 0 else "torch=%r" % _out
     print("[ENV] env mismatch (%s) -> repairing" % _why)
-    _REPAIR_CMD = (
-        "uv pip install -U "
-        "transformers kernels marimo[recommended] huggingface-hub transformers torch einops "
-        "--torch-backend=auto -p /tmp/uv-venv/bin/python"
-    )
     _rr = _subprocess.run(_REPAIR_CMD, shell=True, capture_output=True, text=True, timeout=900)
     print("[ENV] repair rc=%s" % _rr.returncode)
     if _rr.returncode != 0:
@@ -72,7 +71,6 @@ else:
     print("[ENV] NOTE: after repair, restart the session (UI) so no stale torch "
           "sits in this kernel's sys.modules")
 print("[ENV] env-check complete")
-
 
 # %%
 import json, random, re, time, os, gc, torch, textwrap
@@ -112,7 +110,6 @@ def generate_batch(texts, teacher_model, tokenizer, torch, max_new_tokens=512):
 _free, _tot = torch.cuda.mem_get_info()
 print(f"  [VRAM] free={_free / 2**30:.1f}/{_tot / 2**30:.1f} GiB")
 
-
 # %%
 # Deliberate: unload touches teacher_model only via globals() so this cell does
 # NOT become a reactive descendant of the teacher cell — unload must not fire
@@ -128,7 +125,6 @@ _free1, _ = torch.cuda.mem_get_info()
 print(
     f"  [UNLOAD] freed {(_free1 - _free0) / 2**30:.1f} GiB -> free={_free1 / 2**30:.1f}/{_tot / 2**30:.1f} GiB"
 )
-
 
 # %%
 import torch as _torch
@@ -157,7 +153,6 @@ tokenizer = _AutoTok.from_pretrained(_teacher_name)
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 print(f"Tokenizer loaded: {type(tokenizer).__name__}, vocab={tokenizer.vocab_size}")
-
 
 # %%
 "\n    Generate synthetic QA data from HF bucket documents.json\n    using the already-loaded teacher model.\n\n    Resume-safe: re-run the cell to continue where it left off.\n    State saved to data/training/gen_state.json after every checkpoint.\n\n    Run after cell order: imports -> teacher -> (load_student) -> (memory/unload_student) -> gen_synthetic.\n    All imports provided by the shared imports cell; batched generate lives in generate_helper (dynamic BATCH + static KV cache).\n    Hardware: molab-class GPU (CUDA cuda:0) -- unload the student first to free ~16.8 GiB, then BATCH scales to live free VRAM (capped at 32).\n"
