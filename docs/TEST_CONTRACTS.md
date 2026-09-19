@@ -305,7 +305,7 @@ test (prove the source is fine) or recording a deliberate contract change
   (ruff pinned there, not in runtime deps)
 - **Contracts**: `uv run ruff check src scripts tests` returns 0 — any new
   finding in the linted trees fails `mise test`. `ruff.toml` `extend-exclude`
-  (`notebooks/`, `data/`, caches) plus per-file-ignores (`scripts/**`:
+  (`data/`, caches) plus per-file-ignores (`scripts/**`:
   BLE001/PLW1510/S110/S112/DTZ005/RUF059/F841; `scripts/pg_rag.py`: E402;
   `tests/**`: BLE001/RUF059) are deliberate, not drift. Re-export lines
   (`chunking.py` MAX_EMBED_CHARS) use `as`-form so F401 fix doesn't strip

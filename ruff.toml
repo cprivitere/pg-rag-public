@@ -4,7 +4,7 @@
 # LLM artifacts and generated files are excluded — never hand-lint those.
 line-length = 100
 
-extend-exclude = ["notebooks", "data", ".tmp", ".venv", "logs", ".ruff_cache", ".pytest_cache"]      # LLM artifacts + gitignored build outputs
+extend-exclude = ["data", ".tmp", ".venv", "logs", ".ruff_cache", ".pytest_cache"]      # LLM artifacts + gitignored build outputs
 
 [format]
 quote-style = "double"      # repo dominant already
