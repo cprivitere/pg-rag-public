@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from scripts.golden_check import GOLDEN_DIR, check_golden
+from scripts.golden_check import GOLDEN_DIR, check_golden, normalize
 
 _ALL_FILES = sorted(GOLDEN_DIR.glob("*.json"))
 
@@ -26,6 +26,16 @@ _SHORT_FILES = [
 ]
 
 _LONG_FILES = [f for f in sorted(GOLDEN_DIR.glob("*.json")) if f not in _SHORT_FILES]
+
+
+def test_normalize_contractions_strip_not_space():
+    """Contractions normalize to their stripped form so a source "don't"/"don't"
+    matches a contraction-stripped golden variant "dont"; other punctuation
+    still collapses to a single space."""
+    assert normalize("Curses don't wear off on their own.") == "curses dont wear off on their own"
+    assert normalize("Curses don\u2019t wear off") == "curses dont wear off"
+    assert normalize("curses dont wear off") == "curses dont wear off"
+    assert normalize("Blacksmithing: 25") == "blacksmithing 25"
 
 
 def _servers_up():

@@ -16,7 +16,16 @@ GENERATION = {"temperature": 0, "seed": 0}
 
 
 def normalize(text):
+    """Case/punctuation-insensitive text for fact-presence matching.
+
+    Apostrophes and single quotes are DELETED (not spaced) before the general
+    punctuation mangling, so a contraction in the source or answer ("don't",
+    "don\u2019t") normalizes to the same token as a contraction-stripped golden
+    fact variant ("dont") -- the golden files author variants that way (e.g.
+    "curses dont wear off"). Other punctuation still collapses to a space
+    ("Blacksmithing: 25" -> "blacksmithing 25")."""
     text = (text or "").lower()
+    text = re.sub(r"[\u2018\u2019\u201a\u201b`']", "", text)
     text = re.sub(r"[^a-z0-9 ]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
