@@ -187,6 +187,18 @@ def _is_game_assembly(assembly):
     return (assembly or "") == "GorgonCore"
 
 
+def _readable_identifier(name):
+    """Split a game-code identifier into readable words so lexical/dense
+    retrieval can match a natural-language query against a camelCase code
+    symbol: 'DancingOnPole' -> 'dancing on pole', 'AbilityRequirement' ->
+    'ability requirement'. CamelCase, acronym (URLParser -> url parser), and
+    underscore boundaries become spaces; the result is lowercased."""
+    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name)
+    s = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", s)
+    s = re.sub(r"_+", " ", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
 def _enum_doc(doc_id, name, assembly, block_lines):
     members = []
     for line in block_lines:
@@ -195,10 +207,14 @@ def _enum_doc(doc_id, name, assembly, block_lines):
             continue
         g = m.group(1)
         v = m.group(2).strip()
-        members.append(f"- {g} = {v}")
+        member = f"- {g} = {v}"
+        readable = _readable_identifier(g)
+        if readable != g.lower():
+            member += f" ({readable})"
+        members.append(member)
     if not members:
         return None
-    text = f"{name} (enum, {assembly}):" + "\n" + "\n".join(members)
+    text = f"{name} (enum, {assembly}): {_readable_identifier(name)}" + "\n" + "\n".join(members)
     return _base_doc(doc_id, "enum", "enums", name, text)
 
 

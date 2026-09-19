@@ -53,6 +53,29 @@ def test_assembly_filter_excludes_engine_types(tmp_path, monkeypatch):
     assert "Unknown = 0" in doc["text"]
 
 
+def test_enum_readable_camelcase_members(tmp_path, monkeypatch):
+    dump = (
+        "// Dll : GorgonCore.dll\n"
+        "public enum AbilityRequirement\n"
+        "{\n"
+        "    public const AbilityRequirement None = 0;\n"
+        "    public const AbilityRequirement DancingOnPole = 1;\n"
+        "    public const AbilityRequirement InMusicPerformance = 2;\n"
+        "}\n"
+    )
+    docs = _build(tmp_path, monkeypatch, dump_cs=dump)
+    assert [d["id"] for d in docs] == ["il2cpp_enum_AbilityRequirement"]
+    text = docs[0]["text"]
+    # Raw identifiers stay for exact match; a readable split is added so a
+    # natural-language query ("ability requirements" / "dancing on pole") can
+    # lexically match the camelCase code symbol.
+    assert "AbilityRequirement (enum, GorgonCore): ability requirement" in text
+    assert "- DancingOnPole = 1 (dancing on pole)" in text
+    assert "- InMusicPerformance = 2 (in music performance)" in text
+    assert "- None = 0" in text
+    assert "(none)" not in text  # single-word member gets no redundant annotation
+
+
 def test_schema_card_target_classes_only(tmp_path, monkeypatch):
     dump = (
         "// Dll : System.Xml.dll\n"
