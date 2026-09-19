@@ -48,15 +48,41 @@ def main():
         "retrieved context (GEN-side extraction gap) or absent (RET-side "
         "retrieval gap), using the exact context the LLM received.",
     )
+    parser.add_argument(
+        "--export",
+        nargs="?",
+        const="data/golden/golden_context_bundle.jsonl",
+        default=None,
+        metavar="PATH",
+        help="also write, per case, the exact fitted context the LLM received "
+        "(post-gap-fill/synthesis) plus question/query_type/facts/local answer "
+        "to a JSONL bundle for oracle replay on a stronger reader. Bare "
+        "--export writes data/golden/golden_context_bundle.jsonl.",
+    )
     args = parser.parse_args()
 
     total_miss = 0
+    export_records = []
     capture_trace = os.environ.get("PGRAG_TRACE") == "1"
     total_xpass = 0
     for path in sorted(GOLDEN_DIR.glob("*.json")):
         golden = json.loads(path.read_text(encoding="utf-8"))
         trace = {} if capture_trace else None
         result, misses, context = check_golden(golden, trace=trace)
+        if args.export:
+            export_records.append(
+                {
+                    "id": golden["id"],
+                    "question": golden["question"],
+                    "type": golden.get("type"),
+                    "query_type": result.get("query_type"),
+                    "xfail": bool(golden.get("xfail")),
+                    "fitted_docs": _fit_context(result.get("documents") or []),
+                    "facts": golden["facts"],
+                    "local_misses": [first for _variants, first in misses],
+                    "local_answer": result.get("answer"),
+                }
+            )
         if capture_trace:
             TRACE_DIR.mkdir(parents=True, exist_ok=True)
             try:
@@ -88,6 +114,14 @@ def main():
             else:
                 print(f"    MISSING: {first}")
         total_miss += len(misses)
+
+    if args.export:
+        out = Path(args.export)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("w", encoding="utf-8") as fh:
+            for rec in export_records:
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        print(f"EXPORTED {len(export_records)} cases -> {out}")
 
     print()
     if total_miss or total_xpass:
