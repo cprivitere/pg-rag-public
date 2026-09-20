@@ -71,16 +71,22 @@ override it (security policy). Consequences:
 
 - Bucket: `hf://buckets/Nubula/paddock/` (HuggingFace *Buckets* product,
   `hf://buckets/<org>/<name>/...` scheme — NOT `hf://datasets/`).
-- `documents.json` (~261,927 docs, ~153 MB) is the same artifact the
-  local `pgrag build-documents` emits. After local rebuilds, upload it
-  back so the next sandbox boot picks it up (the notebook's `rag_index`
-  downloads it and caches to workspace `data/documents.json`).
+- `documents.json` (~262k docs, ~170 MB) is the same artifact the
+  local `pgrag build-documents` emits. Publishing is **explicit**:
+  after a local rebuild run `mise upload-docs` (writes
+  `data/documents.json` → the bucket with your `HF_TOKEN`, then
+  verifies remote size == local). A rebuild never auto-publishes — a
+  bad local rebuild must not silently become the molab corpus on next
+  sandbox boot.
+- The notebook's `rag_index` downloads the bucket file and caches it to
+  workspace `data/documents.json`; the next boot after an upload picks
+  up the new corpus automatically.
 - Historical: `Nubula/paddock/training/` holds unsloth JSONLs from the
   retired distillation route (removed in `4f95adc`). Untouched, but
   nothing in the current pipeline reads them.
 - Access from the sandbox is anonymous (no HF_TOKEN in molab sandboxes);
-  the bucket is public-read. Writes from the sandbox are NOT attempted
-  by the current notebook.
+  the bucket is public-read. Writes come only from the local repo via
+  `mise upload-docs` (needs your `HF_TOKEN` with write scope).
 
 ## The notebook ↔ repo contract
 

@@ -65,6 +65,7 @@ uv run pgrag build-index --source cdn|wiki|computed|curated|il2cpp   # partial r
 mise sync-wiki / sync-cdn / sync   # build-documents + build-index in one shot (aliases syw/syc/sy)
 mise sync-il2cpp                   # IL2CPP decomp: stage fresh Steam-client binaries + re-run the dumper + partial re-embed (alias syi)
 mise generate-docs                 # bare idempotent documents rebuild (alias docs)
+mise upload-docs                   # publish data/documents.json -> hf://buckets/Nubula/paddock (HF_TOKEN write; verifies remote size; alias up)
 mise golden                        # golden eval (needs :8080 + :8081)
 mise golden-short                  # quick tier (~3-5 min; alias gds)
 mise golden-one -- fireball-ability   # rerun named golden case(s) fast (alias go; comma-separate ids)
