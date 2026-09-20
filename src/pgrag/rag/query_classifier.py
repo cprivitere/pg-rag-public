@@ -196,8 +196,8 @@ def _load_entity_index():
         return _ENTITY_INDEX[1]
 
     index = []
+    seen = set()  # shared: doc entries AND alias entries dedupe against it
     if path.exists():
-        seen = set()
         for doc in json.loads(path.read_text(encoding="utf-8")):
             meta = doc.get("metadata", {})
             name = meta.get("name")
