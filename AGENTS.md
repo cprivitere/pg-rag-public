@@ -19,7 +19,6 @@ cdn/*.json ─┐
             ├─ loaders → GameDatabase(tables + wiki) ─┐
 wiki/*.txt ─┘                                          ├─ documents/ (builder + wiki_builder + skill_profiles + summaries)
 data/wiki/curated/*.json ──────────────────────────────┘
-data/il2cpp/out_lean/Dump0/ ───────────────────────────┘  (decomp: enums/schema/mechanics, refreshed by mise sync-il2cpp)
                         │  build.py: generate_documents() → documents.json (+ documents_version.json, stamps DOCUMENTS_VERSION)
                         ▼
               build_index.py → Chroma collection "project_gorgon" (incremental, hash-based)
@@ -46,7 +45,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
   - `rag/` — `retriever.py`, `reranker_client.py`, `bm25.py`, `query_classifier.py`, `query_plan.py`, `spelling.py`, `entity_retrieval.py`, `resolve.py`, `synthesis_detector.py`+`synthesis_generator.py`, `pipeline.py` (+ `ask_stream`), `prompts.py`, `llm.py`.
 - `scripts/` — eval + service tooling (see Important Files).
 - `tests/` — pytest suite, imports the installed `pgrag` package.
-- `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`), `il2cpp/` (decomp artifacts: client binaries `GameAssembly.dll` + `global-metadata.dat` quoted verbatim from the Steam client, dumper output `out_lean/Dump0/{dump.cs,stringliteral.json}` the document builder reads, survey tools + the cargo-built dumper under `tools/il2cpp-dumper-rs` — refreshed by `mise sync-il2cpp`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `rerank.log`, `chat.log`, and `webui.log` when run).
+- `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `rerank.log`, `chat.log`, and `webui.log` when run).
 - `.omp/` — oh-my-pi config: `RULES.md`, `config.yml`, `WATCHDOG.md`.
 - `.agents/skills/` — all agent skills, discoverable by any agent harness: `pg-rag`, `pg-data`, `retrieval`, `evaluation`, `testing` (pipeline/workflow skills) + `molab-notebook` (pairing on the molab-hosted marimo chat notebook). Skills live here only — commit changes here, never re-create `.omp/skills/` copies.
 - `notebooks/molab-mirror/` — the marimo notebook that runs the PG-RAG chat on molab (marimo's hosted notebook service). Platform mechanics (sandbox lifecycle, GPU attach, torch repair, HF bucket, auto-start limits): `docs/MOLAB_OPS.md`. Pairing/protocol: the `molab-notebook` skill.
@@ -61,9 +60,8 @@ uv run pgrag download-cdn           # fetch CDN json
 uv run pgrag build-documents        # regenerate documents.json (stamps version)
 uv run pgrag build-index            # embed + index into Chroma
 uv run pgrag validate              # full offline pipeline integrity check (sources, documents+freshness, wiki meta, index)
-uv run pgrag build-index --source cdn|wiki|computed|curated|il2cpp   # partial rebuild of one source
+uv run pgrag build-index --source cdn|wiki|computed|curated   # partial rebuild of one source
 mise sync-wiki / sync-cdn / sync   # build-documents + build-index in one shot (aliases syw/syc/sy)
-mise sync-il2cpp                   # IL2CPP decomp: stage fresh Steam-client binaries + re-run the dumper + partial re-embed (alias syi)
 mise generate-docs                 # bare idempotent documents rebuild (alias docs)
 mise upload-docs                   # publish data/documents.json -> hf://buckets/Nubula/paddock (HF_TOKEN write; verifies remote size; alias up)
 mise golden                        # golden eval (needs :8080 + :8081)

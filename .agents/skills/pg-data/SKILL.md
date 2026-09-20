@@ -32,19 +32,16 @@ the "ideal" schema, and dropping them is wrong.
   filtering; multi-value fields MUST be joined (`" | ".join(...)`) because
   Chroma can store but not filter lists.
 
-## IL2CPP decomp source
+## IL2CPP decomp source (private overlay only)
 
-Provenance: Steam client binaries (`GameAssembly.dll` +
-`global-metadata.dat`) are staged verbatim into `data/il2cpp/` by
-`scripts/sync_il2cpp.py` (`mise sync-il2cpp`, reads `GAME_INSTALL_DIR`),
-dumped by il2cpp-dumper-rs, and read from
-`data/il2cpp/out_lean/Dump0/{dump.cs,stringliteral.json}` by
-`documents/decomp_builder.py`. Three tables: `enums`, `schema`,
-`mechanic` — the allowlists (`SCHEMA_CLASSES`, `MECHANIC_TOPICS`) are
-code-owned in `decomp_builder.py`. A clean checkout without `data/il2cpp`
-yields zero il2cpp docs (additive-only source). Post-dump discovery for
-extending the allowlists: `scripts/analyze_schemas.py` +
-`scripts/analyze_stringliteral.py`.
+Not in this public repo. Provenance: Steam client binaries
+(`GameAssembly.dll` + `global-metadata.dat`) staged into `data/il2cpp/`
+by a private overlay's `sync_il2cpp.py`, dumped by il2cpp-dumper-rs, and
+read from `data/il2cpp/out_lean/Dump0/{dump.cs,stringliteral.json}` by
+the overlay's `documents/decomp_builder.py` (allowlists: `enums`,
+`schema`, `mechanic`). Public checkouts never see this source: the
+builder hook imports the overlay's module and yields zero docs when it
+is absent.
 
 ## Record examples
 

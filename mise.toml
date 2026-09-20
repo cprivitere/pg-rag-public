@@ -131,16 +131,6 @@ run = [
 ]
 alias = "syc"
 
-[tasks."sync-il2cpp"]
-description = "Converge the IL2CPP decomp source to the current Steam client: stage fresh binaries, run the IL2CPP dumper, regenerate documents, partial il2cpp re-embed, then BM25"
-run = [
-  "uv run python scripts/sync_il2cpp.py",
-  "uv run pgrag build-documents",
-  "uv run pgrag build-index --source il2cpp",
-  "uv run python -m pgrag.rag.bm25",
-]
-alias = "syi"
-
 [tasks.validate]
 description = "Validate vectorstore health; rebuild if issues found"
 run = "uv run pgrag validate && echo 'Index healthy' || (echo 'Rebuilding...' && uv run pgrag build-index)"

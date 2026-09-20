@@ -21,7 +21,6 @@ _SHORT_FILES = [
     GOLDEN_DIR / "fireball-vs-fire-breath-damage.json",  # comparison: damage numbers
     GOLDEN_DIR / "healing-potion-omega.json",  # recipe: crafting/effects
     GOLDEN_DIR / "cheesemaking-leveling.json",  # entity: arithmetic, 8 facts, hardest
-    GOLDEN_DIR / "il2cpp-mechanic-curse-remedy.json",  # general: xfail gate
     GOLDEN_DIR / "grow-field-mushrooms.json",  # general: 5 facts, medium
 ]
 
