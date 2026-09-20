@@ -85,32 +85,43 @@ override it (security policy). Consequences:
   retired distillation route (removed in `4f95adc`). Untouched, but
   nothing in the current pipeline reads them.
 - Access from the sandbox is anonymous (no HF_TOKEN in molab sandboxes);
-  the bucket is public-read. Writes come only from the local repo via
-  `mise upload-docs` (needs your `HF_TOKEN` with write scope).
+  the bucket is public-read. Writes come only from a repo checkout via
+  `mise upload-docs` (needs `HF_TOKEN` with write scope). The public
+  corpus is published from the public repo; if the private overlay's
+  corpus is ever published, it replaces the file wholesale — see the
+  corpus-variant note below.
 
 ## The notebook ↔ repo contract
 
-- Source of truth for the notebook is THIS REPO
-  (`notebooks/molab-mirror/notebook.py`, pushed to GitHub). molab loads
-  it from GitHub:
-  `https://molab.marimo.io/github/cprivitere/pg-rag-builder/blob/main/notebooks/molab-mirror/notebook.py`
-  (private repo → requires the user's GitHub auth on molab).
+- Source of truth for the notebook is the PUBLIC repo
+  (`cprivitere/pg-rag-public`, notebook at
+  `notebooks/molab-mirror/notebook.py`). molab loads it from GitHub:
+  `https://molab.marimo.io/github/cprivitere/pg-rag-public/blob/main/notebooks/molab-mirror/notebook.py`
+  (public repo → no GitHub auth needed on molab).
 - Sandbox-local edits via `cm.edit_cell` are LIVE-ONLY. Persist a cell
   edit by exporting the notebook (base64 via scratchpad) and committing
   to the repo. Never assume an edited cell survives a sandbox recreate.
 - molab adds `marimo[mcp]>=0.24.0` + its own pinned deps to the PEP 723
   deps block on save; don't hand-craft the header, let the sandbox write it.
 
+## Corpus variant policy
+
+The bucket carries exactly one `documents.json`. Publishing rules:
+
+- **Default (public-safe)**: publish from this repo
+  (`mise generate-docs && mise upload-docs`) — 261,703 docs, zero
+  il2cpp-derived content.
+- **Full (with decomp cards)**: publish only deliberately, from a
+  checkout with the private overlay installed. That replaces the bucket
+  file wholesale (with 305 extra enum/schema/mechanic docs). Revert by
+  re-publishing from this repo. The notebook is identical either way;
+  only the corpus differs.
+
 ## Repo artifacts touched by molab work
 
 - `data/golden/*.json` — golden eval cases; unrelated to molab, but the
   SYSTEM_PROMPT in the notebook mirrors the local pipeline's prompt
   conventions (context-grounded, no fabrication).
-- `data/tmp_eval/` (deleted 2026-09-20) — was local scratch from the
-  retired synthetic-QA generation route (teacher cell code, judge
-  payloads, clean/unsloth JSONLs). The route was removed in `4f95adc`;
-  the remaining run artifacts live on the HF bucket under
-  `Nubula/paddock/training/` if ever needed again.
 
 ## Accessing the notebook from an agent
 

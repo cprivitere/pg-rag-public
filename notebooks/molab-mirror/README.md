@@ -27,9 +27,9 @@ No training, no distillation, no QA generation — those routes were removed
 
 Open from GitHub via [molab](https://molab.marimo.io/github):
 
-    https://molab.marimo.io/github/cprivitere/pg-rag-builder/blob/main/notebooks/molab-mirror/notebook.py
+    https://molab.marimo.io/github/cprivitere/pg-rag-public/blob/main/notebooks/molab-mirror/notebook.py
 
-(Private repo: you must be logged into molab with GitHub access.)
+(Public repo: no GitHub auth needed on molab.)
 
 - Attach the GPU via the notebook specs button (RTX PRO 6000 Blackwell).
 - The first run downloads the 27B weights (~54 GB) and the corpus (~180 MB);
