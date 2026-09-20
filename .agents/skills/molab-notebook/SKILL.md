@@ -1,39 +1,3 @@
-# Pair on a molab-hosted marimo notebook without re-pasting connection details.
-#
-# molab sandboxes issue a per-sandbox URL (https://sb-XXXX.sb.molab.run/) and a
-# 64-hex-char bearer token. The URL changes whenever molab recreates the
-# sandbox (GPU attach, sandbox restart), and the token regenerates with it.
-#
-# Connection info is cached per sandbox id in
-#   %USERPROFILE%\.marimo\molab-connections.json
-#
-# FIRST CONNECT ON A FRESH SANDBOX (the user must paste a block):
-# The user's message contains lines like:
-#   "Connect to the notebook at: https://sb-....sb.molab.run/"
-#   "Use this auth token when calling execute-code.sh: ... --token <64 hex>"
-# Parse and cache it, then delegate:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File <skill>/scripts/molab-connect.ps1 -Pasteline "<the pasted block>" -Save
-#
-# LATER CALLS (no pasting needed - reads cache):
-#   molab-connect.ps1                                  # most recent cached sandbox
-#   molab-connect.ps1 -SandboxId sb-XXXX -Code "1+1"   # explicit sandbox
-#   molab-connect.ps1 -Info                            # show url + probe the kernel
-#   molab-connect.ps1 -Cache                           # list cached sandboxes
-#   molab-connect.ps1 -Set -Url URL -Token TOKEN       # manual upsert
-# Extra args pass straight through to execute-code.ps1 (-Code, -File, piped stdin...).
-#
-# MANDATORY FIRST KERNEL CALL once connected (the cm API is agent-only and
-# undocumented; this prints its usage):
-#   import marimo._code_mode as cm; help(cm)
-# Then send the user a toast:
-#   import marimo as mo; mo.status.toast(title='...', description='...', kind='success')
-#
-# BEHAVIOR WHEN THE URL 410s (sandbox moved): ask the user for the new URL /
-# connect block; -Pasteline -Save the new one; the cache upserts by sandbox id.
-#
-# All code execution goes through execute-code.ps1 in this skill's scripts dir;
-# molab-connect.ps1 is a thin cache + delegation layer.
-
 ---
 name: molab-notebook
 description: >-
@@ -49,11 +13,17 @@ allowed-tools: Bash(powershell **/scripts/molab-connect.ps1 *), Read
 
 # molab-notebook
 
-Connect to and drive a marimo notebook hosted on **molab**
-(`https://sb-XXXX.sb.molab.run/`). Bundles its own `execute-code.ps1`
-(direct HTTP/SSE client for the marimo kernel scratchpad); adds a persistent
-per-sandbox credential cache so the user never has to re-paste the URL +
-token.
+Pair on a molab-hosted marimo notebook without re-pasting connection details.
+
+molab sandboxes issue a per-sandbox URL (`https://sb-XXXX.sb.molab.run/`) and a
+64-hex-char bearer token. The URL changes whenever molab recreates the
+sandbox (GPU attach, sandbox restart), and the token regenerates with it.
+
+Connection info is cached per sandbox id in
+`%USERPROFILE%\.marimo\molab-connections.json`.
+
+All code execution goes through `execute-code.ps1` in this skill's scripts
+dir; `molab-connect.ps1` is a thin cache + delegation layer.
 
 ## When to use
 - The user asks to pair on / inspect / edit a marimo notebook hosted on
