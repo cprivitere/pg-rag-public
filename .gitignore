@@ -225,8 +225,10 @@ data/golden/*
 
 .vscode/
 
-# OpenCode superpowers/agent config — never commit
-.agents/
+# OpenCode superpowers/agent config — never commit (EXCEPT .agents/skills/,
+# which carries portable agent skills — see the negation below)
+.agents/*
+!.agents/skills/
 skills-lock.json
 docs/superpowers/
 
