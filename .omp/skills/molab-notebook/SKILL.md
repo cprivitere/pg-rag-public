@@ -39,8 +39,12 @@ name: molab-notebook
 description: >-
   Pair on a molab-hosted marimo notebook (sb-*.sb.molab.run) without
   re-pasting connection details: caches per-sandbox URL + token, delegates
-  execution to the marimo-pair-win execute-code.ps1 script, and handles
-  sandbox moves (GPU attach recreates the sandbox at a new URL).
+  execution to the bundled execute-code.ps1 script, and handles sandbox
+  moves (GPU attach recreates the sandbox at a new URL). Use this INSTEAD
+  OF generic marimo-pair skills whenever the notebook URL is sb-*.sb.molab.run
+  (a molab sandbox) — a pasted "Connect to the notebook at: https://sb-…"
+  block is this skill's trigger. Delegate to marimo-pair-win only for
+  locally-hosted marimo servers.
 allowed-tools: Bash(powershell **/scripts/molab-connect.ps1 *), Read
 ---
 
