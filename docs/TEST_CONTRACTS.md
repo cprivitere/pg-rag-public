@@ -1,6 +1,6 @@
 # TEST_CONTRACTS — what breaks when, and what to touch
 
-The load-bearing guardrail for pg-rag-builder: a layer → tests → contract map
+The load-bearing guardrail for pg-rag-public: a layer → tests → contract map
 with an explicit **regression-triage protocol**. The point is that a fresh
 model run (no conversation history) can look at a failing test and decide
 correctly — *fix the source* vs *update the test* — instead of patching a

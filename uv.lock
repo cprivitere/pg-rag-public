@@ -1062,7 +1062,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pg-rag-builder"
+name = "pg-rag-public"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

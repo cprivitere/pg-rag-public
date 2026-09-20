@@ -96,7 +96,7 @@ The sentence above it (L30-31, "spanning recipes-by-ingredient…"), stays uncha
 
 ## Verification
 
-From repo root (`F:/ProjectGorgon/pg-rag-builder`), after steps  igh1-2:
+From repo root (`F:/ProjectGorgon/pg-rag-public`), after steps  igh1-2:
 
 1. **Type histogram** — `jq -r '.type' data/golden/*.json | sort | uniq -c | sort -rn` → exactly:
    ```

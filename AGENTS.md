@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-Oh My Pi agent guide for **pg-rag-builder** — a RAG pipeline and retrieval harness for the *Project Gorgon* game wiki. Vectorizes CDN game data + wiki text into Chroma, retrieves with hybrid BM25+dense fusion, and answers questions through a local LLM.
+Oh My Pi agent guide for **pg-rag-public** — a RAG pipeline and retrieval harness for the *Project Gorgon* game wiki. Vectorizes CDN game data + wiki text into Chroma, retrieves with hybrid BM25+dense fusion, and answers questions through a local LLM.
 
 ---
 
@@ -91,7 +91,7 @@ mise drift                        # check docs/skills against the repo (aliases:
 ## Important Files
 
 - `src/pgrag/cli.py` — entry point; `config.py` — constants/paths; `build.py` — document orchestration; `rag/pipeline.py` — query path (deterministic temp=0/seed=0).
-- `scripts/pg_rag.py` — OpenWebUI pipe, `PG_ROOT = os.environ.get("PG_RAG_ROOT", r"F:\ProjectGorgon\pg-rag-builder")` (env override, Windows default) + `os.chdir()`, adds `PG_ROOT/src` to `sys.path` — the default path is what moves if the repo relocates. Valves: `TOP_K=40`, `USE_HYBRID=True`, `USE_RERANK=True`.
+- `scripts/pg_rag.py` — OpenWebUI pipe, `PG_ROOT = os.environ.get("PG_RAG_ROOT", r"F:\ProjectGorgon\pg-rag-public")` (env override, Windows default) + `os.chdir()`, adds `PG_ROOT/src` to `sys.path` — the default path is what moves if the repo relocates. Valves: `TOP_K=40`, `USE_HYBRID=True`, `USE_RERANK=True`.
 - `scripts/curator.py` + `curator_scheduler.py` — heuristic (non-LLM) curation: regex-detect fragmented knowledge (area_levels, skill_trainers, crafting_progressions), write template docs to `data/wiki/curated/`, scheduler persists state to `data/curator_state.json` and rebuilds doc/index on change. Deterministic by design — no LLM, so curated docs are stable anchors.
 - `scripts/golden_check.py` — fact-presence golden eval → `data/golden/`; `scripts/golden_rerun.py` — quick named-case rerun + flaky focus (`mise golden-one`/`golden-flaky`; appends miss history to `data/golden/history.jsonl`); `scripts/embed_eval.py` (+`bakeoff_corpus.py`; VRAM helpers in `embed_vram_probe.py`) — embedding bake-offs.
 - `docs/TEST_CONTRACTS.md` — layer→tests→contract map + regression-triage protocol (read before changing behavior/tests); `docs/REVIEW.md` — audit findings + improvement backlog.

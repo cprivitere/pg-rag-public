@@ -1,11 +1,11 @@
 ---
 name: pg-rag
-description: How the pg-rag-builder pipeline actually works — loaders, document generation, indexing, and retrieval stages. Use when modifying the RAG pipeline, retrieval behavior, indexing, chunking, embeddings, or reranking. Project-wide orientation (commands, dirs, services) lives in AGENTS.md; test discipline in the `testing` skill.
+description: How the pg-rag-public pipeline actually works — loaders, document generation, indexing, and retrieval stages. Use when modifying the RAG pipeline, retrieval behavior, indexing, chunking, embeddings, or reranking. Project-wide orientation (commands, dirs, services) lives in AGENTS.md; test discipline in the `testing` skill.
 ---
 
 # pg-rag — pipeline architecture
 
-pg-rag-builder turns Project Gorgon CDN tables + wiki content into a searchable
+pg-rag-public turns Project Gorgon CDN tables + wiki content into a searchable
 knowledge base. Everything below already exists — do not redesign it without
 reading the code first. For project-wide orientation (commands, key directories,
 services) see `AGENTS.md`.
