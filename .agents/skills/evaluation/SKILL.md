@@ -26,11 +26,11 @@ Each file:
 
 - `facts` is a list of variant groups: the answer PASSES if ANY variant in
   each group appears (normalized substring) in the LLM answer.
-- 42 files exist today (20 entity / 14 general / /3 recipe / /5 comparison),
+- 38 files exist today (18 entity / 12 general / 3 recipe / 5 comparison),
   spanning recipes-by-ingredient, level-gated crafting, item acquisition/drops,
   ability lookups, comparisons, quest requirements, wiki lore, wiki how-to
   assembly. Future additions should favor the balanced categories (recipe is
-  3/42 today — the thinnest bucket).
+  3/38 today — the thinnest bucket).
 
 ## Running it
 

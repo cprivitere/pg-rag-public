@@ -69,7 +69,7 @@ def main() -> int:
             _report("OK", "TEST_CONTRACTS refs resolve")
 
     # --- 2. Backticked file paths in AGENTS.md + skills resolve ------------
-    doc_sources = [ROOT / "AGENTS.md", *(ROOT / ".omp" / "skills").glob("*/SKILL.md")]
+    doc_sources = [ROOT / "AGENTS.md", *(ROOT / ".agents" / "skills").glob("*/SKILL.md")]
     doc_blob = "\n".join(f.read_text(encoding="utf-8") for f in doc_sources if f.exists())
     named = set(re.findall(r"`((?:scripts|src|tests|docs)/[A-Za-z0-9_./]+\.py)`", doc_blob))
     missing_files = sorted(f for f in named if not _exists(f))
@@ -93,7 +93,7 @@ def main() -> int:
             ("AGENTS.md", ROOT / "AGENTS.md"),
             ("TEST_CONTRACTS", tc),
             ("RULES.md", ROOT / ".omp" / "RULES.md"),
-            ("pg-rag skill", ROOT / ".omp" / "skills" / "pg-rag" / "SKILL.md"),
+            ("pg-rag skill", ROOT / ".agents" / "skills" / "pg-rag" / "SKILL.md"),
         ]:
             if not path.exists():
                 continue
@@ -101,7 +101,7 @@ def main() -> int:
             _report("OK" if ok else "DRIFT", f"DOCUMENTS_VERSION referenced in {label}")
         for label, path in [
             ("AGENTS.md", ROOT / "AGENTS.md"),
-            ("pg-rag skill", ROOT / ".omp" / "skills" / "pg-rag" / "SKILL.md"),
+            ("pg-rag skill", ROOT / ".agents" / "skills" / "pg-rag" / "SKILL.md"),
         ]:
             ok = str(EMBEDDING_DIM) in path.read_text(encoding="utf-8")
             _report("OK" if ok else "DRIFT", f"EMBEDDING_DIM=={EMBEDDING_DIM} in {label}")
@@ -117,7 +117,7 @@ def main() -> int:
         _report("OK" if ok else "DRIFT", f"golden shape in {label}")
 
     # --- 4. Golden counts the evaluation skill quotes are real --------------
-    eval_skill = ROOT / ".omp" / "skills" / "evaluation" / "SKILL.md"
+    eval_skill = ROOT / ".agents" / "skills" / "evaluation" / "SKILL.md"
     golden_dir = ROOT / "data" / "golden"
     if eval_skill.exists() and golden_dir.is_dir():
         golden_files = sorted(golden_dir.glob("*.json"))
@@ -125,7 +125,7 @@ def main() -> int:
             (json.loads(f.read_text(encoding="utf-8")) or {}).get("type", "?") for f in golden_files
         )
         text = eval_skill.read_text(encoding="utf-8")
-        expected = {"entity": 20, "general": 14, "recipe": 3, "comparison": 5}
+        expected = {"entity": 18, "general": 12, "recipe": 3, "comparison": 5}
         mismatches = []
         if f"{len(golden_files)} files exist today" not in text:
             mismatches.append(f"count ({len(golden_files)})")
@@ -140,7 +140,7 @@ def main() -> int:
     # --- 5. Expected skills exist and are well-formed -----------------------
     expected_skills = ["pg-data", "pg-rag", "retrieval", "evaluation", "testing"]
     for name in expected_skills:
-        p = ROOT / ".omp" / "skills" / name / "SKILL.md"
+        p = ROOT / ".agents" / "skills" / name / "SKILL.md"
         if not p.exists():
             _drift(f"missing skill: {name}")
             continue
