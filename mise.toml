@@ -239,6 +239,11 @@ description = "Check docs/skills against the repo: pointers resolve, contract co
 run = "uv run python scripts/check_docs.py"
 alias = "dr"
 
+[tasks."check-parity"]
+description = "Two-repo parity guard: shared files byte-identical with pg-rag-private, overlay never leaked into public, sanctioned diffs verified"
+run = "uv run python scripts/check_parity.py"
+alias = "cp"
+
 # --- Log viewing ---
 
 [tasks.logs]

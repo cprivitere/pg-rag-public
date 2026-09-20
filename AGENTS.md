@@ -74,6 +74,7 @@ mise fmt                         # ruff format + safe autofix (alias fo)
 uv run pytest                      # offline test suite
 uv run pytest tests/test_retrieval_unit.py tests/test_bm25.py tests/test_rerank*.py  # retrieval regression
 mise drift                        # check docs/skills against the repo (aliases: dr)
+mise check-parity                 # two-repo parity guard: shared code identical with pg-rag-private, no overlay leak (alias cp)
 ```
 
 **Build/refresh needs no servers**; only Q&A/eval (`golden`, `chat`, `scripts/retrieval.py`) do.
