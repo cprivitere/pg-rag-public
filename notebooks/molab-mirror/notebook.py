@@ -115,6 +115,7 @@ def rag_index(HfFileSystem, collections, json, math, re):
                 f"[corpus] loaded {len(raw):,} docs from local {_LOCAL_DOCS}"
             )
             return raw
+        _os.makedirs(_LOCAL_DOCS.rsplit("/", 1)[0], exist_ok=True)
         fs = HfFileSystem()
         with fs.open(f"hf://{_BUCKET}", "rb") as _f:
             raw = json.load(_f)
