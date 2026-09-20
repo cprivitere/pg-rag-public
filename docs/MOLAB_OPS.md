@@ -97,14 +97,14 @@ override it (security policy). Consequences:
 
 ## Repo artifacts touched by molab work
 
-- `data/tmp_eval/` — local scratch: the retired `gen_synthetic`
-  (teacher QA-gen) cell code, judge payload chunks, and
-  `clean_train.jsonl`/`clean_eval.jsonl` from the last synthetic run.
-  Gitignored (`data/*`), kept for provenance only. Safe to delete if
-  the synthetic route is truly dead.
 - `data/golden/*.json` — golden eval cases; unrelated to molab, but the
   SYSTEM_PROMPT in the notebook mirrors the local pipeline's prompt
   conventions (context-grounded, no fabrication).
+- `data/tmp_eval/` (deleted 2026-09-20) — was local scratch from the
+  retired synthetic-QA generation route (teacher cell code, judge
+  payloads, clean/unsloth JSONLs). The route was removed in `4f95adc`;
+  the remaining run artifacts live on the HF bucket under
+  `Nubula/paddock/training/` if ever needed again.
 
 ## Accessing the notebook from an agent
 
