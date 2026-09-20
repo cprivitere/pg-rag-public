@@ -48,6 +48,7 @@ Query → query_classifier → retriever (dense + BM25 → RRF fuse → reranker
 - `tests/` — pytest suite, imports the installed `pgrag` package.
 - `data/` (gitignored) — `cdn/`, `wiki/` (+`curated/`, `.meta.json`), `derived/` (`documents_version.json`), `documents.json`, `chroma/`, `golden/`, `retrieval_traces/`, eval records (`embed_eval_*.log`, `embed_vram.json`, `bakeoff_*.json`), `il2cpp/` (decomp artifacts: client binaries `GameAssembly.dll` + `global-metadata.dat` quoted verbatim from the Steam client, dumper output `out_lean/Dump0/{dump.cs,stringliteral.json}` the document builder reads, survey tools + the cargo-built dumper under `tools/il2cpp-dumper-rs` — refreshed by `mise sync-il2cpp`). Service logs live at project-root `logs/` (`embed.log`, `llm.log`, `rerank.log`, `chat.log`, and `webui.log` when run).
 - `.omp/` — oh-my-pi config: `RULES.md`, `config.yml`, `WATCHDOG.md`, `skills/` (`pg-rag`, `pg-data`, `retrieval`, `evaluation`, `testing`).
+- `.agents/skills/` — portable agent skills discoverable by any agent harness (`molab-notebook`: pairing on the molab-hosted marimo chat notebook; commit changes here, never to `.omp/skills/` copies).
 
 ## Development Commands
 
