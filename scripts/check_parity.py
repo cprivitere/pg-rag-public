@@ -65,6 +65,7 @@ OVERLAY_FILES = {
     "tests/test_decomp_builder.py",
     "tests/test_sync_il2cpp.py",
     # decomp-derived golden cases (removed from the public 38-golden set)
+    "data/golden/peaceableness-rakshasa.json",
     "data/golden/il2cpp-enum-ability-requirement.json",
     "data/golden/il2cpp-mechanic-combat-xp.json",
     "data/golden/il2cpp-mechanic-curse-remedy.json",
