@@ -3,9 +3,11 @@
 Two budgeting schemes:
 
 - **Non-embed-capped families** (item, recipe, skill, …) chunk by *characters*
-  at ``DEFAULT_MAX_CHARS``. At 1024 chars they never approach the embedder's
-  512-token window (worst measured density ≈2.4 chars/token → ~426 tokens), so
-  an exact token count is unnecessary overhead.
+  at ``DEFAULT_MAX_CHARS`` — normally far from the embedder's 512-token window
+  (prose ≈2.4 chars/token → ~426 tokens at 1024 chars), but dense numeric text
+  measures ≈1.85 chars/token (≈4.9 for prose is the *upper* density bound),
+  so ``_enforce_embed_window`` re-splits any chunk
+  the char budget let past the window.
 - **Embed-capped families** (lorebook, skillprofile, leveling, summary,
   curated) chunk by *tokens* at ``EMBED_WINDOW_TOKENS``. bge-small (the
   production embedder) hard-rejects inputs past 512 tokens, and the previous
@@ -180,7 +182,10 @@ def _split_words_by_tokens(line, budget):
                 out.append(" ".join(acc))
                 acc = []
                 acc_tokens = 0
-            # A single word over budget stays whole (pathological; budget-safe).
+            # A single word over budget stays whole (pathological; safe for the
+            # token *budget* only — such a segment can still exceed the 512
+            # embedder window; _enforce_embed_window re-splits it later when
+            # the tokenizer is available).
             acc = [w]
             acc_tokens = wt
     if acc:
@@ -254,6 +259,39 @@ def _split_token_budget(text, budget):
     return chunks
 
 
+def _enforce_embed_window(chunks):
+    """Post-split guard: re-split every splittable chunk past the window.
+
+    Char-budgeted families split by characters (``DEFAULT_MAX_CHARS``), but
+    dense numeric text can measure far below the prose density those budgets
+    assume (worst ≈1.85 chars/token) — a 1024-char chunk can carry >512 tokens
+    and be hard-rejected by bge-small. Re-split any over-window chunk with the
+    token-budget splitter (token totals preserved exactly; sub-chunks splice
+    in at the original position, with the splitter's usual whitespace
+    normalization). One pathological case passes through unsplit: a single
+    "word" longer than the budget (see ``_split_words_by_tokens``) stays whole
+    — only the pre-embed guard in build_index catches that, and it keeps the
+    failure loud. If the tokenizer is unavailable, degrade to a no-op like
+    ``_split_token_budget``'s fallback: the pre-embed guard in build_index
+    keeps the failure loud.
+    """
+    if not chunks:
+        return chunks
+    counts = [token_count(c) for c in chunks]
+    if all(t is None for t in counts):
+        _logger.warning("tokenizer unavailable; embed-window guard skipped")
+        return chunks
+    return [
+        part
+        for chunk, t in zip(chunks, counts, strict=True)
+        for part in (
+            [chunk]
+            if t is None or t <= EMBED_WINDOW_TOKENS
+            else _split_token_budget(chunk, EMBED_WINDOW_TOKENS)
+        )
+    ]
+
+
 def _assemble(doc, chunks):
     """Turn a list of chunk strings into chunk documents with lineage metadata."""
     if len(chunks) == 1:
@@ -303,6 +341,12 @@ def chunk_document(doc, max_chars=None, *, max_tokens=None):
             chunks = _split_token_budget(doc["text"], budget)
         else:
             chunks = _chunk_chars(doc["text"], budget)
+    # Universal post-split guard: char-budgeted families can still produce
+    # token-dense chunks (dense numeric text ≈1.85 chars/token at 1024 chars
+    # → >512 tokens), so enforce the embedder window before assembly — on all
+    # paths, including explicit max_tokens/max_chars overrides, since every
+    # produced chunk must fit the embedder.
+    chunks = _enforce_embed_window(chunks)
     return _assemble(doc, chunks)
 
 

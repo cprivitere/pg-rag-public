@@ -64,6 +64,12 @@ def _lead_paragraph(raw: str) -> str:
     body = _WIKILINK.sub(r"\1", body)  # [[X|Y]] -> Y ; [[X]] -> X
     body = body.replace("'''", "")  # '''bold''' markup
     body = re.sub(r"__[A-Z]+__(?:\s*|$)", " ", body)  # __NOTOC__/__FORCETOC__
+    # Editor comments, complete or not: match `<!--` to the first `-->` OR to
+    # end-of-string. The end branch also rescues openers whose closing `-->`
+    # was already consumed as part of a `{{template -->...}}` match by
+    # _TEMPLATE above (non-greedy template regex can swallow the comment's
+    # closer), which `<!--.*?-->` alone would leak into the Description.
+    body = re.sub(r"<!--.*?(?:-->|$)", " ", body, flags=re.S)
     body = re.sub(r"[{}|]+", " ", body)  # sweep stray braces/pipes
     body = re.sub(r"\s+", " ", body).strip()
     body = body[:_DESCRIPTION_MAX].strip()

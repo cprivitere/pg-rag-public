@@ -3,7 +3,7 @@ GOLDEN_DIR; requires the LLM (:8080) and embedding (:8081) servers and retries
 sampled LLM answers to damp nondeterminism.
 
 Tiered by marker: -m short (9 representative queries, ~3-5 min) or
--m long (remaining 33, ~11-23 min). Default (no -m) runs all 42."""
+-m long (remaining 34, ~11-23 min). Default (no -m) runs all 43."""
 
 import json
 
@@ -21,6 +21,7 @@ _SHORT_FILES = [
     GOLDEN_DIR / "fireball-vs-fire-breath-damage.json",  # comparison: damage numbers
     GOLDEN_DIR / "healing-potion-omega.json",  # recipe: crafting/effects
     GOLDEN_DIR / "cheesemaking-leveling.json",  # entity: arithmetic, 8 facts, hardest
+    GOLDEN_DIR / "il2cpp-mechanic-curse-remedy.json",  # general: xfail gate
     GOLDEN_DIR / "grow-field-mushrooms.json",  # general: 5 facts, medium
 ]
 
@@ -91,6 +92,6 @@ def test_golden_facts_short(path, require_servers):
 @pytest.mark.long
 @pytest.mark.parametrize("path", _LONG_FILES, ids=lambda p: p.stem)
 def test_golden_facts_long(path, require_servers):
-    """Long golden tier: remaining 33 queries. ~11-23 min. Filter: -m long.
-    Default (no -m) runs both tiers = all 42 files exactly once."""
+    """Long golden tier: remaining 34 queries. ~11-23 min. Filter: -m long.
+    Default (no -m) runs both tiers = all 43 files exactly once."""
     _check_golden_file(path)

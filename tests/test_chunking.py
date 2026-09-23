@@ -170,15 +170,20 @@ def test_type_aware_limits():
         assert token_count(c["text"]) is not None
         assert token_count(c["text"]) <= 512
         assert len(c["text"]) <= MAX_EMBED_CHARS
-    # The same char-sized doc as a non-embed family falls back to char budget
-    # and may exceed 512 tokens (it is not embed-capped by design).
+    # contract: char-budgeted families are window-checked post-guard. This
+    # prose fixture stays well under the window even assembled, so the loop
+    # asserts ≤ EMBED_WINDOW_TOKENS on assembled chunks; the general
+    # post-overlap bound (≤512 hard window) is asserted on the dense fixture
+    # in test_char_path_chunks_respect_embed_window. The re-split path itself
+    # is covered there too.
     prose = {
         "id": "i1",
         "type": "item",
         "text": ("This is a fairly long flowing sentence. " * 120),
         "metadata": {},
     }
-    assert chunk_document(prose)[0] is prose or len(chunk_document(prose)) >= 1
+    for c in chunk_document(prose):
+        assert token_count(c["text"]) <= EMBED_WINDOW_TOKENS
 
 
 def test_overlap_between_chunks():
@@ -275,3 +280,71 @@ def test_non_positive_budgets_rejected():
         chunk_document(doc, max_chars=0)
     with pytest.raises(ValueError):
         chunk_document(doc, max_tokens=0)
+
+
+def _dense_tsys_doc():
+    # Dense tier-table lines: the worst measured density (~1.85 chars/token),
+    # the shape that let char-budgeted chunks exceed the embedder window.
+    lines = [
+        f"- id_{n}: Level {n}-{n + 9}, Uncommon: {{SpellPower}}{{-0.01}}" for n in range(1, 121)
+    ]
+    return {"id": "tsys_power_31107", "type": "tsys", "text": "\n".join(lines), "metadata": {}}
+
+
+def test_char_path_chunks_respect_embed_window():
+    # contract: the char-budgeted families (default path, tsys at 1024 chars)
+    # are re-split by _enforce_embed_window when dense text measures over the
+    # embedder window — every chunk lands ≤ EMBED_WINDOW_TOKENS pre-overlap.
+    from pgrag.documents.chunking import _chunk_chars, _enforce_embed_window
+
+    doc = _dense_tsys_doc()
+    raw = _chunk_chars(doc["text"], TYPE_MAX_CHARS["tsys"])
+    assert any(token_count(c) > EMBED_WINDOW_TOKENS for c in raw)  # guard needed
+    chunks = chunk_document(doc)
+    assert len(chunks) > 1
+    for c in chunks:
+        # Assembled chunks include the ≤100-char overlap (≤~54t dense), so the
+        # post-overlap contract is the 512 hard window; the pre-overlap
+        # ≤ EMBED_WINDOW_TOKENS contract is asserted on raw segments below.
+        assert token_count(c["text"]) <= 512
+        assert len(c["text"]) <= MAX_EMBED_CHARS
+    # guard itself re-splits over-window segments, preserving token totals
+    over = [c for c in raw if token_count(c) > EMBED_WINDOW_TOKENS]
+    segs = _enforce_embed_window(over)
+    assert segs and len(segs) > len(over)  # every over-window chunk was re-split
+    for seg in segs:
+        assert token_count(seg) <= EMBED_WINDOW_TOKENS
+
+
+def test_embed_window_guard_skipped_without_tokenizer(monkeypatch):
+    # Degradation contract mirrors _split_token_budget's fallback: without the
+    # tokenizer the guard is a no-op (shape may exceed the window; build_index
+    # pre-embed guard keeps the failure loud). No-op means the output is
+    # exactly the raw char path, overlap included.
+    from pgrag.documents import chunking as ch
+    from pgrag.documents.chunking import _apply_overlap, _chunk_chars
+
+    monkeypatch.setattr(ch, "token_count", lambda _t: None)
+    doc = _dense_tsys_doc()
+    chunks = chunk_document(doc)
+    raw = _chunk_chars(doc["text"], TYPE_MAX_CHARS["tsys"])
+    assert [c["text"] for c in chunks] == _apply_overlap(raw)
+
+
+def test_guard_is_noop_for_small_chunks():
+    # A doc whose default split is a single sub-window chunk passes through
+    # unchanged (single-chunk identity path).
+    doc = {"id": "item_2", "type": "item", "text": "short text", "metadata": {"source": "cdn"}}
+    result = chunk_document(doc)
+    assert len(result) == 1
+    assert result[0] is doc
+    # A dense doc that fits the 1024-char budget in one chunk (~200 tokens)
+    # passes through unchanged: single chunk, no _chunk_ ids.
+    lines = "\n".join(
+        f"- id_{n}: Level {n}-{n + 9}, Uncommon: {{SpellPower}}{{-0.01}}" for n in range(1, 10)
+    )
+    dense_small = {"id": "tsys_power_44", "type": "tsys", "text": lines, "metadata": {}}
+    assert len(dense_small["text"]) <= DEFAULT_MAX_CHARS
+    result = chunk_document(dense_small)
+    assert len(result) == 1
+    assert result[0] is dense_small

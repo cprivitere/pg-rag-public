@@ -46,6 +46,16 @@ RECURSIVE_CATEGORIES = {
     "Items": 1,
 }
 
+# Pages with no [[Category:...]] membership are invisible to category-driven
+# discovery (enumeration only walks Category: members). These titles are
+# appended to the download queue directly. Verified uncategorized on the live
+# wiki 2026-09-22; extend this list when a new uncategorized page matters.
+WIKI_TITLE_EXTRAS = [
+    "Peaceableness",
+    "Community",
+    "Special Behavior Badges",
+]
+
 MAX_RETRIES = 5
 BATCH_SIZE = 50
 BASE_DELAY = 0.5
@@ -386,6 +396,13 @@ def main() -> int:
             except Exception as e:
                 print(f"[{_ts()}]   Allpages failed: {e}")
                 return 1
+
+    if WIKI_TITLE_EXTRAS:
+        all_titles.extend(WIKI_TITLE_EXTRAS)
+        print(
+            f"[{_ts()}] Explicit titles ({len(WIKI_TITLE_EXTRAS)}): "
+            f"{', '.join(WIKI_TITLE_EXTRAS)}"
+        )
 
     unique_titles = list(dict.fromkeys(all_titles))
     total_count = len(unique_titles)

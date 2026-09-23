@@ -12,7 +12,7 @@ CACHE_FILE = WIKI_PARSED_CACHE
 # Bump when the cached doc shape OR generated text changes, so stale cache
 # entries are rebuilt instead of served with old content (a mtime-equal page
 # with a changed section-cleanup step would otherwise keep residue forever).
-CACHE_VERSION = 5
+CACHE_VERSION = 7
 
 # CDN tables whose entity names wiki pages can link to.
 _ENTITY_TABLES = {
@@ -162,6 +162,113 @@ def _is_table_node(node):
     return getattr(node, "__class__", None).__name__ == "Tag" and node.tag == "table"
 
 
+# Matches any `==..==` heading line so pages whose headings skip level 2
+# (e.g. ==== forum-post transcripts) can still be split per section.
+_ANY_HEADING_RE = re.compile(r"^(={2,6})([^=\n]+?)\1[ \t]*$", re.M)
+
+
+def _parse_page_by_headings(page_name, raw_text, metadata, seen_ids):
+    """Fallback for pages whose headings skip level 2: get_sections(levels=[2])
+    yields no usable split, so the page would parse to zero documents. Split on
+    any heading level instead and run the same strip/table pipeline per piece,
+    one doc per heading. Pages with no headings at all (infobox-only dumps)
+    stay empty — the shared pipeline strips template shells and the
+    __NOTOC__ guard holds, so no indiscriminate mega-doc is emitted.
+    """
+    documents = []
+    display = page_name.replace("_", " ")
+    safe = "wiki_" + "".join(c if c.isalnum() else "_" for c in page_name)
+
+    matches = list(_ANY_HEADING_RE.finditer(raw_text))
+    if matches:
+        lead = raw_text[: matches[0].start()]
+        pieces = [("", lead)]
+        for i, m in enumerate(matches):
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(raw_text)
+            # Same heading sanitization as the level-2 path (strip_code removes
+            # template shells from headings like `==== {{Item|X}} ====`), so
+            # doc ids stay in the same domain regardless of which path ran.
+            # A fully-templated heading cleans to "" — collapse to the inner
+            # template parameter rather than emitting an id-less doc or
+            # leaking {{ }} into the id.
+            h_clean = (
+                mwparserfromhell.parse(m.group(2).strip())
+                .strip_code(normalize=False, collapse=True)
+                .strip()
+            )
+            if not h_clean:
+                h_clean = (
+                    m.group(2).strip().replace("{", "").replace("}", "").strip()
+                )
+            h_clean = h_clean.split("|", 1)[-1].strip()
+            pieces.append((h_clean, raw_text[m.start() : end]))
+    else:
+        pieces = [("", raw_text)]
+
+    table_offset = 0
+    for heading, piece in pieces:
+        piece_meta = dict(metadata, section=heading or None)
+        section_wikicode = mwparserfromhell.parse(piece)
+
+        tables = [node for node in section_wikicode.nodes if _is_table_node(node)]
+        table_records = []
+        removed = 0
+        for tab in tables:
+            recs = _parse_table(tab, table_offset + removed, display, safe, piece_meta)
+            if not recs:
+                continue
+            table_records.extend(recs)
+            section_wikicode.remove(tab)
+            removed += 1
+        table_offset += removed
+
+        for rec in table_records:
+            rec_id = rec["id"]
+            if rec_id in seen_ids:
+                continue
+            seen_ids.add(rec_id)
+            documents.append(rec)
+
+        text = _preserve_template_names(str(section_wikicode))
+        text = mwparserfromhell.parse(text).strip_code(normalize=False, collapse=True).strip()
+
+        # Same stray-double-brace hygiene as the level-2 path, plus HTML
+        # comments: the fallback runs at raw-text level (mwparserfromhell does
+        # not drop <!-- --> on strip_code), so editor comments would otherwise
+        # ride into doc text. The tail pattern handles comments truncated at
+        # the piece boundary.
+        text = re.sub(r"\{\{|\}\}", " ", text).strip()
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.S).strip()
+        text = re.sub(r"<!--[^>]*$", " ", text).strip()
+
+        if not text or len(text) < MIN_SECTION_CHARS:
+            continue
+        if text.startswith("__NOTOC__"):
+            continue
+
+        doc_id = f"wiki_{page_name}"
+        if heading:
+            safe_heading = heading.replace(" ", "_").replace("/", "_").replace("&", "and")[:80]
+            doc_id = f"wiki_{page_name}_{safe_heading}"
+        if doc_id in seen_ids:
+            counter = 2
+            while f"{doc_id}_{counter}" in seen_ids:
+                counter += 1
+            doc_id = f"{doc_id}_{counter}"
+        seen_ids.add(doc_id)
+
+        documents.append(
+            {
+                "id": doc_id,
+                "type": "wiki",
+                "text": text,
+                "metadata": piece_meta,
+            }
+        )
+
+    return documents
+
+
 def _parse_page(page_name, raw_text, entity_info=None):
     documents = []
     seen_ids = set()
@@ -228,6 +335,13 @@ def _parse_page(page_name, raw_text, entity_info=None):
         # literal single `{`/`}` (non-markup) prose untouched.
         text = re.sub(r"\{\{|\}\}", " ", text).strip()
 
+        # Same HTML-comment hygiene as the fallback: mwparserfromhell does not
+        # drop <!-- --> on strip_code, so editor comments would ride into doc
+        # text (the tail pattern handles comments truncated at the piece
+        # boundary, e.g. one straddling the next heading).
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.S).strip()
+        text = re.sub(r"<!--[^>]*$", " ", text).strip()
+
         if not text or len(text) < MIN_SECTION_CHARS:
             continue
 
@@ -255,7 +369,14 @@ def _parse_page(page_name, raw_text, entity_info=None):
             }
         )
 
-    return documents
+    if documents:
+        return documents
+
+    # No level-2 section cleared the minimum-length guard (either no level-2
+    # headings at all, or only stub sections): fall back to a per-heading split
+    # at any heading level so heading-heavy pages (forum-post transcripts with
+    # ==== headings, etc.) emit docs instead of silently parsing to nothing.
+    return _parse_page_by_headings(page_name, raw_text, metadata, seen_ids)
 
 
 def _load_cache():

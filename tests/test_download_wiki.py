@@ -274,6 +274,7 @@ def test_v45_missing_title_deletes_tombstones(tmp_path):
                 },
             ),
             patch.object(download_wiki, "WIKI_DIR", tmp_path),
+            patch.object(download_wiki, "WIKI_TITLE_EXTRAS", []),
             patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
             patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
         ):
@@ -497,6 +498,7 @@ def test_skip_existing_pages_download_new_pages(tmp_path):
 
     with (
         patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch.object(download_wiki, "WIKI_TITLE_EXTRAS", []),
         patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
         patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
         patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
@@ -549,6 +551,7 @@ def test_stale_metadata_existing_file_still_skipped(tmp_path):
 
     with (
         patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch.object(download_wiki, "WIKI_TITLE_EXTRAS", []),
         patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
         patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
         patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
@@ -560,3 +563,90 @@ def test_stale_metadata_existing_file_still_skipped(tmp_path):
     assert existing_file.read_text(encoding="utf-8") == "existing content", (
         "existing file content should not be overwritten when metadata is stale"
     )
+
+
+def test_wiki_title_extras_join_download_queue(tmp_path):
+    """Uncategorized titles from WIKI_TITLE_EXTRAS are fetched like category pages."""
+    meta = {"pages": {}}
+
+    def fake_api(s, params):
+        if params.get("list") == "categorymembers":
+            return {"query": {"categorymembers": [{"pageid": 1, "title": "Category Page"}]}}
+        if "prop" in params and params["prop"] == "info":
+            pages = {}
+            for i, t in enumerate(params["titles"].split("|")):
+                pages[str(i + 1)] = {
+                    "pageid": i + 1,
+                    "title": t,
+                    "touched": "2026-01-01T00:00:00Z",
+                }
+            return {"query": {"pages": pages}}
+        if "prop" in params and params["prop"] == "revisions":
+            pages = {}
+            for t in params["titles"].split("|"):
+                pages[str(abs(hash(t)) % 100000)] = {
+                    "pageid": abs(hash(t)) % 100000,
+                    "title": t,
+                    "revisions": [{"slots": {"main": {"*": f"content of {t}"}}}],
+                }
+            return {"query": {"pages": pages}}
+        return {"query": {"pages": {}}}
+
+    with (
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch.object(download_wiki, "TARGET_CATEGORIES", ["Fake Category"]),
+        patch.object(download_wiki, "WIKI_TITLE_EXTRAS", ["Peaceableness"]),
+        patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
+        patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+        patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
+    ):
+        result = download_wiki.main()
+
+    assert result == 0
+    assert list(tmp_path.glob("Category_Page_*.txt")), "category page downloaded"
+    assert list(tmp_path.glob("Peaceableness_*.txt")), "extras title downloaded"
+    saved = json.loads((tmp_path / ".meta.json").read_text(encoding="utf-8"))
+    assert "Peaceableness" in saved["pages"], "extras title tracked in meta"
+
+
+def test_wiki_title_extras_deduped_against_categories(tmp_path):
+    """A title returned by BOTH a category and WIKI_TITLE_EXTRAS yields one file."""
+    meta = {"pages": {}}
+
+    def fake_api(s, params):
+        if params.get("list") == "categorymembers":
+            return {"query": {"categorymembers": [{"pageid": 1, "title": "Peaceableness"}]}}
+        if "prop" in params and params["prop"] == "info":
+            pages = {}
+            for i, t in enumerate(params["titles"].split("|")):
+                pages[str(i + 1)] = {
+                    "pageid": i + 1,
+                    "title": t,
+                    "touched": "2026-01-01T00:00:00Z",
+                }
+            return {"query": {"pages": pages}}
+        if "prop" in params and params["prop"] == "revisions":
+            pages = {}
+            for t in params["titles"].split("|"):
+                pages[str(abs(hash(t)) % 100000)] = {
+                    "pageid": abs(hash(t)) % 100000,
+                    "title": t,
+                    "revisions": [{"slots": {"main": {"*": f"content of {t}"}}}],
+                }
+            return {"query": {"pages": pages}}
+        return {"query": {"pages": {}}}
+
+    with (
+        patch.object(download_wiki, "WIKI_DIR", tmp_path),
+        patch.object(download_wiki, "TARGET_CATEGORIES", ["Fake Category"]),
+        patch.object(download_wiki, "WIKI_TITLE_EXTRAS", ["Peaceableness"]),
+        patch("pgrag.loaders.download_wiki.api_call_with_retry", side_effect=fake_api),
+        patch("pgrag.loaders.download_wiki.load_metadata", return_value=meta),
+        patch.object(download_wiki, "META_FILE", tmp_path / ".meta.json"),
+        patch.object(download_wiki, "RECURSIVE_CATEGORIES", {}),
+    ):
+        result = download_wiki.main()
+
+    assert result == 0
+    assert len(list(tmp_path.glob("Peaceableness_*.txt"))) == 1, "deduped to one file"

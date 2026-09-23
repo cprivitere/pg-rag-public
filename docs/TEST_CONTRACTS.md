@@ -266,6 +266,7 @@ test (prove the source is fine) or recording a deliberate contract change
 - **Source**: `src/pgrag/loaders/`, `scripts/curator*.py`
 - **Contracts**: wiki display names come only from `data/wiki/.meta.json`
   (`RULES.md` #11); filename `{safe_title}_<sha256-8>.txt`; download batch ≤50;
+  explicit-title extras (`WIKI_TITLE_EXTRAS`) merge into the same queue;
   immutability-guard scope (only `*.txt` + `.meta.json` are wiki source).
 - **Isolation rule (absolute)**: any test touching `data/wiki/.meta.json`,
   `data/cdn`, or `data/derived/*` must use tmp dirs and patch the paths —

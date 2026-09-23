@@ -115,8 +115,8 @@ Each file:
 
 ## Planned direction
 
-- Golden set is **at target (42)** — future additions should fill the thinnest
-  buckets (recipe is 3/42 today) or capture a *named regression case*,
+- Golden set is **at target (38)** — future additions should fill the thinnest
+  buckets (recipe is 3/38 today) or capture a *named regression case*,
   e.g.:
   - `grow-field-mushrooms` ("How do I grow Field Mushrooms?") — fails before
     wiki page expansion, passes after (already present).
@@ -126,5 +126,5 @@ Each file:
 - When adding a golden: ground every fact in the corpus first (`grep
   data/documents.json`) so it is actually retrievable — an un-grounded fact
   is a permanently-failing test.
-- Extend `evaluation/queries.jsonl` (45 cases today) across the same
+- Extend `evaluation/queries.jsonl` (48 cases today) across the same
   categories, and promote benchmark snapshots into regression thresholds.

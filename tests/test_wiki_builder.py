@@ -292,3 +292,141 @@ minimum section length without any trouble at all.
     for t in texts:
         assert "{{" not in t and "}}" not in t
     assert any("{carefully}" in t for t in texts)
+
+
+# --- any-level heading fallback (pages whose headings skip level 2) ---
+# Contract: pages without level-2 sections fall back to per-heading docs
+# instead of silently emitting nothing.
+
+
+def test_h4_only_page_emits_per_heading_docs():
+    raw = """__NOTOC__
+==== Feeling Dead Inside? ====
+Stop killing sentient beings for an hour or so and your mood will improve a lot; the Serbule crypt has pretty much no sentient beings to speak of, so it works there.
+
+==== Slithering Around ====
+The slithers are giant snakes found around the Serbule hills; they are aggressive but you can avoid them by staying on the main road while traveling between towns at night.
+"""
+    db = FakeDB({"Citan Forum Posts": raw})
+    docs = build_wiki_documents(db)
+    assert len(docs) == 2
+    by_heading = {d["metadata"]["section"]: d for d in docs}
+    assert "Feeling Dead Inside?" in by_heading
+    dead = by_heading["Feeling Dead Inside?"]
+    assert dead["id"].startswith("wiki_Citan Forum Posts_Feeling")
+    assert "Stop killing sentient beings" in dead["text"]
+    # heading title stays in the text, matching the level-2 convention
+    assert dead["text"].startswith("Feeling Dead Inside?")
+    assert "{{" not in dead["text"] and "}}" not in dead["text"]
+
+
+def test_duplicate_headings_get_deterministic_counter_suffixes():
+    """Repeated headings under the fallback must collide-resolve with the same
+    deterministic _2/_3... counter the level-2 path uses (production hits
+    this: Citan Forum Posts has four 'Transmutation' headings)."""
+    raw = (
+        "__NOTOC__\n"
+        "==== Transmutation ====\n"
+        "First transmutation note with enough text to clear the fifty character minimum length guard easily, yes.\n\n"
+        "==== Transmutation ====\n"
+        "Second transmutation note with enough text to clear the fifty character minimum length guard easily, yes.\n\n"
+        "==== Transmutation ====\n"
+        "Third transmutation note with enough text to clear the fifty character minimum length guard easily, yes.\n"
+    )
+    db = FakeDB({"Transmuter Notes": raw})
+    docs = build_wiki_documents(db)
+    ids = [d["id"] for d in docs]
+    assert ids == [
+        "wiki_Transmuter Notes_Transmutation",
+        "wiki_Transmuter Notes_Transmutation_2",
+        "wiki_Transmuter Notes_Transmutation_3",
+    ]
+    # heading title prefixes the text, then the piece's own body (order stable)
+    assert "First transmutation note" in docs[0]["text"]
+    assert "Second transmutation note" in docs[1]["text"]
+    assert "Third transmutation note" in docs[2]["text"]
+
+
+def test_h2_page_unchanged_by_fallback():
+    raw = """__NOTOC__
+== Grow ==
+Intro line describing the growing mechanics in enough detail to survive the minimum section length threshold for this page.
+{| class="wikitable"
+| {{Item|Parasol Mushroom}} || N/A
+|-
+| {{Item|Mycena Mushroom}} || 05
+|}
+"""
+    db = FakeDB({"Mushroom Farming": raw})
+    docs = build_wiki_documents(db)
+    # exactly 3 docs (2 table records + 1 narrative lead), as the level-2 path
+    # produced BEFORE the fallback existed. (The headerless first table row is
+    # dropped by mwparserfromhell's row structure — a pre-existing _parse_table
+    # quirk identical on the old path; not this fallback's concern.)
+    assert len(docs) == 3
+    table_recs = [d for d in docs if d["metadata"].get("table_record")]
+    assert len(table_recs) == 2
+    narr = [d for d in docs if not d["metadata"].get("table_record")]
+    assert any("Intro line" in d["text"] for d in narr)
+    for d in docs:
+        assert "{|" not in d["text"]
+        assert "{{Item|" not in d["text"]
+
+
+def test_h2_stub_sections_fall_back_to_any_level_split():
+    """A page whose level-2 pass emits NOTHING (only stub sections under the
+    minimum length) falls back to the per-heading split rather than emitting
+    nothing. Pages where a level-2 section already cleared the minimum keep
+    their level-2 docs — nested h4 content rides inside the h2 section, and
+    re-splitting it would duplicate text across docs."""
+    raw = (
+        "__NOTOC__\n"
+        "==== Real content ====\n"
+        "This subsection carries the real meat of the page and easily clears the minimum section length threshold by a comfortable margin, so it survives.\n\n"
+        "== One ==\n"
+        "Too short.\n\n"
+        "== Two ==\n"
+        "Very short.\n\n"
+        "== Three ==\n"
+        "Stub.\n"
+    )
+    db = FakeDB({"Stub Page": raw})
+    docs = build_wiki_documents(db)
+    sections = [d["metadata"]["section"] for d in docs]
+    assert "Real content" in sections
+    meaty = next(d for d in docs if d["metadata"]["section"] == "Real content")
+    assert "real meat" in meaty["text"]
+    assert all(d["metadata"]["name"] == "Stub Page" for d in docs)
+
+
+def test_no_heading_page_with_template_infobox_stays_empty():
+    """Infobox-only dumps (no headings) emit NO documents at all — the real
+    Acid Arrow page parses to []. The infobox templates contain NESTED
+    templates ({{KWAB|...}} inside {{Ability infobox}}), so _clean_cell leaves
+    a `{{` residue that trips the single-cell layout-wrapper filter in
+    _parse_table: the wrappers yield zero table records, the narrative shell
+    strips out, and the __NOTOC__ guard holds. A fixture with bare (non-nested)
+    templates would instead emit empty-cell table records — not this page's
+    shape."""
+    raw = """__NOTOC__
+{|
+|-
+|
+{{Ability infobox
+| name = Acid Arrow
+| description = Fire an acid-covered arrow at your target that burns armor and lowers it while doing decent damage to the target skin layer.
+| level = 5
+| keywords = {{KWAB|Attack}}{{KWAB|Archery}}
+}}
+|-
+|
+{{Ability infobox
+| name = Acid Arrow 2
+| description = Fire an acid-covered arrow at your target that burns armor even harder than before with more damage over time.
+| level = 15
+| keywords = {{KWAB|Attack}}{{KWAB|Archery}}
+}}
+|}
+"""
+    db = FakeDB({"Acid Arrow": raw})
+    assert build_wiki_documents(db) == []

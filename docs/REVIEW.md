@@ -122,7 +122,7 @@ The suite is better than the original audit claimed:
    **34** (not 5; docs said 5/"expand to 20-30"). Left well-formed; counts were
    corrected then in `evaluation/SKILL.md` + `pg-rag/SKILL.md`. Balance then:
    comparison = 1/34 vs entity = 18/34 — favoring comparison additions. The
-   set has since grown to **42** (20 entity / 14 general / 5 comparison / 3
+   set has since grown to **43** (20 entity / 15 general / 5 comparison / 3
    recipe); `evaluation/SKILL.md` now tracks the live balance. Grounded
    against `documents.json` at review time (facts present, no fabrication).
 7. **Pipeline-set redundancy** — landed via P1.5: every `test_pipeline_*.py`
